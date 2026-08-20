@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.1 · **Data:** 2026-08-20 · **Revisado ao final da Fase 4**
+> **Versão:** 1.2 · **Data:** 2026-08-20 · **Revisado ao final da Fase 5a**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-20:** as fases 0 a 4 estão **concluídas e verificadas** — 177 testes automatizados passando (521 asserções), `pint` limpo, e o fluxo completo demonstrado por comandos artisan a partir de um banco recém-semeado. As fases 5 a 9 não foram iniciadas.
+> **Estado real em 2026-08-20:** as fases 0 a 4 e a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix) estão **concluídas e verificadas** — 205 testes Pest passando (795 asserções), 12 cenários Playwright passando num navegador que imita um celular, `pint`, `eslint` e `npm run build` limpos. Falta a **Fase 5b** (área do participante) e as fases 6 a 9 não foram iniciadas.
 
 ---
 
@@ -16,7 +16,8 @@
 | 2 | Domínio do evento | ✅ | Evento configurável com dias, grupos, atividades, cidades e grupos de participantes |
 | 3 | Inscrição | ✅ | Inscrição válida com reserva de vaga à prova de concorrência |
 | 4 | Pagamento simulado | ✅ | Cobrança Pix, aviso automático, expiração e reconciliação |
-| 5 | Site público | ❌ | Página do evento e formulário de inscrição em etapas |
+| 5a | Site público | ✅ | Página do evento, formulário de inscrição em quatro etapas e cobrança Pix |
+| 5b | Área do participante | ❌ | Acompanhamento da inscrição por link assinado |
 | 6 | Administração | ❌ | Painel com números e cadastros |
 | 7 | Comunicação | ❌ | E-mails em fila |
 | 8 | Provedor real | ❌ | Pix de verdade em produção |
@@ -148,18 +149,35 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 5 — Site público ❌
+## Fase 5a — Site público ✅
 
 **Objetivo:** dar rosto ao que já funciona por baixo.
 
-- Página `/eventos/{slug}` com nome, banner, descrição, datas, programação, valor, vagas e regulamento.
-- Formulário em quatro etapas: dados pessoais, participação, revisão, pagamento.
-- Interface das atividades mostrando horário, vagas restantes, "Esgotado", "Conflito de horário com Futebol" e o contador "2 de 2 selecionadas".
-- Tela de pagamento com QR Code, código copia e cola, botão de copiar e contador regressivo.
-- Área do participante por link seguro (decisão DA-05 ainda em aberto).
-- Testes de ponta a ponta com Playwright: caminho feliz, erro de validação, esgotado e conflito.
+| Entrega | Situação |
+|---------|:--------:|
+| Página `/eventos/{slug}` com nome, descrição, datas, programação por dia, valor, vagas e regulamento | ✅ |
+| Evento em rascunho ou cancelado responde 404; inscrições fechadas explicam o motivo no lugar do botão | ✅ |
+| Formulário em quatro etapas: dados pessoais, participação, revisão, pagamento | ✅ |
+| Atividades com horário, vagas restantes, "Esgotado", "Indisponível — conflito de horário com Futebol" e o contador "2 de 2 selecionadas" | ✅ |
+| Tela de pagamento com QR Code, código copia e cola, botão de copiar e contador regressivo | ✅ |
+| Volta à cobrança por URL assinada com validade (decisão DA-05, agora tomada) | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 12 cenários |
+| Área do participante (linha do tempo, histórico, reenvio do link) | ❌ Fase 5b |
 
-**Regra que não muda:** tudo que a tela valida é conforto. A regra continua sendo a do servidor.
+**Regra que não muda:** tudo que a tela valida é conforto. A regra continua sendo a do servidor — e o 422 dele devolve o participante ao passo do campo com problema, com o campo em foco.
+
+**Acessibilidade:** rótulo de verdade em todo campo, erro ligado por `aria-describedby` e anunciado com `role="alert"`, troca de etapa anunciada em região viva, foco visível em todo controle, alvos de toque de 44 px e nenhuma rolagem horizontal a partir de 320 px. Contraste AA medido nos modos claro e escuro.
+
+---
+
+## Fase 5b — Área do participante ❌
+
+**Objetivo:** deixar o participante acompanhar a própria inscrição depois de fechar o navegador.
+
+- Linha do tempo da inscrição: criada, aguardando pagamento, confirmada ou expirada.
+- Histórico da cobrança e segunda via do Pix enquanto o prazo não venceu.
+- Reenvio do link de acesso (por enquanto o link assinado só chega no redirecionamento logo após a inscrição; e-mail é Fase 7).
+- Decidir se o participante pode cancelar a própria inscrição.
 
 ---
 
@@ -216,7 +234,7 @@ flowchart LR
     F1 --> F2[Fase 2<br/>Evento]
     F2 --> F3[Fase 3<br/>Inscrição]
     F3 --> F4[Fase 4<br/>Pagamento]
-    F4 --> F5[Fase 5<br/>Site público]
+    F4 --> F5[Fase 5a<br/>Site público]
     F4 --> F6[Fase 6<br/>Administração]
     F4 --> F7[Fase 7<br/>Comunicação]
     F4 --> F8[Fase 8<br/>Provedor real]

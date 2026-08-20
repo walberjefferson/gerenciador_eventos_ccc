@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 10 (prazo, expiração automática e reconciliação). **Fases 0 a 4 concluídas: o backend do MVP está completo.**
+> **Última atualização:** 2026-08-20 — Etapa 11 (Fase 5a: site público, inscrição em quatro etapas e cobrança Pix). **Fases 0 a 4 e a Fase 5a concluídas: o participante já se inscreve e paga pelo celular.**
 
 ---
 
@@ -26,11 +26,15 @@
 
 **Com isso, a Fase 4 — Pagamento está concluída**, e o fluxo do briefing foi verificado de ponta a ponta em banco recém-semeado, por comandos artisan: inscrição válida reserva a vaga do evento e a de cada atividade → cobrança Pix fictícia emitida com o mesmo prazo da inscrição → aviso assinado entregue na rota pública (`POST /webhooks/pagamentos` → HTTP 200) → inscrição confirmada com os contadores passando de reservada para confirmada; e, em seguida, uma segunda inscrição com o prazo vencido → `php artisan inscricoes:expirar-vencidas` → vaga do evento e de cada atividade de volta a zero reservadas, cobrança em "prazo vencido", **nenhuma linha apagada** (2 inscrições, 2 pagamentos e 4 vínculos inscrição-atividade continuam no banco) e a segunda execução do comando não muda mais nada.
 
+- [x] Etapa 11 — **Fase 5a, site público**: `EventoPublicoController` (`/eventos/{slug}`, com rascunho e cancelado respondendo 404), `InscricaoPublicaController` (`/eventos/{slug}/inscricao`), sete Resources que montam os props sem vazar documento, hash nem contador cru, `InscricaoController@store` adaptado para redirecionar o Inertia à URL assinada mantendo o JSON de sempre para quem chama por outro caminho, `GeradorQrCodePix` (SVG embutido, sem imagick) e `PagamentoController@show`/`@situacao` atrás do middleware `signed`. No navegador: `PublicoLayout`, a vitrine `Eventos/Show.vue`, o formulário `Inscricoes/Criar.vue` em quatro etapas (dados, participação, revisão, pagamento) com as regras RN-03 a RN-09 espelhadas em `useSelecaoAtividades` — mínimo e máximo, bloco obrigatório, choque de horário, conflito declarado, faixa etária e vaga esgotada — e a tela `Inscricoes/Pagamento.vue` com QR Code, copia e cola, contador regressivo e consulta leve que troca para "inscrição confirmada" sem recarregar. Identidade do CCC em tokens semânticos (vermelho de ação, verde de disponibilidade, azul de informação, amarelo de atenção sempre com texto preto), com contraste AA medido nos modos claro e escuro. **Suíte Pest: 205 testes, 795 asserções. Suíte Playwright: 12 cenários** — caminho feliz, confirmação do pagamento, erro de validação (na tela e vindo do servidor), esgotado, conflito de horário, máximo de seleções, acesso sem assinatura e a varredura de acessibilidade e responsividade (teclado, foco visível, anúncio de troca de etapa, alvos de 44 px e ausência de rolagem horizontal a 320 px)
+
+**Com isso, a Fase 5a está concluída.** Falta a **Fase 5b** — a área do participante: linha do tempo da inscrição, histórico da cobrança e reenvio do link de acesso.
+
 **Com isso, a Fase 3 — Inscrição está concluída:** regras RN-01 a RN-13, reserva de vaga por contador atômico, varredura sob demanda das reservas vencidas e cobertura de teste dos seis cenários exigidos pelo briefing que dependem apenas do domínio de inscrição.
 
 ## Em andamento
 
-- [ ] Nada em andamento. O backend do MVP (Fases 0 a 4) está fechado. A próxima entrega é a **Fase 5 — Frontend público**, em plano separado
+- [ ] Nada em andamento. O backend do MVP (Fases 0 a 4) e o fluxo público (Fase 5a) estão fechados. A próxima entrega é a **Fase 5b — área do participante**, em plano separado
 
 ## Próximas tarefas
 
@@ -38,11 +42,18 @@ O que **está pronto** hoje: todo o núcleo transacional. Evento configurável, 
 
 O que **falta**, por fase:
 
-### Fase 5 — Frontend público
-- [ ] Páginas Inertia + Vue: vitrine do evento, formulário de inscrição (com seleção de atividades respeitando `min_selecoes`/`max_selecoes`, conflitos de horário e faixa etária), página de pagamento com o Pix copia e cola e a contagem regressiva do prazo, e página de acompanhamento da inscrição
-- [ ] Controller de leitura para a vitrine e para o acompanhamento (hoje só existe `POST /inscricoes`)
-- [ ] Decidir como o participante volta à própria inscrição depois (pendência **P-05**: link assinado ou código por e-mail)
-- [ ] Validação no navegador espelhando `ValidadorSelecaoAtividades` — sem nunca substituir a validação do servidor
+### Fase 5a — Site público ✅ concluída
+- [x] Vitrine `/eventos/{slug}`, formulário de inscrição em quatro etapas e tela de cobrança Pix
+- [x] Controllers de leitura (`EventoPublicoController`, `InscricaoPublicaController`, `PagamentoController`) e Resources sem vazamento de dado pessoal
+- [x] Volta à cobrança por **URL assinada com validade** (pendência **P-05** resolvida: decisão DA-05)
+- [x] Regras de seleção espelhadas no navegador (`useSelecaoAtividades`), sempre como conforto — quem decide continua sendo o servidor
+- [x] Doze cenários de ponta a ponta com Playwright, contra banco semeado do zero
+
+### Fase 5b — Área do participante
+- [ ] Página de acompanhamento da inscrição: linha do tempo (criada, aguardando pagamento, confirmada, expirada) e histórico da cobrança
+- [ ] Reenvio do link de acesso à própria inscrição (hoje o link assinado só chega pelo redirecionamento logo após a inscrição; e-mail é Fase 7)
+- [ ] Segunda via do Pix enquanto o prazo não venceu
+- [ ] Cancelamento da própria inscrição pelo participante, se o dono do produto quiser oferecê-lo (decisão ainda não tomada)
 
 ### Fase 6 — Administração
 - [ ] Painel: total de inscrições por situação, vagas restantes por atividade, receita reconhecida
@@ -108,6 +119,13 @@ O que **falta**, por fase:
 | D-33 | A reconciliação roda **a cada cinco minutos** e olha apenas cobranças a até quinze minutos do vencimento | Perguntar de cinco em cinco minutos reconhece o pagamento bem antes do prazo vencer, e a margem estreita mantém o volume de consultas baixo — provedores cobram limite de chamadas por minuto |
 | D-34 | A reconciliação **fecha** aqui a cobrança que o provedor já deu por vencida, mas **não devolve vaga** por conta própria | Vaga é assunto da inscrição, e quem devolve é sempre a expiração. Duas rotinas mexendo no mesmo contador seria a receita para contar errado |
 | D-35 | A expiração processa em lotes de 100 com `chunkById` e cada inscrição em sua própria transação | Uma transação única sobre milhares de linhas seguraria bloqueios por tempo demais. Falha em uma inscrição não derruba o lote inteiro |
+| D-36 | O site público não guarda rascunho: as quatro etapas são navegação na própria tela e só o envio final grava | O backend cria a inscrição inteira em um `POST` só, dentro de uma transação. Guardar meio caminho exigiria uma segunda máquina de estados e a chance de duas verdades sobre a mesma pessoa |
+| D-37 | A `chave_idempotencia` nasce no navegador (`crypto.randomUUID()`) quando o formulário abre e acompanha todas as tentativas | Duplo clique, conexão que cai e reenvio passam a devolver a mesma inscrição, e não uma segunda |
+| D-38 | Quem escolhe qual das três telas de cobrança aparece (aguardando, confirmada, expirada) é o **servidor**, por uma propriedade `estado` calculada a partir do que o domínio gravou | Nenhum parâmetro vindo do navegador pode declarar que algo foi pago. A tela só desenha o que o servidor decidiu |
+| D-39 | As vagas mostradas na tela são um retrato do momento em que a página carregou; não há consulta contínua de vagas | A autoridade é a revalidação no envio, que já existe e já devolve 422 em linguagem simples. Consulta contínua custaria banda no celular por uma informação que muda pouco |
+| D-40 | Toda cor vive em token semântico (`--cor-acao`, `--cor-sucesso`, `--cor-informacao`, `--cor-atencao`), definido uma vez para o modo claro e redefinido para o escuro; nenhum componente escreve cor literal | Trocar a paleta passa a ser editar um arquivo. E é o único jeito de garantir o contraste nos dois modos sem caçar cor espalhada por dezenas de telas |
+| D-41 | O vermelho de erro do pacote inicial (`#EF4444`) foi escurecido para `#D31212` no modo claro | O tom original rende 3.76:1 sobre branco e reprova em texto pequeno — justamente onde o participante lê "Este CPF não parece válido". O novo passa a 5.43:1. No modo escuro o tom original já cumpre (5.24:1) e ficou como estava |
+| D-42 | A suíte de ponta a ponta usa o banco `testing`, o mesmo do Pest, e o recria antes de começar | Criar um banco próprio exigiria um passo de instalação a mais em cada máquina. O preço é não rodar `npm run test:e2e` e `php artisan test` ao mesmo tempo — está escrito no cabeçalho de `tests/e2e/ambiente.ts` |
 
 ---
 
@@ -119,7 +137,7 @@ O que **falta**, por fase:
 | P-02 | Definir política de reembolso | Dono do produto |
 | P-03 | Definir o que fazer com pagamento recebido após o prazo | Dono do produto |
 | P-04 | Definir prazo de retenção e descarte de dados pessoais | Dono do produto |
-| P-05 | Definir como o participante acessa a inscrição depois (link assinado, código por e-mail) | Fase 5 |
+| P-05 | ~~Definir como o participante acessa a inscrição depois~~ — **resolvida na Fase 5a**: URL assinada com validade casada com o prazo de pagamento, mais 24 horas de folga para o participante ainda ver a tela de "prazo vencido" em vez de um 403 sem explicação | Concluída |
 | P-06 | Confirmar as taxas de Pagar.me, Mercado Pago e Asaas diretamente com o comercial | Dono do produto. Ver seção 6.3 de `PAYMENTS.md` |
 | P-08 | Conferir no `.env` local as chaves `PAYMENT_GATEWAY`, `PAYMENT_FAKE_SIMULATION_ENABLED` e `PAYMENT_FAKE_WEBHOOK_SECRET`, como já estão em `.env.example`. Sem o segredo do webhook, o provedor simulado recusa todo aviso (falha para o lado seguro) | Pessoa desenvolvedora, na própria máquina |
 | P-07 | Ajustar o arquivo `.env` local para `DB_PORT=55432` e `FORWARD_PGSQL_PORT=55432`, como já está em `.env.example` (decisão D-19) | Pessoa desenvolvedora, na própria máquina |
@@ -150,4 +168,9 @@ Nenhuma contradição exigiu correção. As decisões D-13 a D-18 foram registra
 
 ## Dependências externas adicionadas
 
-Nenhuma até o momento além do que o framework já entrega.
+| Pacote | Onde entra | Por quê |
+|--------|-----------|---------|
+| `bacon/bacon-qr-code` | `app/Services/Pagamentos/GeradorQrCodePix.php` | Desenha o QR Code do Pix como SVG no próprio HTML, sem `imagick` no servidor e sem peso no pacote que o celular baixa |
+| `@playwright/test` (desenvolvimento) | `tests/e2e/` | Prova o caminho do participante num navegador de verdade, imitando um celular |
+
+Nada além destes dois. O `@vueuse/core`, que já vinha no pacote inicial, resolve a cópia do código Pix e o contador regressivo.
