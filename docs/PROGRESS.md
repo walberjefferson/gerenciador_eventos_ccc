@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 4 (base do projeto)
+> **Última atualização:** 2026-08-20 — Etapa 5 (domínio do evento: banco e modelos)
 
 ---
 
@@ -12,12 +12,13 @@
 - [x] Etapa 3 — `docs/PAYMENTS.md` (matriz de provedores com data de consulta) e `docs/IMPLEMENTATION_PLAN.md`; revisão cruzada dos 7 documentos
 - [x] Etapa 4 — Base do projeto: Laravel 12 com pacote inicial Vue (Inertia + TypeScript + Tailwind), Laravel Sail com PostgreSQL 18, Redis e Mailpit, `config/payments.php`, fuso `America/Sao_Paulo`, Pest e Pint funcionando. Migrações do framework aplicadas no PostgreSQL e 27 testes do pacote inicial passando
 
+- [x] Etapa 5 — Domínio do evento: migrações de `cidades`, `grupos_participantes`, `eventos`, `dias_evento`, `grupos_atividades`, `atividades` e `conflitos_atividades` com todas as restrições `CHECK` e índices; Enum `SituacaoEvento`; sete modelos em português com relações, conversões e filtros
+
 ## Em andamento
 
-- [ ] Etapa 5 — Domínio do evento (estrutura de banco e modelos)
+- [ ] Etapa 6 — Dados de exemplo e testes do domínio do evento
 
 ## Próximas tarefas
-- [ ] Etapa 6 — Dados de exemplo e testes do domínio do evento
 - [ ] Etapa 7 — Inscrição (regras, reserva de vaga, concorrência)
 - [ ] Etapa 8 — Testes das regras de inscrição
 - [ ] Etapa 9 — Pagamento, provedor simulado e aviso automático
