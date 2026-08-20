@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Inscricoes;
 
+use App\Actions\Pagamentos\CancelarPagamento;
 use App\Enums\SituacaoInscricao;
+use App\Enums\SituacaoPagamento;
+use App\Events\InscricaoExpirada;
 use App\Models\Evento;
 use App\Models\Inscricao;
+use App\Models\Pagamento;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +33,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ExpirarInscricoesVencidas
 {
-    public function __construct(private readonly LiberarVagas $liberarVagas) {}
+    public function __construct(
+        private readonly LiberarVagas $liberarVagas,
+        private readonly CancelarPagamento $cancelarPagamento,
+    ) {}
 
     /**
      * @param  Evento|null  $evento  limita a varredura a um evento (uso sob demanda)
@@ -57,7 +64,7 @@ class ExpirarInscricoesVencidas
      */
     private function expirar(Inscricao $inscricao, Carbon $momento): int
     {
-        return DB::transaction(function () use ($inscricao, $momento): int {
+        $expirou = DB::transaction(function () use ($inscricao, $momento): bool {
             // A condicao "ainda aguardando pagamento" faz o papel de trava: se
             // outro processo confirmou ou expirou esta inscricao no meio do
             // caminho, nenhuma linha muda e nada e devolvido em dobro.
@@ -70,17 +77,44 @@ class ExpirarInscricoesVencidas
                 ]);
 
             if ($linhas === 0) {
-                return 0;
+                return false;
             }
 
             $this->liberarVagas->liberarReserva($inscricao);
 
-            // TODO(Fase 4): cancelar o Pagamento pendente desta inscricao e
-            // disparar o evento de dominio InscricaoExpirada. Enquanto o
-            // dominio de pagamento nao existe, expirar significa apenas mudar
-            // a situacao e devolver as vagas.
+            $this->encerrarCobrancas($inscricao);
 
-            return 1;
+            return true;
         });
+
+        if (! $expirou) {
+            return 0;
+        }
+
+        $inscricao->refresh();
+
+        // O anuncio sai depois do commit: ninguem deve ser avisado de uma
+        // expiracao que o banco ainda pode desfazer.
+        InscricaoExpirada::dispatch($inscricao);
+
+        return 1;
+    }
+
+    /**
+     * Fecha a porta do dinheiro: nenhuma cobranca pode continuar aceitando Pix
+     * de uma vaga que ja voltou para a fila.
+     *
+     * A Action de cancelamento exige situacao "pendente", entao rodar de novo
+     * simplesmente nao encontra nada para fechar.
+     */
+    private function encerrarCobrancas(Inscricao $inscricao): void
+    {
+        Pagamento::query()
+            ->where('inscricao_id', $inscricao->getKey())
+            ->pendentes()
+            ->get()
+            ->each(function (Pagamento $pagamento): void {
+                ($this->cancelarPagamento)($pagamento, SituacaoPagamento::Expirado);
+            });
     }
 }

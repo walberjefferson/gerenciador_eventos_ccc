@@ -7,6 +7,7 @@ namespace App\Actions\Pagamentos;
 use App\Actions\Inscricoes\LiberarVagas;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
+use App\Events\InscricaoConfirmada;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
 use Illuminate\Support\Carbon;
@@ -35,7 +36,9 @@ class ConfirmarPagamento
     {
         $momento = $pagoEm ?? Carbon::now();
 
-        return DB::transaction(function () use ($pagamento, $momento): bool {
+        $inscricaoConfirmada = null;
+
+        $reconheceu = DB::transaction(function () use ($pagamento, $momento, &$inscricaoConfirmada): bool {
             $linhas = Pagamento::query()
                 ->whereKey($pagamento->getKey())
                 ->where('situacao', SituacaoPagamento::Pendente->value)
@@ -68,11 +71,18 @@ class ConfirmarPagamento
                 // A vaga presa vira vaga paga: o total ocupado nao muda.
                 $this->liberarVagas->confirmar($inscricao);
 
-                // TODO(Fase 4b): disparar o evento de dominio InscricaoConfirmada,
-                // criado junto com a rotina de expiracao e reconciliacao.
+                $inscricaoConfirmada = $inscricao;
             }
 
             return true;
         });
+
+        // O anuncio sai fora da transacao, e so na chamada que de fato mudou a
+        // situacao: aviso repetido do provedor nao dispara evento de novo.
+        if ($inscricaoConfirmada instanceof Inscricao) {
+            InscricaoConfirmada::dispatch($inscricaoConfirmada->refresh(), $pagamento->refresh());
+        }
+
+        return $reconheceu;
     }
 }

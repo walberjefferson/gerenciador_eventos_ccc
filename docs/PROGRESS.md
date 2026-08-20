@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 9 (pagamento simulado e webhook). **Fase 4a — Pagamento: concluída.**
+> **Última atualização:** 2026-08-20 — Etapa 10 (prazo, expiração automática e reconciliação). **Fases 0 a 4 concluídas: o backend do MVP está completo.**
 
 ---
 
@@ -22,23 +22,50 @@
 
 - [x] Etapa 9 — Pagamento e webhook: migrações `pagamentos` e `webhooks_pagamento` (dinheiro em centavos, unicidade parcial do identificador externo); Enums `SituacaoPagamento`, `MetodoPagamento` e `SituacaoWebhook`; modelos `Pagamento` e `WebhookPagamento`; contrato `PaymentGateway` e DTOs somente leitura (`app/Contracts/Payments`, `app/DTOs/Payments` — em inglês, por espelharem a fronteira externa); `FakePaymentGateway` completo (emite cobrança Pix fictícia no formato EMV, paga, vence, falha, cancela, estorna e emite aviso assinado); `PaymentServiceProvider` escolhendo o provedor por `config/payments.php`; Actions `CriarPagamentoDaInscricao`, `ConfirmarPagamento` e `CancelarPagamento`; `PaymentWebhookController` (confere assinatura, grava o aviso cru sem dado sensível, responde imediatamente) e o job idempotente `ProcessarWebhookPagamento`; `routes/dev.php` com as rotas de simulação, com dupla trava de ambiente e configuração. A criação de inscrição já emite a cobrança, com `expira_em` igual ao `prazo_pagamento`. **Suíte completa: 160 testes, 424 asserções, tudo passando**
 
+- [x] Etapa 10 — Prazo, expiração e reconciliação: `ExpirarInscricoesVencidas` completa (marca a inscrição como expirada, devolve a vaga do evento e a de cada atividade, encerra a cobrança como "prazo vencido" e anuncia `InscricaoExpirada`, tudo em lotes de 100 com `chunkById`); anúncios internos `InscricaoConfirmada` e `InscricaoExpirada`; comandos `inscricoes:expirar-vencidas` (com a opção `--evento`) e `pagamentos:reconciliar` (com as opções `--margem` e `--lote`), agendados em `routes/console.php` a cada minuto e a cada cinco minutos; testes `PrazoPagamentoTest`, `ExpiracaoInscricaoTest` e `ReconciliacaoTest`. **Suíte completa: 177 testes, 521 asserções, tudo passando**
+
+**Com isso, a Fase 4 — Pagamento está concluída**, e o fluxo do briefing foi verificado de ponta a ponta em banco recém-semeado, por comandos artisan: inscrição válida reserva a vaga do evento e a de cada atividade → cobrança Pix fictícia emitida com o mesmo prazo da inscrição → aviso assinado entregue na rota pública (`POST /webhooks/pagamentos` → HTTP 200) → inscrição confirmada com os contadores passando de reservada para confirmada; e, em seguida, uma segunda inscrição com o prazo vencido → `php artisan inscricoes:expirar-vencidas` → vaga do evento e de cada atividade de volta a zero reservadas, cobrança em "prazo vencido", **nenhuma linha apagada** (2 inscrições, 2 pagamentos e 4 vínculos inscrição-atividade continuam no banco) e a segunda execução do comando não muda mais nada.
+
 **Com isso, a Fase 3 — Inscrição está concluída:** regras RN-01 a RN-13, reserva de vaga por contador atômico, varredura sob demanda das reservas vencidas e cobertura de teste dos seis cenários exigidos pelo briefing que dependem apenas do domínio de inscrição.
 
 ## Em andamento
 
-- [ ] Nada em andamento. Próxima entrega: Fase 4b — prazo, expiração agendada, reconciliação e fechamento (Etapa 10)
+- [ ] Nada em andamento. O backend do MVP (Fases 0 a 4) está fechado. A próxima entrega é a **Fase 5 — Frontend público**, em plano separado
 
 ## Próximas tarefas
 
-### Fase 4b — Prazo, expiração e fechamento (Etapa 10)
+O que **está pronto** hoje: todo o núcleo transacional. Evento configurável, inscrição com reserva de vaga à prova de venda a mais, regras de seleção de atividades, cobrança Pix simulada, aviso automático (webhook) idempotente, expiração agendada que devolve vaga e reconciliação server-to-server. Não existe nenhuma tela pública, nenhum e-mail sai e nenhum dinheiro real circula.
 
-O que ainda falta construir, na ordem:
+O que **falta**, por fase:
 
-- [ ] Completar `ExpirarInscricoesVencidas` com o `TODO(Fase 4)` que ficou no código: cancelar a cobrança pendente (`CancelarPagamento`, com destino `SituacaoPagamento::Expirado`) e disparar o anúncio `InscricaoExpirada` (decisão D-23)
-- [ ] Anúncios internos `InscricaoConfirmada` e `InscricaoExpirada`. O ponto exato onde a confirmação deve ser anunciada está marcado com `TODO(Fase 4b)` em `ConfirmarPagamento`
-- [ ] Comandos `inscricoes:expirar-vencidas` e `pagamentos:reconciliar`, agendados em `routes/console.php`. A reconciliação consulta o provedor com `getPayment()` e aplica o mesmo `ConfirmarPagamento`, que já é idempotente
-- [ ] Testes `PrazoPagamentoTest`, `ExpiracaoInscricaoTest` e `ReconciliacaoTest`, incluindo o pagamento que chega depois do prazo (pendência P-03)
-- [ ] Ouvintes dos anúncios internos `InscricaoCriada` e `InscricaoConfirmada` (ainda sem e-mail — decisão D-12)
+### Fase 5 — Frontend público
+- [ ] Páginas Inertia + Vue: vitrine do evento, formulário de inscrição (com seleção de atividades respeitando `min_selecoes`/`max_selecoes`, conflitos de horário e faixa etária), página de pagamento com o Pix copia e cola e a contagem regressiva do prazo, e página de acompanhamento da inscrição
+- [ ] Controller de leitura para a vitrine e para o acompanhamento (hoje só existe `POST /inscricoes`)
+- [ ] Decidir como o participante volta à própria inscrição depois (pendência **P-05**: link assinado ou código por e-mail)
+- [ ] Validação no navegador espelhando `ValidadorSelecaoAtividades` — sem nunca substituir a validação do servidor
+
+### Fase 6 — Administração
+- [ ] Painel: total de inscrições por situação, vagas restantes por atividade, receita reconhecida
+- [ ] CRUDs de evento, dias, grupos de atividades, atividades, conflitos, cidades e grupos de participantes
+- [ ] Lista de inscrições com filtros e exportação; visualização de uma inscrição com o histórico da cobrança
+- [ ] Policies de acesso administrativo (hoje só existe a autenticação do pacote inicial)
+
+### Fase 7 — Comunicação
+- [ ] Ouvintes de `InscricaoCriada`, `InscricaoConfirmada` e `InscricaoExpirada` — os três anúncios já são disparados pelo domínio e **não têm nenhum ouvinte** (decisão D-12). É só plugar
+- [ ] E-mails: confirmação de inscrição com o Pix, comprovante de pagamento, aviso de prazo vencido
+- [ ] Lembrete de prazo próximo do fim (comando agendado, no mesmo molde do `inscricoes:expirar-vencidas`)
+
+### Fase 8 — Provedor de pagamento real
+- [ ] Escolher o provedor (pendência **P-01**) e confirmar as taxas (**P-06**)
+- [ ] Implementar a classe do provedor real contra o mesmo contrato `PaymentGateway` e registrá-la no `match` do `PaymentServiceProvider`. **Nenhuma Action, Model, Job ou teste de domínio precisa mudar** — só o `PAYMENT_GATEWAY` do `.env`
+- [ ] Conferir a assinatura do webhook real e o vocabulário de status do provedor em `SituacaoPagamento::deStatusExterno()`
+- [ ] Definir a política de reembolso (**P-02**) e ligar `refundPayment()` a uma Action de estorno (hoje o contrato existe, o fluxo de domínio não)
+
+### Fase 9 — Endurecimento
+- [ ] Registro de auditoria das ações administrativas
+- [ ] Revisão de desempenho com volume real (índices já existem; falta medir)
+- [ ] Revisão de LGPD: prazo de retenção e descarte (**P-04**)
+- [ ] Decidir o que fazer com pagamento reconhecido depois do prazo (**P-03**) — ver a decisão D-34
 
 ---
 
@@ -77,6 +104,10 @@ O que ainda falta construir, na ordem:
 | D-30 | A chave estrangeira de `pagamentos` para `inscricoes` é **restrict** | Apagar inscrição já é proibido; a restrição do banco garante que nenhum histórico de dinheiro suma junto com um apagamento acidental |
 | D-31 | O aviso do provedor é guardado com os campos sensíveis substituídos por `[removido]` (segredo, token, cartão, CVV) | O aviso serve para investigar divergência, não para colecionar dado sensível |
 | D-25 | O prazo de pagamento (`prazo_pagamento`) já é gravado na criação da inscrição | RN-P01 manda congelar o prazo no momento da inscrição. Sem ele gravado, a varredura sob demanda não teria como saber quais reservas venceram |
+| D-32 | Os anúncios internos (`InscricaoConfirmada`, `InscricaoExpirada`) são disparados **depois** que a transação fecha, e só na chamada que de fato mudou a situação | Ninguém pode ser avisado de um fato que o banco ainda pode desfazer. E, como a mudança é condicional à situação anterior, aviso repetido do provedor não gera segundo anúncio |
+| D-33 | A reconciliação roda **a cada cinco minutos** e olha apenas cobranças a até quinze minutos do vencimento | Perguntar de cinco em cinco minutos reconhece o pagamento bem antes do prazo vencer, e a margem estreita mantém o volume de consultas baixo — provedores cobram limite de chamadas por minuto |
+| D-34 | A reconciliação **fecha** aqui a cobrança que o provedor já deu por vencida, mas **não devolve vaga** por conta própria | Vaga é assunto da inscrição, e quem devolve é sempre a expiração. Duas rotinas mexendo no mesmo contador seria a receita para contar errado |
+| D-35 | A expiração processa em lotes de 100 com `chunkById` e cada inscrição em sua própria transação | Uma transação única sobre milhares de linhas seguraria bloqueios por tempo demais. Falha em uma inscrição não derruba o lote inteiro |
 
 ---
 
