@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 6 (dados de exemplo e testes do domínio)
+> **Última atualização:** 2026-08-20 — Etapa 7 (inscrição: regras, reserva de vaga e concorrência)
 
 ---
 
@@ -16,12 +16,13 @@
 
 - [x] Etapa 6 — Fábricas de dados para os sete modelos, `CidadeSeeder`, `EventoDemoSeeder` (Copa CCC 2026, dois dias) e `tests/Feature/Dominio/EventoTest.php` com 29 testes provando relações, filtros e as restrições do banco
 
+- [x] Etapa 7 — Inscrição: migrações de `inscricoes` (com as unicidades parciais de e-mail e CPF) e `inscricoes_atividades`; Enum `SituacaoInscricao`; modelos `Inscricao` e `InscricaoAtividade`; `DadosNovaInscricao`; `ValidadorSelecaoAtividades` (RN-03 a RN-08); `ReservarVagas` e `LiberarVagas` (contador atômico em ordem fixa); `CriarInscricao` (transação única, varredura sob demanda com uma retentativa, tradução das violações de unicidade em mensagem amigável); `ExpirarInscricoesVencidas` na versão mínima; `StoreInscricaoRequest`, `InscricaoController@store` e a rota `POST /inscricoes`; anúncio interno `InscricaoCriada`
+
 ## Em andamento
 
-- [ ] Etapa 7 — Inscrição (regras, reserva de vaga, concorrência)
+- [ ] Etapa 8 — Testes das regras de inscrição
 
 ## Próximas tarefas
-- [ ] Etapa 8 — Testes das regras de inscrição
 - [ ] Etapa 9 — Pagamento, provedor simulado e aviso automático
 - [ ] Etapa 10 — Prazo, expiração, reconciliação e fechamento
 
@@ -51,6 +52,11 @@
 | D-18 | O endereço de webhook responde **200 mesmo com assinatura inválida**, gravando o aviso como inválido e sem produzir efeito | Responder 401 informaria a quem tenta forjar avisos que ele acertou o endereço e errou só a assinatura |
 | D-19 | O PostgreSQL do Sail é publicado na porta **55432** do computador (variável `FORWARD_PGSQL_PORT`), e não na 5432 | A porta 5432 já estava ocupada por outro PostgreSQL instalado na máquina de desenvolvimento, que respondia no lugar do contêiner. A porta interna do contêiner continua sendo 5432 |
 | D-20 | Os testes rodam no banco `testing` do mesmo PostgreSQL, com `DB_HOST`/`DB_PORT` fixados em `phpunit.xml` | Restrição parcial de unicidade, `CHECK`, `jsonb` e concorrência real só têm valor testados no mesmo motor de produção |
+| D-21 | As recusas de inscrição partem de uma classe base comum (`InscricaoInvalidaException`), e RN-01/RN-02 ganharam a sua própria (`InscricaoIndisponivelException`), além das três previstas no plano | A classe base guarda as mensagens já agrupadas pelo campo do formulário, e o controller as devolve como erro de validação (422). Sem ela, cada recusa teria o seu próprio formato e o controller decidiria texto para o participante |
+| D-22 | O envio do formulário é a rota `POST /inscricoes` em `routes/web.php` | O projeto não tem `routes/api.php`; criar um exigiria instalar o pacote de API só para uma rota. A proteção contra envio forjado (CSRF) do grupo `web` é bem-vinda em um formulário público |
+| D-23 | `ExpirarInscricoesVencidas` foi antecipada da etapa de pagamento para a etapa de inscrição | A varredura sob demanda (quando o contador diz "lotado") depende dela. A versão atual apenas muda a situação e devolve as vagas; cancelar a cobrança e anunciar a expiração entram junto com o domínio de pagamento |
+| D-24 | Envio repetido com a mesma chave de idempotência responde **200**, e não 201 | Nada de novo foi criado. O participante recebe a mesma inscrição, e o código de resposta diz a verdade sobre o que aconteceu |
+| D-25 | O prazo de pagamento (`prazo_pagamento`) já é gravado na criação da inscrição | RN-P01 manda congelar o prazo no momento da inscrição. Sem ele gravado, a varredura sob demanda não teria como saber quais reservas venceram |
 
 ---
 
