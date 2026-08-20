@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 3 (pagamentos e plano)
+> **Última atualização:** 2026-08-20 — Etapa 4 (base do projeto)
 
 ---
 
@@ -10,13 +10,13 @@
 - [x] Etapa 1 — `docs/PRD.md` com as 24 seções exigidas + Glossário; `docs/PROGRESS.md`
 - [x] Etapa 2 — `docs/ARCHITECTURE.md`, `docs/DATABASE.md` (ERD + dicionário de dados), `docs/BUSINESS_RULES.md` (RN-01 a RN-13 + regras de pagamento)
 - [x] Etapa 3 — `docs/PAYMENTS.md` (matriz de provedores com data de consulta) e `docs/IMPLEMENTATION_PLAN.md`; revisão cruzada dos 7 documentos
+- [x] Etapa 4 — Base do projeto: Laravel 12 com pacote inicial Vue (Inertia + TypeScript + Tailwind), Laravel Sail com PostgreSQL 18, Redis e Mailpit, `config/payments.php`, fuso `America/Sao_Paulo`, Pest e Pint funcionando. Migrações do framework aplicadas no PostgreSQL e 27 testes do pacote inicial passando
 
 ## Em andamento
 
-- [ ] Etapa 4 — Base do projeto (Laravel 12 + Sail + configuração)
+- [ ] Etapa 5 — Domínio do evento (estrutura de banco e modelos)
 
 ## Próximas tarefas
-- [ ] Etapa 5 — Domínio do evento (estrutura de banco e modelos)
 - [ ] Etapa 6 — Dados de exemplo e testes do domínio do evento
 - [ ] Etapa 7 — Inscrição (regras, reserva de vaga, concorrência)
 - [ ] Etapa 8 — Testes das regras de inscrição
@@ -47,6 +47,8 @@
 | D-16 | Em RN-04, grupo **opcional** com mínimo maior que zero significa "ou nada, ou pelo menos o mínimo" | Interpretação mais restritiva entre as possíveis, conforme a política de ambiguidade do plano |
 | D-17 | O provedor de pagamento devolve `parseWebhook` (tradução), não `handleWebhook` (ação) | Mantém a decisão sobre o domínio de um lado só da fronteira; trocar de provedor não muda o efeito na inscrição |
 | D-18 | O endereço de webhook responde **200 mesmo com assinatura inválida**, gravando o aviso como inválido e sem produzir efeito | Responder 401 informaria a quem tenta forjar avisos que ele acertou o endereço e errou só a assinatura |
+| D-19 | O PostgreSQL do Sail é publicado na porta **55432** do computador (variável `FORWARD_PGSQL_PORT`), e não na 5432 | A porta 5432 já estava ocupada por outro PostgreSQL instalado na máquina de desenvolvimento, que respondia no lugar do contêiner. A porta interna do contêiner continua sendo 5432 |
+| D-20 | Os testes rodam no banco `testing` do mesmo PostgreSQL, com `DB_HOST`/`DB_PORT` fixados em `phpunit.xml` | Restrição parcial de unicidade, `CHECK`, `jsonb` e concorrência real só têm valor testados no mesmo motor de produção |
 
 ---
 
@@ -60,6 +62,7 @@
 | P-04 | Definir prazo de retenção e descarte de dados pessoais | Dono do produto |
 | P-05 | Definir como o participante acessa a inscrição depois (link assinado, código por e-mail) | Fase 5 |
 | P-06 | Confirmar as taxas de Pagar.me, Mercado Pago e Asaas diretamente com o comercial | Dono do produto. Ver seção 6.3 de `PAYMENTS.md` |
+| P-07 | Ajustar o arquivo `.env` local para `DB_PORT=55432` e `FORWARD_PGSQL_PORT=55432`, como já está em `.env.example` (decisão D-19) | Pessoa desenvolvedora, na própria máquina |
 
 ---
 
