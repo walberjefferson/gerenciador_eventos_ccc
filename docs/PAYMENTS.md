@@ -1,0 +1,266 @@
+# Pagamentos
+
+> **Versão:** 1.0 · **Data do documento:** 2026-08-20
+> Descreve como a plataforma cobra, como ela se mantém independente de fornecedor e como comparar os provedores brasileiros para a escolha futura.
+
+---
+
+## ⚠️ Aviso sobre taxas
+
+**Taxas comerciais mudam com frequência e quase sempre são negociáveis por volume.**
+
+Por isso, três regras valem neste projeto:
+
+1. **Nenhuma taxa aparece no código.** Nunca. Nem em configuração de aplicação.
+2. **Toda taxa neste documento vem com a data da consulta e o endereço consultado.**
+3. **O que não foi confirmado em fonte oficial fica escrito como "a validar".** Número comercial inventado é falha grave: leva a decisão de negócio errada.
+
+Antes de fechar contrato, confirme tudo diretamente com o provedor.
+
+---
+
+## 1. Estratégia adotada
+
+**Método inicial:** Pix. Cartão de crédito fica previsto na estrutura, sem implementação nesta entrega.
+
+**Provedor desta entrega:** um provedor **simulado** (`FakePaymentGateway`), que gera cobrança Pix fictícia e permite simular pagamento, expiração, falha, estorno e o envio do aviso automático. Ele existe para que toda a plataforma possa ser desenvolvida e testada sem contratar nenhuma instituição financeira.
+
+**Escolha do provedor real:** decisão de negócio, apoiada pela matriz da seção 6 deste documento. Trocar de provedor é escrever uma nova implementação do contrato e mudar uma linha de configuração — nenhuma regra de inscrição muda.
+
+---
+
+## 2. O contrato
+
+Todo provedor de pagamento precisa cumprir exatamente este conjunto de operações:
+
+```php
+interface PaymentGateway
+{
+    public function createPayment(CreatePaymentData $data): PaymentResult;
+
+    public function getPayment(string $externalId): PaymentStatusResult;
+
+    public function cancelPayment(string $externalId): void;
+
+    public function refundPayment(string $externalId, ?int $amountCents = null): RefundResult;
+
+    public function verifyWebhookSignature(WebhookRequestData $request): bool;
+
+    public function parseWebhook(WebhookRequestData $request): WebhookResult;
+}
+```
+
+| Operação | O que faz |
+|----------|-----------|
+| `createPayment` | Cria a cobrança e devolve o identificador externo, o código Pix copia e cola e o vencimento |
+| `getPayment` | Consulta a situação atual da cobrança. Usada pela reconciliação |
+| `cancelPayment` | Cancela a cobrança. Usada quando a inscrição expira |
+| `refundPayment` | Devolve o dinheiro, total ou parcialmente |
+| `verifyWebhookSignature` | Confere se o aviso recebido veio mesmo do provedor |
+| `parseWebhook` | **Traduz** o aviso do provedor para um formato neutro. Não altera nada |
+
+### 2.1 Três decisões deste contrato
+
+**Está em inglês, de propósito.** O resto do domínio deste projeto é escrito em português. Este contrato não, porque é a fronteira com serviços externos cujas APIs são todas em inglês (`amount`, `payer`, `qr_code`). Traduzir só na nossa metade criaria um vaivém de tradução em cada campo. A fronteira fala a língua de quem está do outro lado.
+
+**`parseWebhook`, não `handleWebhook`.** O rascunho inicial sugeria `handleWebhook`, o que colocaria o provedor no comando de alterar nossas inscrições. Aqui o provedor apenas **traduz**; quem decide o efeito é a Action da aplicação. A regra fica de um lado só da fronteira, e trocar de provedor não muda o que acontece com a inscrição.
+
+**Nenhum Model Eloquent atravessa a fronteira.** Só DTOs `readonly` — pacotes de dados imutáveis. Assim o código do provedor não consegue gravar nada no banco por um caminho lateral, e testar a integração não exige banco de dados.
+
+### 2.2 DTOs
+
+| DTO | Direção | Conteúdo |
+|-----|---------|----------|
+| `CreatePaymentData` | aplicação → provedor | valor em centavos, moeda, descrição, referência interna, dados do pagador (nome, e-mail, CPF), vencimento, endereço de aviso |
+| `PaymentResult` | provedor → aplicação | identificador externo, situação, código Pix copia e cola, imagem do QR Code, vencimento, dados extras |
+| `PaymentStatusResult` | provedor → aplicação | identificador externo, situação, valor pago, momento do pagamento |
+| `RefundResult` | provedor → aplicação | identificador do estorno, valor estornado, situação |
+| `WebhookRequestData` | requisição → provedor | corpo cru, cabeçalhos, endereço de origem |
+| `WebhookResult` | provedor → aplicação | tipo do aviso, identificador do aviso, identificador externo do pagamento, situação, valor, momento |
+
+**Por que o valor sempre em centavos.** `R$ 120,00` vira `12000`. Número decimal aproximado (`float`) soma errado: `0.1 + 0.2` não dá exatamente `0.3` em nenhuma linguagem que use ponto flutuante. Em dinheiro isso vira diferença de centavo em fechamento. Inteiro em centavos elimina a classe inteira de problema.
+
+---
+
+## 3. Como o provedor é escolhido
+
+```env
+PAYMENT_GATEWAY=fake
+```
+
+```php
+// app/Providers/PaymentServiceProvider.php
+$this->app->singleton(PaymentGateway::class, fn () => match (config('payments.default')) {
+    // 'efi'     => new EfiPaymentGateway(...),      // fase 8
+    // 'pagarme' => new PagarMePaymentGateway(...),  // fase 8
+    default => new FakePaymentGateway(...),
+});
+```
+
+Regra inegociável: **as palavras `FakePaymentGateway`, `Efi` ou `PagarMe` não aparecem em nenhuma Action, Model ou Service de inscrição.** O domínio conhece apenas a interface. Isso é o que torna a troca de provedor uma mudança de configuração.
+
+---
+
+## 4. Fluxo Pix
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Participante
+    participant AP as Aplicação
+    participant GW as Provedor (contrato PaymentGateway)
+
+    P->>AP: conclui a inscrição
+    AP->>AP: reserva as vagas e grava a inscrição
+    AP->>GW: createPayment(valor, pagador, vencimento)
+    GW-->>AP: id externo + Pix copia e cola + vencimento
+    AP->>AP: grava o pagamento como pendente
+    AP-->>P: mostra QR Code, valor, código copia e cola e contador regressivo
+    P->>GW: paga pelo aplicativo do banco
+    GW-->>AP: aviso automático "cobrança paga"
+    AP->>AP: confirma o pagamento e a inscrição
+    AP-->>P: inscrição confirmada
+```
+
+A tela de pagamento (fase 5) mostrará: valor, QR Code, código copia e cola com botão de copiar, prazo, contador regressivo e instruções.
+
+---
+
+## 5. Fluxo do aviso automático (webhook)
+
+**Webhook** é a chamada que o provedor faz ao nosso servidor para avisar que algo mudou.
+
+```mermaid
+flowchart TB
+    A[Provedor envia o aviso] --> B[Confere a assinatura]
+    B -->|inválida| C[Grava marcado como inválido<br/>responde 200<br/>nenhum efeito]
+    B -->|válida| D[Grava em webhooks_pagamento]
+    D -->|identificador repetido| E[Marca como ignorado<br/>responde 200]
+    D -->|novo| F[Responde 200 imediatamente]
+    F --> G[Enfileira o processamento]
+    G --> H[Traduz o aviso com parseWebhook]
+    H --> I[Atualiza o pagamento]
+    I --> J[Confirma a inscrição<br/>ajusta os contadores de vaga]
+    J --> K[Anuncia InscricaoConfirmada]
+```
+
+Três decisões importantes:
+
+- **Guardar antes de processar.** O provedor espera resposta em poucos segundos. Se processássemos antes de responder, uma lentidão faria o provedor considerar falha e reenviar tudo. Guardamos, respondemos "recebido" e processamos em segundo plano.
+- **Responder 200 mesmo com assinatura inválida.** Responder 401 informaria a quem tenta forjar avisos que ele acertou o endereço e errou só a assinatura. Guardamos o aviso marcado como inválido, não produzimos efeito nenhum e respondemos de forma neutra.
+- **Proteção contra repetição no banco.** A unicidade `(gateway, id_evento_externo)` impede que o mesmo aviso seja processado duas vezes, sem depender de nenhuma verificação em memória.
+
+### 5.1 Quando o aviso nunca chega — reconciliação
+
+Avisos se perdem: instabilidade de rede, deploy no momento errado, falha do provedor. Por isso existe uma segunda frente.
+
+O comando `pagamentos:reconciliar` roda a cada 5 minutos, procura pagamentos `pendente` cujo vencimento está próximo ou já passou, e pergunta ao provedor: "esta cobrança foi paga?". Se foi, aplica **o mesmo** caminho de confirmação usado pelo aviso.
+
+Como as duas frentes são idempotentes, um pagamento confirmado pelas duas ao mesmo tempo é confirmado uma vez só.
+
+---
+
+## 6. Matriz de comparação de provedores
+
+> **Data da consulta: 2026-08-20.** Fonte de cada número indicada na própria célula. Onde não houve fonte oficial acessível na data, está escrito **a validar** — nunca um valor estimado.
+
+### 6.1 Taxas
+
+| Item | Efí | Pagar.me | Mercado Pago | Asaas |
+|------|-----|----------|--------------|-------|
+| **Pix** | Sim | Sim | Sim | Sim |
+| **Taxa Pix (recebimento por API / QR Code dinâmico)** | **1,19% por transação** — consultado em `sejaefi.com.br/tarifas` em 2026-08-20 | **a validar** — a página pública de preços não divulga percentual; a precificação é apresentada como negociada com o comercial | **a validar** — a página pública de custos não expõe o percentual em conteúdo estático; precisa de confirmação direta | **a validar** — a página pública de preços exige autenticação |
+| **Observações sobre gratuidade** | Existe isenção mensal para recebimentos pelo aplicativo, mas ela **não vale** para recebimento por chave cadastrada na API nem com webhook (fonte: mesma página, nota de rodapé). Como este projeto recebe por API com webhook, considere a taxa cheia | a validar | a validar | a validar |
+| **Cartão de crédito** | Sim | Sim | Sim | Sim |
+| **Taxa cartão à vista (venda online)** | **3,49%** — consultado em `sejaefi.com.br/tarifas` em 2026-08-20 | a validar | a validar | a validar |
+| **Taxa cartão parcelado** | 2x a 6x: **3,99%**; 7x a 12x: **4,39%** (recebimento parcelado). Antecipação de parcelas: **+1,29% por parcela antecipada** — mesma fonte e data | a validar | a validar | a validar |
+| **Prazo de recebimento** | Cartão à vista com valor total antecipado: **até 31 dias**, conforme a mesma página. Pix: liquidação imediata | a validar | a validar | a validar |
+| **Tarifas fixas adicionais** | a validar (conferir tarifa de conta, saque e transferência no contrato) | a validar | a validar | a validar |
+
+### 6.2 Recursos técnicos
+
+| Item | Efí | Pagar.me | Mercado Pago | Asaas |
+|------|-----|----------|--------------|-------|
+| **Webhook** | Sim | Sim | Sim | Sim |
+| **API REST documentada** | Sim | Sim | Sim | Sim |
+| **SDK PHP oficial** | Sim — `efipay/sdk-php-apis-efi` (~116 mil instalações, consultado no Packagist em 2026-08-20) | Sim — `pagarme/pagarme-php-sdk` (~193 mil) e o pacote anterior `pagarme/pagarme-php` (~1,6 milhão), ambos no namespace oficial | Sim — `mercadopago/dx-php` (~5,8 milhões), namespace oficial | **Não há SDK no namespace oficial.** Existem apenas bibliotecas de terceiros, como `softr/asaas-php-sdk` (~198 mil). Consultado no Packagist em 2026-08-20 |
+| **Estorno via API** | a validar | a validar | a validar | a validar |
+| **Split de pagamento** | a validar | a validar | a validar | a validar |
+| **Checkout transparente** | a validar | a validar | a validar | a validar |
+| **Recorrência** | a validar | a validar | a validar | a validar |
+| **Qualidade da documentação** | a validar (avaliar na prova de conceito) | a validar | a validar | a validar |
+| **Complexidade de integração** | a validar (avaliar na prova de conceito) | a validar | a validar | a validar |
+
+> **Por que tantos "a validar".** Duas das páginas oficiais de preço (Mercado Pago e Asaas) não expõem os valores em conteúdo público estático, e a página do Pagar.me apresenta a precificação como negociada. Registrar um número aproximado ali seria pior do que não registrar nada: alguém decidiria com base em um valor que ninguém confirmou. Os campos de recursos técnicos ficam para a prova de conceito, porque "tem estorno via API" só vale como resposta depois de testado, não depois de lido.
+
+### 6.3 Como preencher as lacunas antes da decisão
+
+1. Solicitar proposta comercial escrita aos quatro provedores, informando o volume estimado do evento.
+2. Confirmar por escrito: taxa Pix efetiva por transação, tarifas fixas de conta, prazo de liquidação e política de estorno.
+3. Fazer uma prova de conceito de meio dia com os dois finalistas, exercitando: criar cobrança, receber o aviso automático, consultar a cobrança e estornar.
+4. Avaliar o ambiente de homologação (existe? é estável? precisa de conta separada?).
+5. Registrar a decisão e a data em `PROGRESS.md`.
+
+**Critérios de desempate sugeridos:** confiabilidade do webhook e existência de consulta server-to-server (nós dependemos das duas), qualidade do ambiente de homologação, e SDK oficial mantido.
+
+---
+
+## 7. Provedor simulado (`FakePaymentGateway`)
+
+Serve para desenvolver e testar sem credencial nenhuma. Ele:
+
+- gera um identificador externo fictício e um código Pix copia e cola no formato do padrão Pix, com dados fictícios;
+- guarda o estado das cobranças simuladas para responder às consultas;
+- permite simular: **pagamento**, **expiração**, **falha**, **estorno** e **envio do aviso automático**;
+- assina os avisos simulados com um segredo de teste, para que o caminho de verificação de assinatura seja exercitado de verdade.
+
+### 7.1 Endereços de simulação
+
+Ficam em `routes/dev.php` e só existem quando **as duas** condições valem:
+
+1. o ambiente é `local` ou `testing`; **e**
+2. `payments.fake.simulation_enabled` está ligado.
+
+Fora disso respondem **404 (não encontrado)**. Não 403: responder "proibido" confirmaria que o endereço existe.
+
+| Endereço | O que faz |
+|----------|-----------|
+| `POST /dev/pagamentos/{idExterno}/pagar` | Simula o pagamento e dispara o aviso automático |
+| `POST /dev/pagamentos/{idExterno}/expirar` | Simula o vencimento da cobrança |
+| `POST /dev/pagamentos/{idExterno}/falhar` | Simula a recusa do pagamento |
+| `POST /dev/pagamentos/{idExterno}/estornar` | Simula o estorno |
+
+Existe um teste automatizado que prova o 404 fora dos ambientes permitidos. Sem esse teste, a proteção seria apenas uma intenção.
+
+---
+
+## 8. Segurança de pagamento
+
+O que **nunca** é feito neste projeto:
+
+- guardar número completo de cartão ou código de segurança (não existe coluna para isso e nunca existirá);
+- registrar chave, segredo ou credencial em log;
+- expor credencial de provedor para o navegador;
+- confiar em parâmetro enviado pelo navegador para confirmar pagamento;
+- considerar um pagamento concluído porque o navegador voltou para uma página de sucesso.
+
+O que é sempre feito:
+
+- confirmação apenas por aviso autenticado do provedor ou por consulta que o próprio servidor faz;
+- verificação da assinatura de todo aviso antes de qualquer efeito;
+- credenciais em variáveis de ambiente, fora do código;
+- conteúdo do aviso guardado sem dado pessoal desnecessário;
+- identificadores públicos não sequenciais em pagamentos e inscrições.
+
+---
+
+## 9. O que fica para a fase 8
+
+- Implementar a classe do provedor escolhido cumprindo o contrato da seção 2.
+- Cadastrar as credenciais no ambiente.
+- Configurar o endereço de aviso no painel do provedor.
+- Homologar na conta de testes: cobrança, pagamento, aviso, consulta, cancelamento e estorno.
+- Rodar a suíte de testes com `PAYMENT_GATEWAY` apontando para o provedor real em ambiente de homologação.
+- Registrar em `PROGRESS.md` a data da escolha e as taxas efetivamente contratadas.
+
+Nenhum arquivo de domínio deve ser alterado nessa fase. Se for necessário alterar, o contrato estava errado — e isso é sinal para revisar o desenho, não para abrir exceção.
