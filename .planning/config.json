@@ -1,0 +1,7 @@
+{
+  "lang": "pt-BR",
+  "model_profile": "balanced",
+  "model_overrides": {
+    "feat-executor": "opus"
+  }
+}
