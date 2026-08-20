@@ -21,3 +21,9 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Playwright: artefatos de execucao, nao vao para o repositorio
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
