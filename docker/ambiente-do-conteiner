@@ -1,0 +1,59 @@
+# Ambiente usado SOMENTE pela aplicacao que roda dentro do conteiner do Sail.
+#
+# Por que este arquivo existe:
+# dentro do conteiner os servicos atendem pelo nome na rede interna
+# (pgsql, redis, mailpit); na maquina, eles atendem em 127.0.0.1 nas portas
+# publicadas. Sao dois enderecamentos diferentes para o mesmo banco.
+#
+# Tentamos primeiro declarar os enderecos em "environment:" no
+# docker-compose.yml. Nao funciona: as variaveis chegam ao conteiner e valem
+# para "sail artisan", mas nao alcancam o processo que atende as requisicoes
+# HTTP, e a aplicacao acaba caindo no padrao 127.0.0.1:5432 — enquanto
+# "sail artisan db:show" responde certo, o que torna o problema dificil de
+# enxergar.
+#
+# Este arquivo e montado por cima do arquivo de ambiente da raiz, apenas
+# dentro do conteiner. O da raiz continua valendo para o Pest e o Playwright,
+# que rodam na maquina (decisoes D-19 e D-20).
+#
+# A chave abaixo e propria deste ambiente e serve so para desenvolvimento
+# local: nao ha nada cifrado em comum entre os dois.
+
+APP_NAME="Gestao de Eventos"
+APP_ENV=local
+APP_KEY=base64:jrue6aHKf3Us100SrVzR2/9iCWnhk8oGgqxJd32KgQM=
+APP_DEBUG=true
+APP_TIMEZONE=America/Sao_Paulo
+APP_URL=http://localhost:8888
+
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+
+DB_CONNECTION=pgsql
+DB_HOST=pgsql
+DB_PORT=5432
+DB_DATABASE=gestao_eventos
+DB_USERNAME=sail
+DB_PASSWORD=password
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=redis
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=smtp
+MAIL_HOST=mailpit
+MAIL_PORT=1025
+MAIL_FROM_ADDRESS="eventos@ccc.local"
+MAIL_FROM_NAME="${APP_NAME}"
+
+PAYMENT_GATEWAY=fake
+PAYMENT_FAKE_SIMULATION_ENABLED=true
+PAYMENT_FAKE_WEBHOOK_SECRET=segredo-de-teste-do-provedor-simulado
+
+VITE_APP_NAME="${APP_NAME}"
