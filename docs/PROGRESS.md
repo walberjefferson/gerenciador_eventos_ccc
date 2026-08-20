@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 5 (domínio do evento: banco e modelos)
+> **Última atualização:** 2026-08-20 — Etapa 6 (dados de exemplo e testes do domínio)
 
 ---
 
@@ -14,12 +14,13 @@
 
 - [x] Etapa 5 — Domínio do evento: migrações de `cidades`, `grupos_participantes`, `eventos`, `dias_evento`, `grupos_atividades`, `atividades` e `conflitos_atividades` com todas as restrições `CHECK` e índices; Enum `SituacaoEvento`; sete modelos em português com relações, conversões e filtros
 
+- [x] Etapa 6 — Fábricas de dados para os sete modelos, `CidadeSeeder`, `EventoDemoSeeder` (Copa CCC 2026, dois dias) e `tests/Feature/Dominio/EventoTest.php` com 29 testes provando relações, filtros e as restrições do banco
+
 ## Em andamento
 
-- [ ] Etapa 6 — Dados de exemplo e testes do domínio do evento
+- [ ] Etapa 7 — Inscrição (regras, reserva de vaga, concorrência)
 
 ## Próximas tarefas
-- [ ] Etapa 7 — Inscrição (regras, reserva de vaga, concorrência)
 - [ ] Etapa 8 — Testes das regras de inscrição
 - [ ] Etapa 9 — Pagamento, provedor simulado e aviso automático
 - [ ] Etapa 10 — Prazo, expiração, reconciliação e fechamento
