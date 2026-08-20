@@ -100,16 +100,26 @@ const prazoEmPalavras = 'Depois de confirmar, você verá o código Pix e o praz
                 </div>
                 <p v-else class="text-sm text-muted-foreground">O regulamento será divulgado pela organização.</p>
 
-                <div class="flex items-start gap-3 py-2">
-                    <Checkbox
-                        id="aceite_termos"
-                        v-model:checked="aceite"
-                        class="mt-0.5 size-6"
-                        :aria-describedby="erros.aceite_termos ? 'erro-aceite_termos' : undefined"
-                    />
-                    <label for="aceite_termos" class="cursor-pointer text-sm leading-relaxed">
-                        Li e aceito o regulamento do evento
-                        <span v-if="evento.versao_termos" class="text-muted-foreground">(versão {{ evento.versao_termos }})</span>.
+                <!--
+                    A caixa de marcar continua com 24 px, que e o tamanho certo
+                    para ela ser lida como caixa. O que cresce e a area que
+                    responde ao dedo: 44 px de folga em volta da caixa e a
+                    frase inteira ao lado, que tambem marca ao ser tocada.
+                -->
+                <div class="flex items-center gap-1 py-1">
+                    <span class="flex size-11 shrink-0 items-center justify-center">
+                        <Checkbox
+                            id="aceite_termos"
+                            v-model:checked="aceite"
+                            class="size-6"
+                            :aria-describedby="erros.aceite_termos ? 'erro-aceite_termos' : undefined"
+                        />
+                    </span>
+                    <label for="aceite_termos" class="flex min-h-11 cursor-pointer items-center text-sm leading-relaxed">
+                        <span>
+                            Li e aceito o regulamento do evento
+                            <span v-if="evento.versao_termos" class="text-muted-foreground">(versão {{ evento.versao_termos }})</span>.
+                        </span>
                     </label>
                 </div>
 
