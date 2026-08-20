@@ -31,5 +31,11 @@ Route::get('inscricoes/{codigo_publico}/pagamento', [PagamentoController::class,
     ->middleware('signed')
     ->name('inscricoes.pagamento');
 
+// Consulta curta que a tela da cobranca faz de tempos em tempos para saber se
+// o pagamento foi reconhecido. Tambem assinada, pelo mesmo motivo.
+Route::get('inscricoes/{codigo_publico}/situacao', [PagamentoController::class, 'situacao'])
+    ->middleware('signed')
+    ->name('inscricoes.situacao');
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
