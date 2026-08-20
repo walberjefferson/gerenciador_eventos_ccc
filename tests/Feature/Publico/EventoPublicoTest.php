@@ -47,8 +47,7 @@ it('mostra a pagina publica do evento com programacao, valor e regulamento', fun
     $this->get('/eventos/caminhada-2026')
         ->assertOk()
         ->assertInertia(fn (Assert $pagina) => $pagina
-            // O arquivo da pagina entra no passo seguinte; aqui checamos o nome.
-            ->component('Eventos/Show', false)
+            ->component('Eventos/Show')
             ->where('evento.nome', 'Caminhada 2026')
             ->where('evento.slug', 'caminhada-2026')
             ->where('evento.valor_centavos', 15000)
