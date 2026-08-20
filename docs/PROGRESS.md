@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 7 (inscrição: regras, reserva de vaga e concorrência)
+> **Última atualização:** 2026-08-20 — Etapa 8 (testes das regras de inscrição). **Fase 3 — Inscrição: concluída.**
 
 ---
 
@@ -18,13 +18,33 @@
 
 - [x] Etapa 7 — Inscrição: migrações de `inscricoes` (com as unicidades parciais de e-mail e CPF) e `inscricoes_atividades`; Enum `SituacaoInscricao`; modelos `Inscricao` e `InscricaoAtividade`; `DadosNovaInscricao`; `ValidadorSelecaoAtividades` (RN-03 a RN-08); `ReservarVagas` e `LiberarVagas` (contador atômico em ordem fixa); `CriarInscricao` (transação única, varredura sob demanda com uma retentativa, tradução das violações de unicidade em mensagem amigável); `ExpirarInscricoesVencidas` na versão mínima; `StoreInscricaoRequest`, `InscricaoController@store` e a rota `POST /inscricoes`; anúncio interno `InscricaoCriada`
 
+- [x] Etapa 8 — Testes das regras de inscrição: `tests/Feature/Inscricoes/` com `InscricaoTest`, `SelecaoAtividadesTest`, `ConflitoAtividadeTest`, `CapacidadeAtividadeTest`, `InscricaoDuplicadaTest` e `ConcorrenciaTest`, apoiados no cenário compartilhado `Cenario.php`. A concorrência é provada de duas formas: pela gravação condicional (o `UPDATE` não altera nenhuma linha quando o contador alcançou a capacidade) e por seis processos de sistema operacional de verdade disputando a última vaga ao mesmo tempo, cada um com a sua própria conexão (`scripts/disputar-vaga.php`). **Suíte completa: 140 testes, 333 asserções, tudo passando**
+
+**Com isso, a Fase 3 — Inscrição está concluída:** regras RN-01 a RN-13, reserva de vaga por contador atômico, varredura sob demanda das reservas vencidas e cobertura de teste dos seis cenários exigidos pelo briefing que dependem apenas do domínio de inscrição.
+
 ## Em andamento
 
-- [ ] Etapa 8 — Testes das regras de inscrição
+- [ ] Nada em andamento. Próxima entrega: Fase 4 — Pagamento simulado (Etapa 9)
 
 ## Próximas tarefas
-- [ ] Etapa 9 — Pagamento, provedor simulado e aviso automático
-- [ ] Etapa 10 — Prazo, expiração, reconciliação e fechamento
+
+### Fase 4 — Pagamento simulado (Etapa 9)
+
+O que ainda falta construir, na ordem:
+
+- [ ] Migrações `pagamentos` e `webhooks_pagamento` (dinheiro em centavos, número inteiro; identificadores sem acento)
+- [ ] Enum `SituacaoPagamento` e modelos `Pagamento` e `WebhookPagamento`
+- [ ] Contrato do provedor de pagamento com `parseWebhook` (tradução, não ação — decisão D-17) e a implementação simulada, ligada por `config/payments.php`
+- [ ] Action `IniciarPagamento`, criada a partir da inscrição recém-nascida (o valor já vem congelado em `valor_centavos`)
+- [ ] Action `ConfirmarPagamento`: transforma reserva em vaga confirmada, movendo o contador de `vagas_reservadas` para `vagas_confirmadas` na mesma transação, sem apagar registro
+- [ ] Endereço de webhook que responde **200 mesmo com assinatura inválida** (decisão D-18), gravando o aviso como inválido e sem produzir efeito; proteção contra aviso repetido
+- [ ] Completar `ExpirarInscricoesVencidas` com o `TODO(Fase 4)` que ficou no código: cancelar o pagamento pendente e disparar o anúncio `InscricaoExpirada` (decisão D-23)
+- [ ] Ouvintes dos anúncios internos `InscricaoCriada` e `InscricaoConfirmada` (ainda sem e-mail — decisão D-12)
+- [ ] Testes de pagamento, incluindo o aviso repetido e o pagamento que chega depois do prazo (pendência P-03)
+
+### Fase 5 (Etapa 10)
+
+- [ ] Prazo, expiração agendada, reconciliação e fechamento do evento
 
 ---
 

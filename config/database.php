@@ -95,6 +95,21 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            /*
+             * Fuso da conversa com o banco.
+             *
+             * As colunas de data e hora do dominio sao "timestamptz": o
+             * PostgreSQL sempre guarda o instante em UTC, independentemente
+             * deste ajuste. O que este ajuste decide e como o banco entende a
+             * data que o Laravel envia (que vai sem o fuso escrito) e em que
+             * fuso ele devolve o que foi guardado.
+             *
+             * Sem isto, "9 da manha em Sao Paulo" era entendido pelo banco como
+             * "9 da manha em Londres" e voltava rotulado como UTC — tres horas
+             * de diferenca em toda comparacao feita no PHP, como a que decide
+             * se as inscricoes ja abriram.
+             */
+            'timezone' => env('DB_TIMEZONE', env('APP_TIMEZONE', 'UTC')),
         ],
 
         'sqlsrv' => [
