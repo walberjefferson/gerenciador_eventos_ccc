@@ -96,3 +96,20 @@ export function idExternoDaCobranca(codigoPublico: string): string {
 
     return idExterno as string;
 }
+
+/**
+ * Muda a capacidade de uma atividade direto no banco.
+ *
+ * Serve para montar o cenario de "esgotado" sem precisar inventar dezenas de
+ * inscricoes: capacidade zero e o mesmo que nao ter mais vaga. Quem usa deve
+ * devolver o valor original no fim, para nao contaminar os outros cenarios.
+ */
+export function definirCapacidadeDaAtividade(nome: string, capacidade: number | null): void {
+    const valor = capacidade === null ? 'null' : String(capacidade);
+
+    artisan([
+        'tinker',
+        '--execute',
+        `\\App\\Models\\Atividade::query()->where('nome', '${nome}')->update(['capacidade' => ${valor}]);`,
+    ]);
+}
