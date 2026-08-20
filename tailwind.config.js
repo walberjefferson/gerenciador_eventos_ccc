@@ -60,6 +60,27 @@ export default {
                     4: 'hsl(var(--chart-4))',
                     5: 'hsl(var(--chart-5))',
                 },
+                acao: {
+                    DEFAULT: 'hsl(var(--cor-acao))',
+                    foreground: 'hsl(var(--cor-acao-contraste))',
+                    texto: 'hsl(var(--cor-acao-texto))',
+                },
+                sucesso: {
+                    DEFAULT: 'hsl(var(--cor-sucesso))',
+                    foreground: 'hsl(var(--cor-sucesso-contraste))',
+                    texto: 'hsl(var(--cor-sucesso-texto))',
+                },
+                informacao: {
+                    DEFAULT: 'hsl(var(--cor-informacao))',
+                    foreground: 'hsl(var(--cor-informacao-contraste))',
+                    texto: 'hsl(var(--cor-informacao-texto))',
+                },
+                atencao: {
+                    DEFAULT: 'hsl(var(--cor-atencao))',
+                    forte: 'hsl(var(--cor-atencao-forte))',
+                    foreground: 'hsl(var(--cor-atencao-contraste))',
+                    texto: 'hsl(var(--cor-atencao-texto))',
+                },
                 sidebar: {
                     DEFAULT: 'hsl(var(--sidebar-background))',
                     foreground: 'hsl(var(--sidebar-foreground))',

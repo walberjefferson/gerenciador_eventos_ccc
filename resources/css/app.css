@@ -34,6 +34,46 @@ html {
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
         --radius: 0.5rem;
+
+        /*
+         * Identidade Caminhada Comunitaria com Cristo (CCC).
+         * Cores extraidas da logo (public/img/logo-ccc.png) e escritas aqui em
+         * HSL para casar com o restante do tema. Todo componente usa estes
+         * tokens; nenhum componente escreve cor literal.
+         *
+         * Contraste medido sobre branco no modo claro:
+         *   vermelho #D0020D 5.68:1 (texto pequeno liberado)
+         *   verde    #019018 4.20:1 (so titulo grande e elemento de UI)
+         *   azul     #0684D5 3.99:1 (so titulo grande e elemento de UI)
+         *   amarelos #FAD119 1.48:1 e #FCF222 1.18:1 (nunca como texto)
+         * Por isso existe um par para cada papel: a cor de superficie
+         * (`--cor-*`) e a variante segura para texto pequeno (`--cor-*-texto`).
+         */
+
+        /* Acao principal - vermelho #D0020D, texto branco por cima (5.68:1). */
+        --cor-acao: 356.8 98.1% 41.2%;
+        --cor-acao-contraste: 0 0% 100%;
+        --cor-acao-texto: 356.8 98.1% 41.2%;
+
+        /* Sucesso e disponibilidade - verde #019018, texto preto por cima (5.00:1). */
+        --cor-sucesso: 129.7 98.6% 28.4%;
+        --cor-sucesso-contraste: 0 0% 0%;
+        /* #018917 - 4.57:1 sobre branco, liberado para texto pequeno. */
+        --cor-sucesso-texto: 129.7 98.5% 27.1%;
+
+        /* Informacao e navegacao - azul #0684D5, texto preto por cima (5.27:1). */
+        --cor-informacao: 203.5 94.5% 42.9%;
+        --cor-informacao-contraste: 0 0% 0%;
+        /* #0677C0 - 4.76:1 sobre branco, liberado para texto pequeno. */
+        --cor-informacao-texto: 203.5 93.9% 38.8%;
+
+        /* Atencao e contagem de tempo - amarelo sol #FAD119 (14.20:1 com preto). */
+        --cor-atencao: 49.1 95.7% 53.9%;
+        /* Amarelo raios #FCF222 (17.86:1 com preto). */
+        --cor-atencao-forte: 57.2 97.3% 56.1%;
+        --cor-atencao-contraste: 0 0% 0%;
+        /* #88710D - 4.76:1 sobre branco; o amarelo puro nunca vira texto. */
+        --cor-atencao-texto: 48.8 82.6% 29.2%;
         --sidebar-background: 0 0% 98%;
         --sidebar-foreground: 240 5.3% 26.1%;
         --sidebar-primary: 0 0% 10%;
@@ -77,6 +117,30 @@ html {
         --sidebar-accent-foreground: 240 4.8% 95.9%;
         --sidebar-border: 0 0% 15.9%;
         --sidebar-ring: 217.2 91.2% 59.8%;
+
+        /*
+         * Modo escuro (fundo #0A0A0A). Verde (4.69:1), azul (4.94:1) e os
+         * amarelos (13:1 e 16:1) passam sem alteracao. So o vermelho precisa
+         * clarear para #DB3F47 (4.51:1); o #D0020D puro daria 3.46:1 e reprova.
+         * Sobre o #DB3F47 o texto passa a ser preto (4.81:1), porque branco
+         * sobre ele fica em 4.36:1.
+         */
+        --cor-acao: 356.9 68.4% 55.3%;
+        --cor-acao-contraste: 0 0% 0%;
+        --cor-acao-texto: 356.9 68.4% 55.3%;
+
+        --cor-sucesso: 129.7 98.6% 28.4%;
+        --cor-sucesso-contraste: 0 0% 0%;
+        --cor-sucesso-texto: 129.7 98.6% 28.4%;
+
+        --cor-informacao: 203.5 94.5% 42.9%;
+        --cor-informacao-contraste: 0 0% 0%;
+        --cor-informacao-texto: 203.5 94.5% 42.9%;
+
+        --cor-atencao: 49.1 95.7% 53.9%;
+        --cor-atencao-forte: 57.2 97.3% 56.1%;
+        --cor-atencao-contraste: 0 0% 0%;
+        --cor-atencao-texto: 49.1 95.7% 53.9%;
     }
 }
 
