@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -100,6 +101,25 @@ class Inscricao extends Model
         return $this->belongsToMany(Atividade::class, 'inscricoes_atividades')
             ->withTimestamps()
             ->orderBy('atividades.id');
+    }
+
+    /**
+     * Cobrancas emitidas para esta inscricao. Normalmente e uma so; podem ser
+     * mais se a primeira vencer e outra for emitida no lugar.
+     *
+     * @return HasMany<Pagamento, $this>
+     */
+    public function pagamentos(): HasMany
+    {
+        return $this->hasMany(Pagamento::class);
+    }
+
+    /**
+     * A cobranca que ainda pode ser paga, se existir.
+     */
+    public function pagamentoPendente(): ?Pagamento
+    {
+        return $this->pagamentos()->pendentes()->orderByDesc('id')->first();
     }
 
     /**

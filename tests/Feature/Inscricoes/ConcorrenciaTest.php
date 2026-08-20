@@ -78,6 +78,14 @@ function limparCenarioCommitado(Cenario $cenario): void
 
     // As demais tabelas saem por cascata: inscricoes_atividades vai junto com
     // as inscricoes, e dias_evento, grupos e atividades vao junto com o evento.
+    // As cobrancas precisam sair antes das inscricoes: a chave estrangeira e
+    // "restrict" de proposito, para que nenhum pagamento suma sem querer.
+    $inscricoes = $conexao->table('inscricoes')
+        ->where('evento_id', $cenario->evento->id)
+        ->pluck('id')
+        ->all();
+
+    $conexao->table('pagamentos')->whereIn('inscricao_id', $inscricoes)->delete();
     $conexao->table('inscricoes')->where('evento_id', $cenario->evento->id)->delete();
     $conexao->table('eventos')->where('id', $cenario->evento->id)->delete();
     $conexao->table('grupos_participantes')->where('id', $cenario->grupoParticipante->id)->delete();

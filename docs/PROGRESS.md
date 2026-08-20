@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 8 (testes das regras de inscrição). **Fase 3 — Inscrição: concluída.**
+> **Última atualização:** 2026-08-20 — Etapa 9 (pagamento simulado e webhook). **Fase 4a — Pagamento: concluída.**
 
 ---
 
@@ -20,31 +20,25 @@
 
 - [x] Etapa 8 — Testes das regras de inscrição: `tests/Feature/Inscricoes/` com `InscricaoTest`, `SelecaoAtividadesTest`, `ConflitoAtividadeTest`, `CapacidadeAtividadeTest`, `InscricaoDuplicadaTest` e `ConcorrenciaTest`, apoiados no cenário compartilhado `Cenario.php`. A concorrência é provada de duas formas: pela gravação condicional (o `UPDATE` não altera nenhuma linha quando o contador alcançou a capacidade) e por seis processos de sistema operacional de verdade disputando a última vaga ao mesmo tempo, cada um com a sua própria conexão (`scripts/disputar-vaga.php`). **Suíte completa: 140 testes, 333 asserções, tudo passando**
 
+- [x] Etapa 9 — Pagamento e webhook: migrações `pagamentos` e `webhooks_pagamento` (dinheiro em centavos, unicidade parcial do identificador externo); Enums `SituacaoPagamento`, `MetodoPagamento` e `SituacaoWebhook`; modelos `Pagamento` e `WebhookPagamento`; contrato `PaymentGateway` e DTOs somente leitura (`app/Contracts/Payments`, `app/DTOs/Payments` — em inglês, por espelharem a fronteira externa); `FakePaymentGateway` completo (emite cobrança Pix fictícia no formato EMV, paga, vence, falha, cancela, estorna e emite aviso assinado); `PaymentServiceProvider` escolhendo o provedor por `config/payments.php`; Actions `CriarPagamentoDaInscricao`, `ConfirmarPagamento` e `CancelarPagamento`; `PaymentWebhookController` (confere assinatura, grava o aviso cru sem dado sensível, responde imediatamente) e o job idempotente `ProcessarWebhookPagamento`; `routes/dev.php` com as rotas de simulação, com dupla trava de ambiente e configuração. A criação de inscrição já emite a cobrança, com `expira_em` igual ao `prazo_pagamento`. **Suíte completa: 160 testes, 424 asserções, tudo passando**
+
 **Com isso, a Fase 3 — Inscrição está concluída:** regras RN-01 a RN-13, reserva de vaga por contador atômico, varredura sob demanda das reservas vencidas e cobertura de teste dos seis cenários exigidos pelo briefing que dependem apenas do domínio de inscrição.
 
 ## Em andamento
 
-- [ ] Nada em andamento. Próxima entrega: Fase 4 — Pagamento simulado (Etapa 9)
+- [ ] Nada em andamento. Próxima entrega: Fase 4b — prazo, expiração agendada, reconciliação e fechamento (Etapa 10)
 
 ## Próximas tarefas
 
-### Fase 4 — Pagamento simulado (Etapa 9)
+### Fase 4b — Prazo, expiração e fechamento (Etapa 10)
 
 O que ainda falta construir, na ordem:
 
-- [ ] Migrações `pagamentos` e `webhooks_pagamento` (dinheiro em centavos, número inteiro; identificadores sem acento)
-- [ ] Enum `SituacaoPagamento` e modelos `Pagamento` e `WebhookPagamento`
-- [ ] Contrato do provedor de pagamento com `parseWebhook` (tradução, não ação — decisão D-17) e a implementação simulada, ligada por `config/payments.php`
-- [ ] Action `IniciarPagamento`, criada a partir da inscrição recém-nascida (o valor já vem congelado em `valor_centavos`)
-- [ ] Action `ConfirmarPagamento`: transforma reserva em vaga confirmada, movendo o contador de `vagas_reservadas` para `vagas_confirmadas` na mesma transação, sem apagar registro
-- [ ] Endereço de webhook que responde **200 mesmo com assinatura inválida** (decisão D-18), gravando o aviso como inválido e sem produzir efeito; proteção contra aviso repetido
-- [ ] Completar `ExpirarInscricoesVencidas` com o `TODO(Fase 4)` que ficou no código: cancelar o pagamento pendente e disparar o anúncio `InscricaoExpirada` (decisão D-23)
+- [ ] Completar `ExpirarInscricoesVencidas` com o `TODO(Fase 4)` que ficou no código: cancelar a cobrança pendente (`CancelarPagamento`, com destino `SituacaoPagamento::Expirado`) e disparar o anúncio `InscricaoExpirada` (decisão D-23)
+- [ ] Anúncios internos `InscricaoConfirmada` e `InscricaoExpirada`. O ponto exato onde a confirmação deve ser anunciada está marcado com `TODO(Fase 4b)` em `ConfirmarPagamento`
+- [ ] Comandos `inscricoes:expirar-vencidas` e `pagamentos:reconciliar`, agendados em `routes/console.php`. A reconciliação consulta o provedor com `getPayment()` e aplica o mesmo `ConfirmarPagamento`, que já é idempotente
+- [ ] Testes `PrazoPagamentoTest`, `ExpiracaoInscricaoTest` e `ReconciliacaoTest`, incluindo o pagamento que chega depois do prazo (pendência P-03)
 - [ ] Ouvintes dos anúncios internos `InscricaoCriada` e `InscricaoConfirmada` (ainda sem e-mail — decisão D-12)
-- [ ] Testes de pagamento, incluindo o aviso repetido e o pagamento que chega depois do prazo (pendência P-03)
-
-### Fase 5 (Etapa 10)
-
-- [ ] Prazo, expiração agendada, reconciliação e fechamento do evento
 
 ---
 
@@ -76,6 +70,12 @@ O que ainda falta construir, na ordem:
 | D-22 | O envio do formulário é a rota `POST /inscricoes` em `routes/web.php` | O projeto não tem `routes/api.php`; criar um exigiria instalar o pacote de API só para uma rota. A proteção contra envio forjado (CSRF) do grupo `web` é bem-vinda em um formulário público |
 | D-23 | `ExpirarInscricoesVencidas` foi antecipada da etapa de pagamento para a etapa de inscrição | A varredura sob demanda (quando o contador diz "lotado") depende dela. A versão atual apenas muda a situação e devolve as vagas; cancelar a cobrança e anunciar a expiração entram junto com o domínio de pagamento |
 | D-24 | Envio repetido com a mesma chave de idempotência responde **200**, e não 201 | Nada de novo foi criado. O participante recebe a mesma inscrição, e o código de resposta diz a verdade sobre o que aconteceu |
+| D-26 | O provedor simulado guarda o estado de cada cobrança em **arquivo no disco local** (`storage/app/private/pagamentos-simulados`), não em memória nem em cache | A cobrança é criada em uma requisição e paga em outra, inclusive em processos diferentes (o teste de concorrência dispara processos de sistema operacional). Arquivo funciona em qualquer máquina, sem depender de Redis para desenvolver |
+| D-27 | A cobrança é emitida **fora** da transação que cria a inscrição | Conversa com serviço externo não pode segurar uma transação de banco aberta. Se a emissão falhar, a inscrição já existe e a cobrança sai na tentativa seguinte, porque `CriarPagamentoDaInscricao` é repetível |
+| D-28 | A rota do webhook fica **fora do grupo `web`** | Quem chama é um servidor, não um navegador: sem sessão e sem cookie, não há proteção de CSRF a satisfazer nem por que criar sessão |
+| D-29 | As rotas de simulação têm **duas travas**: só são registradas em `local`/`testing` com a chave ligada, e ainda passam por um middleware que confere as duas condições de novo | Uma configuração trocada por engano em produção não pode abrir uma porta de "pagar sem pagar". A resposta é 404, não 403: quem procura a porta nem descobre que ela existe |
+| D-30 | A chave estrangeira de `pagamentos` para `inscricoes` é **restrict** | Apagar inscrição já é proibido; a restrição do banco garante que nenhum histórico de dinheiro suma junto com um apagamento acidental |
+| D-31 | O aviso do provedor é guardado com os campos sensíveis substituídos por `[removido]` (segredo, token, cartão, CVV) | O aviso serve para investigar divergência, não para colecionar dado sensível |
 | D-25 | O prazo de pagamento (`prazo_pagamento`) já é gravado na criação da inscrição | RN-P01 manda congelar o prazo no momento da inscrição. Sem ele gravado, a varredura sob demanda não teria como saber quais reservas venceram |
 
 ---
@@ -90,6 +90,7 @@ O que ainda falta construir, na ordem:
 | P-04 | Definir prazo de retenção e descarte de dados pessoais | Dono do produto |
 | P-05 | Definir como o participante acessa a inscrição depois (link assinado, código por e-mail) | Fase 5 |
 | P-06 | Confirmar as taxas de Pagar.me, Mercado Pago e Asaas diretamente com o comercial | Dono do produto. Ver seção 6.3 de `PAYMENTS.md` |
+| P-08 | Conferir no `.env` local as chaves `PAYMENT_GATEWAY`, `PAYMENT_FAKE_SIMULATION_ENABLED` e `PAYMENT_FAKE_WEBHOOK_SECRET`, como já estão em `.env.example`. Sem o segredo do webhook, o provedor simulado recusa todo aviso (falha para o lado seguro) | Pessoa desenvolvedora, na própria máquina |
 | P-07 | Ajustar o arquivo `.env` local para `DB_PORT=55432` e `FORWARD_PGSQL_PORT=55432`, como já está em `.env.example` (decisão D-19) | Pessoa desenvolvedora, na própria máquina |
 
 ---

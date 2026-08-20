@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Inscricoes;
 
+use App\Actions\Pagamentos\CriarPagamentoDaInscricao;
 use App\DTOs\Inscricoes\DadosNovaInscricao;
 use App\Enums\SituacaoInscricao;
 use App\Events\InscricaoCriada;
@@ -34,6 +35,7 @@ class CriarInscricao
         private readonly ValidadorSelecaoAtividades $validadorSelecao,
         private readonly ReservarVagas $reservarVagas,
         private readonly ExpirarInscricoesVencidas $expirarVencidas,
+        private readonly CriarPagamentoDaInscricao $criarPagamento,
     ) {}
 
     public function __invoke(DadosNovaInscricao $dados): Inscricao
@@ -47,19 +49,37 @@ class CriarInscricao
         // RN-12 — o mesmo envio repetido devolve a inscricao ja criada, sem
         // prender vaga de novo.
         if ($jaCriada = $this->buscarPelaChave($evento, $dados)) {
-            return $jaCriada;
+            return $this->comCobranca($jaCriada);
         }
 
         try {
-            return $this->tentar($evento, $grupo, $dados);
+            $inscricao = $this->tentar($evento, $grupo, $dados);
         } catch (VagasEsgotadasException) {
             // Varredura sob demanda: a vaga pode estar presa por reservas que
             // ja venceram e que o agendador ainda nao alcancou.
             ($this->expirarVencidas)($evento);
 
             // Uma unica retentativa. Falhando de novo, esta esgotado de verdade.
-            return $this->tentar($evento, $grupo, $dados);
+            $inscricao = $this->tentar($evento, $grupo, $dados);
         }
+
+        return $this->comCobranca($inscricao);
+    }
+
+    /**
+     * Garante que a inscricao tenha a sua cobranca aberta, com o mesmo prazo
+     * dela.
+     *
+     * Fica fora da transacao de proposito: emitir a cobranca conversa com um
+     * servico externo, e servico externo nao pode segurar uma transacao de
+     * banco aberta. Se a emissao falhar, a inscricao ja existe e a cobranca e
+     * emitida na proxima tentativa — a chamada e repetivel.
+     */
+    private function comCobranca(Inscricao $inscricao): Inscricao
+    {
+        ($this->criarPagamento)($inscricao);
+
+        return $inscricao;
     }
 
     private function tentar(Evento $evento, GrupoParticipante $grupo, DadosNovaInscricao $dados): Inscricao
