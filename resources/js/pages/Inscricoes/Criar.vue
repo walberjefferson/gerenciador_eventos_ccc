@@ -2,6 +2,7 @@
 import IndicadorDePassos from '@/components/inscricao/IndicadorDePassos.vue';
 import PassoDadosPessoais from '@/components/inscricao/PassoDadosPessoais.vue';
 import PassoParticipacao from '@/components/inscricao/PassoParticipacao.vue';
+import PassoRevisao from '@/components/inscricao/PassoRevisao.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useGruposDaCidade } from '@/composables/useGruposDaCidade';
@@ -10,7 +11,7 @@ import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarValor } from '@/lib/formato';
 import type { DiaEventoPublico, EventoPublico } from '@/types/evento';
 import type { CidadePublica, ConflitoDeAtividades, FormularioInscricao, GrupoParticipantePublico, PassoDaInscricao } from '@/types/inscricao';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
 
 /**
@@ -20,6 +21,7 @@ import { computed, nextTick, ref } from 'vue';
  */
 const props = defineProps<{
     evento?: EventoPublico | null;
+    evento_id?: number;
     cidades?: CidadePublica[];
     grupos_participantes?: GrupoParticipantePublico[];
     conflitos?: ConflitoDeAtividades[];
@@ -44,7 +46,7 @@ function novaChave(): string {
 }
 
 const formulario = ref<FormularioInscricao>({
-    evento_id: 0,
+    evento_id: props.evento_id ?? 0,
     cidade_id: null,
     grupo_participante_id: null,
     nome_completo: '',
@@ -80,6 +82,11 @@ const selecao = useSelecaoAtividades({ dias, conflitos, dataNascimento });
 const passo = ref<PassoDaInscricao>('dados');
 const mostrarProblemasDaParticipacao = ref(false);
 const errosLocais = ref<Record<string, string>>({});
+const errosDoServidor = ref<Record<string, string>>({});
+const enviando = ref(false);
+
+/** O que a tela mostra: o erro do servidor sempre por cima do nosso palpite. */
+const erros = computed<Record<string, string>>(() => ({ ...errosLocais.value, ...errosDoServidor.value }));
 const anuncio = ref('');
 const tituloDoPasso = ref<HTMLElement | null>(null);
 
@@ -109,40 +116,40 @@ function apenasDigitos(valor: string): string {
  * regra de negocio: so evita a viagem ate o servidor por um campo vazio.
  */
 function conferirDados(): boolean {
-    const erros: Record<string, string> = {};
+    const encontrados: Record<string, string> = {};
     const dados = formulario.value;
 
     if (dados.nome_completo.trim().length < 3) {
-        erros.nome_completo = 'Informe o seu nome completo.';
+        encontrados.nome_completo = 'Informe o seu nome completo.';
     }
 
     if (!/^\S+@\S+\.\S+$/.test(dados.email.trim())) {
-        erros.email = 'Este e-mail parece incompleto. Confira e tente de novo.';
+        encontrados.email = 'Este e-mail parece incompleto. Confira e tente de novo.';
     }
 
     if (apenasDigitos(dados.telefone).length < 8) {
-        erros.telefone = 'Informe um telefone com DDD para contato.';
+        encontrados.telefone = 'Informe um telefone com DDD para contato.';
     }
 
     if (apenasDigitos(dados.documento).length !== 11) {
-        erros.documento = 'Este CPF não parece válido. Confira os números digitados.';
+        encontrados.documento = 'Este CPF não parece válido. Confira os números digitados.';
     }
 
     if (dados.data_nascimento === '') {
-        erros.data_nascimento = 'Informe a sua data de nascimento.';
+        encontrados.data_nascimento = 'Informe a sua data de nascimento.';
     }
 
     if (dados.cidade_id === null) {
-        erros.cidade_id = 'Escolha a sua cidade.';
+        encontrados.cidade_id = 'Escolha a sua cidade.';
     }
 
     if (dados.grupo_participante_id === null) {
-        erros.grupo_participante_id = 'Escolha o seu grupo.';
+        encontrados.grupo_participante_id = 'Escolha o seu grupo.';
     }
 
-    errosLocais.value = erros;
+    errosLocais.value = encontrados;
 
-    const primeiro = Object.keys(erros)[0];
+    const primeiro = Object.keys(encontrados)[0];
 
     if (primeiro !== undefined) {
         nextTick(() => document.getElementById(primeiro)?.focus());
@@ -174,6 +181,118 @@ async function avancar(): Promise<void> {
         formulario.value.atividades = [...selecao.selecionadas.value];
         await irPara('revisao');
     }
+}
+
+/** Em qual etapa mora cada campo que o servidor pode recusar. */
+const passoDoCampo: Record<string, PassoDaInscricao> = {
+    nome_completo: 'dados',
+    email: 'dados',
+    telefone: 'dados',
+    documento: 'dados',
+    data_nascimento: 'dados',
+    cidade_id: 'dados',
+    grupo_participante_id: 'dados',
+    atividades: 'participacao',
+    aceite_termos: 'revisao',
+    chave_idempotencia: 'revisao',
+    evento_id: 'revisao',
+    evento: 'revisao',
+};
+
+function formatarDataCurta(iso: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        return iso;
+    }
+
+    const [ano, mes, dia] = iso.split('-');
+
+    return `${dia}/${mes}/${ano}`;
+}
+
+const resumoPessoal = computed<Array<{ rotulo: string; valor: string }>>(() => {
+    const dados = formulario.value;
+    const cidade = cidades.value.find((candidata) => candidata.id === dados.cidade_id);
+    const grupo = gruposParticipantes.value.find((candidato) => candidato.id === dados.grupo_participante_id);
+
+    return [
+        { rotulo: 'Nome', valor: dados.nome_completo },
+        { rotulo: 'E-mail', valor: dados.email },
+        { rotulo: 'Telefone', valor: dados.telefone },
+        { rotulo: 'CPF', valor: dados.documento },
+        { rotulo: 'Data de nascimento', valor: formatarDataCurta(dados.data_nascimento) },
+        { rotulo: 'Cidade', valor: cidade?.rotulo ?? '—' },
+        { rotulo: 'Grupo', valor: grupo?.nome ?? '—' },
+    ];
+});
+
+const atividadesPorDia = computed(() =>
+    dias.value.map((dia) => ({
+        id: dia.id,
+        nome: dia.nome,
+        data_rotulo: dia.data_rotulo,
+        atividades: dia.grupos.flatMap((grupo) => grupo.atividades.filter((atividade) => selecao.estaSelecionada(atividade.id))),
+    })),
+);
+
+/**
+ * O 422 do servidor manda. Ele diz qual campo tem problema; a tela volta para
+ * a etapa desse campo e coloca o foco nele, para ninguem ficar preso sem
+ * entender o que aconteceu.
+ */
+async function tratarRecusa(recebidos: Record<string, string>): Promise<void> {
+    const traduzidos: Record<string, string> = { ...recebidos };
+
+    // "evento" nao e um campo da tela: vira o aviso geral da revisao.
+    if (recebidos.evento !== undefined) {
+        traduzidos.geral = recebidos.evento;
+    }
+
+    errosDoServidor.value = traduzidos;
+
+    const primeiro = Object.keys(recebidos)[0];
+
+    if (primeiro === undefined) {
+        return;
+    }
+
+    const raiz = primeiro.split('.')[0];
+    const destino = passoDoCampo[raiz] ?? 'revisao';
+
+    if (destino === 'participacao') {
+        mostrarProblemasDaParticipacao.value = true;
+    }
+
+    if (destino !== passo.value) {
+        await irPara(destino);
+    }
+
+    await nextTick();
+    document.getElementById(raiz)?.focus();
+}
+
+function enviar(): void {
+    if (enviando.value) {
+        return;
+    }
+
+    errosDoServidor.value = {};
+    formulario.value.atividades = [...selecao.selecionadas.value];
+    enviando.value = true;
+
+    // A chave de idempotencia e sempre a mesma desta sessao do formulario:
+    // reenviar nunca cria uma segunda inscricao.
+    router.post(
+        '/inscricoes',
+        { ...formulario.value },
+        {
+            onError: (recebidos: Record<string, string>) => {
+                void tratarRecusa(recebidos);
+            },
+            onFinish: () => {
+                enviando.value = false;
+            },
+        },
+    );
 }
 
 async function voltar(): Promise<void> {
@@ -222,17 +341,22 @@ async function voltar(): Promise<void> {
                 :cidades="cidades"
                 :grupos-da-cidade="gruposDaCidade"
                 :aviso-sem-grupos="avisoSemGrupos"
-                :erros="errosLocais"
+                :erros="erros"
             />
 
             <PassoParticipacao v-if="passo === 'participacao'" :dias="dias" :selecao="selecao" :mostrar-problemas="mostrarProblemasDaParticipacao" />
 
-            <section v-if="passo === 'revisao'" class="space-y-3">
-                <p class="text-sm text-muted-foreground">
-                    {{ selecao.totalSelecionadas.value }} atividade(s) escolhida(s). A revisão completa e o aceite do regulamento chegam na próxima
-                    entrega.
-                </p>
-            </section>
+            <PassoRevisao
+                v-if="passo === 'revisao'"
+                v-model="formulario"
+                :evento="evento"
+                :resumo-pessoal="resumoPessoal"
+                :atividades-por-dia="atividadesPorDia"
+                :erros="erros"
+                :enviando="enviando"
+                @editar="irPara"
+                @enviar="enviar"
+            />
 
             <div class="flex flex-col gap-3 sm:flex-row-reverse">
                 <Button

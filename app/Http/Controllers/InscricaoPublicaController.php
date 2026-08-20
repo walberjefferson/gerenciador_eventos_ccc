@@ -57,6 +57,9 @@ class InscricaoPublicaController extends Controller
 
         return Inertia::render('Inscricoes/Criar', [
             'evento' => new EventoPublicoResource($evento),
+            // O formulario precisa do identificador para o POST; o resto do
+            // evento continua chegando pelo Resource publico.
+            'evento_id' => $evento->id,
             'cidades' => CidadeResource::collection($cidades)->resolve(),
             'grupos_participantes' => GrupoParticipanteResource::collection($grupos)->resolve(),
             'conflitos' => $this->conflitosDoEvento($evento),

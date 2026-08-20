@@ -3,6 +3,7 @@
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
+use App\Http\Controllers\PagamentoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -23,6 +24,12 @@ Route::get('eventos/{slug}/inscricao', [InscricaoPublicaController::class, 'crea
 // Envio do formulario de inscricao. Responde JSON: as telas publicas entram
 // na fase do site do participante.
 Route::post('inscricoes', [InscricaoController::class, 'store'])->name('inscricoes.store');
+
+// Cobranca Pix. O codigo publico nunca autentica sozinho: sem a assinatura
+// valida na URL, o middleware responde 403.
+Route::get('inscricoes/{codigo_publico}/pagamento', [PagamentoController::class, 'show'])
+    ->middleware('signed')
+    ->name('inscricoes.pagamento');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
