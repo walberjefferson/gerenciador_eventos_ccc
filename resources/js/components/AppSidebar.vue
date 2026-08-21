@@ -4,16 +4,21 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid } from 'lucide-vue-next';
+import { CalendarDays, LayoutGrid } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
-// A navegação administrativa de verdade. Por enquanto só o painel: cada fase
-// seguinte acrescenta o seu item aqui, e não em um menu paralelo.
+// A navegação administrativa de verdade. Cada fase acrescenta o seu item aqui,
+// e não em um menu paralelo.
 const itensDoPainel: NavItem[] = [
     {
         title: 'Painel',
         href: '/admin/painel',
         icon: LayoutGrid,
+    },
+    {
+        title: 'Eventos',
+        href: '/admin/eventos',
+        icon: CalendarDays,
     },
 ];
 </script>

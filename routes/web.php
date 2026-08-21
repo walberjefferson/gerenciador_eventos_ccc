@@ -2,7 +2,12 @@
 
 use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
+use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\CidadeController;
+use App\Http\Controllers\Admin\ConflitoAtividadeController;
+use App\Http\Controllers\Admin\DiaEventoController;
+use App\Http\Controllers\Admin\EventoController;
+use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\EventoPublicoController;
@@ -102,6 +107,39 @@ Route::middleware(['auth', 'verified'])
                     ->name('grupos-participantes.update');
                 Route::delete('grupos-participantes/{grupo_participante}', [GrupoParticipanteController::class, 'destroy'])
                     ->name('grupos-participantes.destroy');
+            });
+
+        // Estrutura do evento. Tudo o que pendura no evento — dias, grupos,
+        // atividades e conflitos — vive dentro da URL dele, para que nenhuma
+        // tela alcance a programacao de outro evento trocando um numero.
+        Route::middleware('permission:eventos.gerenciar')
+            ->prefix('eventos')
+            ->name('eventos.')
+            ->group(function (): void {
+                Route::get('/', [EventoController::class, 'index'])->name('index');
+                Route::get('novo', [EventoController::class, 'create'])->name('create');
+                Route::post('/', [EventoController::class, 'store'])->name('store');
+                Route::get('{evento}/editar', [EventoController::class, 'edit'])->name('edit');
+                Route::put('{evento}', [EventoController::class, 'update'])->name('update');
+                Route::delete('{evento}', [EventoController::class, 'destroy'])->name('destroy');
+
+                Route::get('{evento}/estrutura', [EventoController::class, 'estrutura'])->name('estrutura');
+
+                Route::post('{evento}/dias', [DiaEventoController::class, 'store'])->name('dias.store');
+                Route::put('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'update'])->name('dias.update');
+                Route::delete('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'destroy'])->name('dias.destroy');
+
+                Route::post('{evento}/grupos', [GrupoAtividadeController::class, 'store'])->name('grupos.store');
+                Route::put('{evento}/grupos/{grupo_atividade}', [GrupoAtividadeController::class, 'update'])->name('grupos.update');
+                Route::delete('{evento}/grupos/{grupo_atividade}', [GrupoAtividadeController::class, 'destroy'])->name('grupos.destroy');
+
+                Route::post('{evento}/atividades', [AtividadeController::class, 'store'])->name('atividades.store');
+                Route::put('{evento}/atividades/{atividade}', [AtividadeController::class, 'update'])->name('atividades.update');
+                Route::delete('{evento}/atividades/{atividade}', [AtividadeController::class, 'destroy'])->name('atividades.destroy');
+
+                Route::post('{evento}/conflitos', [ConflitoAtividadeController::class, 'store'])->name('conflitos.store');
+                Route::delete('{evento}/conflitos/{conflito_atividade}', [ConflitoAtividadeController::class, 'destroy'])
+                    ->name('conflitos.destroy');
             });
     });
 

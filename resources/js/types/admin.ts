@@ -35,3 +35,120 @@ export interface OpcaoDeCidade {
     nome: string;
     ativo: boolean;
 }
+
+/** Uma situação do evento, com o rótulo que a pessoa lê na tela. */
+export interface OpcaoDeSituacao {
+    valor: string;
+    rotulo: string;
+}
+
+/** Uma linha da lista de eventos. */
+export interface EventoDaLista {
+    id: number;
+    nome: string;
+    slug: string;
+    situacao: string;
+    situacao_rotulo: string;
+    data_inicio: string;
+    data_fim: string;
+    capacidade: number | null;
+    vagas_ocupadas: number;
+    valor_centavos: number;
+    /** Quantas inscrições existem neste evento, em qualquer situação. */
+    inscricoes: number;
+}
+
+/** O evento aberto no formulário de cadastro. */
+export interface EventoEmEdicao {
+    id: number;
+    nome: string;
+    slug: string;
+    descricao: string | null;
+    data_inicio: string;
+    data_fim: string;
+    inscricoes_abrem_em: string;
+    inscricoes_fecham_em: string;
+    capacidade: number | null;
+    valor_centavos: number;
+    moeda: string;
+    prazo_pagamento_minutos: number;
+    situacao: string;
+    regulamento: string;
+    versao_termos: string;
+    contato_email: string;
+    contato_telefone: string | null;
+    vagas_ocupadas: number;
+    /** Quantas inscrições ativas seguram a estrutura deste evento. */
+    inscricoes_ativas: number;
+}
+
+/** O cabeçalho do evento na tela de programação. */
+export interface EventoDaEstrutura {
+    id: number;
+    nome: string;
+    slug: string;
+    situacao_rotulo: string;
+    data_inicio: string;
+    data_fim: string;
+    inscricoes_ativas: number;
+}
+
+/** Uma atividade dentro de um grupo. */
+export interface AtividadeDaEstrutura {
+    id: number;
+    grupo_atividade_id: number;
+    nome: string;
+    descricao: string | null;
+    comeca_em: string;
+    termina_em: string;
+    capacidade: number | null;
+    idade_minima: number | null;
+    idade_maxima: number | null;
+    posicao: number;
+    ativo: boolean;
+    vagas_ocupadas: number;
+    /** Quantas pessoas já escolheram esta atividade. */
+    escolhida_por: number;
+}
+
+/** Um grupo de atividades dentro de um dia. */
+export interface GrupoDaEstrutura {
+    id: number;
+    dia_evento_id: number;
+    nome: string;
+    descricao: string | null;
+    obrigatorio: boolean;
+    min_selecoes: number;
+    max_selecoes: number | null;
+    posicao: number;
+    ativo: boolean;
+    atividades: AtividadeDaEstrutura[];
+}
+
+/** Um dia da programação. */
+export interface DiaDaEstrutura {
+    id: number;
+    nome: string;
+    descricao: string | null;
+    data: string;
+    posicao: number;
+    ativo: boolean;
+    grupos: GrupoDaEstrutura[];
+}
+
+/** Um par de atividades que ninguém pode escolher junto. */
+export interface ConflitoDaEstrutura {
+    id: number;
+    atividade_a_id: number;
+    atividade_b_id: number;
+    atividade_a: string;
+    atividade_b: string;
+    motivo: string | null;
+}
+
+/** Uma atividade na lista plana usada pelos seletores de conflito. */
+export interface OpcaoDeAtividade {
+    id: number;
+    nome: string;
+    escolhida_por: number;
+}

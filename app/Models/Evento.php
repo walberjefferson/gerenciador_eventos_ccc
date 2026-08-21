@@ -66,6 +66,19 @@ class Evento extends Model
     }
 
     /**
+     * As inscricoes feitas neste evento, em qualquer situacao.
+     *
+     * A tela de cadastro usa isso para saber, antes de aceitar uma mudanca de
+     * estrutura, se ha gente inscrita para se preocupar.
+     *
+     * @return HasMany<Inscricao, $this>
+     */
+    public function inscricoes(): HasMany
+    {
+        return $this->hasMany(Inscricao::class);
+    }
+
+    /**
      * @return HasManyThrough<GrupoAtividade, DiaEvento, $this>
      */
     public function gruposAtividades(): HasManyThrough
