@@ -86,6 +86,9 @@ function limparCenarioCommitado(Cenario $cenario): void
         ->all();
 
     $conexao->table('pagamentos')->whereIn('inscricao_id', $inscricoes)->delete();
+    // Pelo mesmo motivo, os registros de e-mail enviado saem antes: a chave
+    // tambem e "restrict", para que nenhum comprovante de envio se perca.
+    $conexao->table('comunicacoes_enviadas')->whereIn('inscricao_id', $inscricoes)->delete();
     $conexao->table('inscricoes')->where('evento_id', $cenario->evento->id)->delete();
     $conexao->table('eventos')->where('id', $cenario->evento->id)->delete();
     $conexao->table('grupos_participantes')->where('id', $cenario->grupoParticipante->id)->delete();

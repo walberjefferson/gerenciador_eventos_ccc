@@ -9,6 +9,9 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
+    // Descoberta automatica de ouvintes desligada: quem escuta cada anuncio do
+    // dominio esta escrito a mao em AppServiceProvider. Ver o motivo la.
+    ->withEvents(discover: false)
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
