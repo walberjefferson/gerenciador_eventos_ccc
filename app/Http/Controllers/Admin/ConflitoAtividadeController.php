@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\CuidaDaEstruturaDoEvento;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ConflitoAtividadeRequest;
 use App\Models\Atividade;
@@ -27,6 +28,7 @@ use Illuminate\Http\RedirectResponse;
 class ConflitoAtividadeController extends Controller
 {
     use CuidaDaEstruturaDoEvento;
+    use RegistraAuditoria;
 
     public function store(ConflitoAtividadeRequest $request, Evento $evento): RedirectResponse
     {
@@ -36,7 +38,9 @@ class ConflitoAtividadeController extends Controller
 
         $this->confirmarQueEDoEvento($evento, $this->eventoDaAtividade($a));
 
-        ConflitoAtividade::create($request->dadosDoConflito());
+        $conflito = ConflitoAtividade::create($request->dadosDoConflito());
+
+        $this->auditarCriacao($conflito, 'conflito-atividade');
 
         return back()->with('sucesso', 'Conflito cadastrado.');
     }
@@ -47,6 +51,8 @@ class ConflitoAtividadeController extends Controller
         $this->confirmarQueEDoEvento($evento, $this->eventoDaAtividade((int) $conflitoAtividade->atividade_a_id));
 
         $conflitoAtividade->delete();
+
+        $this->auditarRemocao($conflitoAtividade, 'conflito-atividade');
 
         return back()->with('sucesso', 'Conflito removido.');
     }

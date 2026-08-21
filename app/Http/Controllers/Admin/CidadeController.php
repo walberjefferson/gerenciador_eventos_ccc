@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CidadeRequest;
 use App\Models\Cidade;
@@ -23,6 +24,8 @@ use Inertia\Response;
  */
 class CidadeController extends Controller
 {
+    use RegistraAuditoria;
+
     public function index(): Response
     {
         $this->authorize('viewAny', Cidade::class);
@@ -52,6 +55,8 @@ class CidadeController extends Controller
 
         $cidade = Cidade::create($request->dadosDaCidade());
 
+        $this->auditarCriacao($cidade, 'cidade');
+
         return back()->with('sucesso', "Cidade {$cidade->nome} cadastrada.");
     }
 
@@ -59,7 +64,11 @@ class CidadeController extends Controller
     {
         $this->authorize('update', $cidade);
 
+        $antes = $cidade->getRawOriginal();
+
         $cidade->update($request->dadosDaCidade());
+
+        $this->auditarAlteracao($cidade, $antes, 'cidade');
 
         return back()->with('sucesso', "Cidade {$cidade->nome} atualizada.");
     }
@@ -80,6 +89,8 @@ class CidadeController extends Controller
         $nome = $cidade->nome;
 
         $cidade->delete();
+
+        $this->auditarRemocao($cidade, 'cidade');
 
         return back()->with('sucesso', "Cidade {$nome} excluída.");
     }

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\AcaoAuditada;
 use App\Models\User;
+use App\Services\Auditoria\RegistrarAcao;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -81,6 +83,18 @@ class CriarAdministrador extends Command
         $usuario->forceFill(['email_verified_at' => now()])->save();
 
         $usuario->assignRole($papel);
+
+        // Conta administrativa nascendo e exatamente o tipo de evento que
+        // alguem revisando o sistema precisa conseguir encontrar depois. Nao
+        // ha usuario autenticado aqui — quem rodou o comando esta no
+        // servidor —, entao o responsavel fica como "Sistema" e o rastro
+        // guarda o e-mail e o papel concedido. A senha, obviamente, nao entra.
+        app(RegistrarAcao::class)(
+            AcaoAuditada::CriouUsuarioAdministrativo,
+            'usuario',
+            (int) $usuario->getKey(),
+            ['email' => $email, 'papel' => $papel, 'origem' => 'linha de comando'],
+        );
 
         $this->components->info(sprintf('Conta criada para %s com o papel "%s".', $email, $papel));
 

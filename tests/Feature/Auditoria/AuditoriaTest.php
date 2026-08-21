@@ -2,14 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Actions\Inscricoes\CancelarInscricaoAdministrativa;
+use App\Actions\Pagamentos\ConfirmarPagamentoManual;
 use App\Enums\AcaoAuditada;
+use App\Enums\MetodoPagamento;
+use App\Enums\SituacaoInscricao;
 use App\Exceptions\Auditoria\LogAuditoriaImutavelException;
+use App\Models\Cidade;
 use App\Models\LogAuditoria;
 use App\Models\User;
 use App\Services\Auditoria\RegistrarAcao;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Tests\Feature\Admin\Cenario as CenarioAdmin;
+use Tests\Feature\Inscricoes\Cenario as CenarioInscricoes;
 
 /**
  * As quatro propriedades que fazem a auditoria valer alguma coisa: ela grava,
@@ -64,16 +71,16 @@ it('recusa apagar um registro de auditoria', function (): void {
     expect(fn () => $registro->delete())
         ->toThrow(LogAuditoriaImutavelException::class);
 
-    expect(LogAuditoria::query()->count())->toBe(1);
+    expect(LogAuditoria::query()->whereKey($registro->getKey())->exists())->toBeTrue();
 });
 
 it('recusa apagar em lote pelo model', function (): void {
-    app(RegistrarAcao::class)(AcaoAuditada::Criou, 'evento', 1);
+    $registro = app(RegistrarAcao::class)(AcaoAuditada::Criou, 'evento', 1);
 
-    expect(fn () => LogAuditoria::query()->get()->each->delete())
+    expect(fn () => LogAuditoria::query()->whereKey($registro->getKey())->get()->each->delete())
         ->toThrow(LogAuditoriaImutavelException::class);
 
-    expect(LogAuditoria::query()->count())->toBe(1);
+    expect(LogAuditoria::query()->whereKey($registro->getKey())->exists())->toBeTrue();
 });
 
 it('nao guarda CPF, hash de documento, senha, token nem Pix completo', function (): void {
@@ -141,4 +148,142 @@ it('deixa o efeito da acao de pe mesmo sem conseguir auditar', function (): void
     });
 
     expect($usuario->fresh()->name)->toBe('Depois da acao');
+});
+
+/*
+|--------------------------------------------------------------------------
+| As acoes administrativas que precisam deixar rastro
+|--------------------------------------------------------------------------
+|
+| Aqui nao se testa o servico de auditoria — isso ja foi feito acima. Testa-se
+| se cada porta administrativa do sistema de fato chama o servico, porque uma
+| auditoria perfeita que ninguem aciona nao registra nada.
+*/
+
+it('registra o cancelamento administrativo com quem, o que e por que', function (): void {
+    $cenario = CenarioInscricoes::montar(['capacidade' => 10]);
+    $inscricao = $cenario->inscrever();
+    $organizador = User::factory()->create(['name' => 'Bruno Organizador']);
+
+    app(CancelarInscricaoAdministrativa::class)($inscricao, 'Desistiu por telefone', $organizador);
+
+    $registro = LogAuditoria::query()
+        ->where('acao', AcaoAuditada::CancelouInscricao->value)
+        ->where('entidade_id', $inscricao->id)
+        ->sole();
+
+    expect($registro->usuario_id)->toBe($organizador->id)
+        ->and($registro->entidade)->toBe('inscricao')
+        ->and($registro->entidade_id)->toBe((int) $inscricao->id)
+        ->and($registro->motivo)->toBe('Desistiu por telefone')
+        ->and($registro->dados['situacao']['depois'])->toBe(SituacaoInscricao::Cancelada->value);
+});
+
+it('nao registra um cancelamento que nao aconteceu', function (): void {
+    $cenario = CenarioInscricoes::montar(['capacidade' => 10]);
+    $inscricao = $cenario->inscrever();
+    $organizador = User::factory()->create();
+
+    app(CancelarInscricaoAdministrativa::class)($inscricao, 'Primeira vez', $organizador);
+    // A segunda chamada nao muda nada: a inscricao ja esta cancelada.
+    app(CancelarInscricaoAdministrativa::class)($inscricao->fresh(), 'Segunda vez', $organizador);
+
+    expect(
+        LogAuditoria::query()
+            ->where('acao', AcaoAuditada::CancelouInscricao->value)
+            ->where('entidade_id', $inscricao->id)
+            ->count()
+    )->toBe(1);
+});
+
+it('registra a confirmacao manual de pagamento sem guardar dado do provedor', function (): void {
+    $cenario = CenarioInscricoes::montar(['capacidade' => 10]);
+    $inscricao = $cenario->inscrever();
+    $administrador = User::factory()->create(['name' => 'Carla Administradora']);
+
+    app(ConfirmarPagamentoManual::class)(
+        $inscricao,
+        $administrador,
+        MetodoPagamento::Dinheiro,
+        'Recebido em dinheiro na secretaria',
+    );
+
+    $registro = LogAuditoria::query()
+        ->where('acao', AcaoAuditada::ConfirmouPagamentoManual->value)
+        ->where('entidade_id', $inscricao->id)
+        ->sole();
+
+    expect($registro->usuario_id)->toBe($administrador->id)
+        ->and($registro->entidade_id)->toBe((int) $inscricao->id)
+        ->and($registro->motivo)->toBe('Recebido em dinheiro na secretaria')
+        ->and($registro->dados['metodo'])->toBe(MetodoPagamento::Dinheiro->value)
+        ->and($registro->dados['valor_centavos'])->toBeInt();
+});
+
+it('registra o cadastro, a alteracao e a remocao feitos pelo painel', function (): void {
+    CenarioAdmin::semearPapeis();
+    $administrador = CenarioAdmin::usuarioCom('administrador');
+
+    $this->actingAs($administrador)
+        ->post(route('admin.catalogo.cidades.store'), ['nome' => 'Ribeirão Preto', 'uf' => 'SP', 'ativo' => true])
+        ->assertRedirect();
+
+    $cidade = Cidade::query()->where('nome', 'Ribeirão Preto')->sole();
+
+    $this->actingAs($administrador)
+        ->put(route('admin.catalogo.cidades.update', $cidade), ['nome' => 'Ribeirão Preto', 'uf' => 'SP', 'ativo' => false])
+        ->assertRedirect();
+
+    $this->actingAs($administrador)
+        ->delete(route('admin.catalogo.cidades.destroy', $cidade))
+        ->assertRedirect();
+
+    $registros = LogAuditoria::query()->daEntidade('cidade', (int) $cidade->id)->orderBy('id')->get();
+
+    expect($registros->pluck('acao')->all())->toBe([
+        AcaoAuditada::Criou,
+        AcaoAuditada::Alterou,
+        AcaoAuditada::Removeu,
+    ]);
+
+    expect($registros->every(fn (LogAuditoria $linha): bool => $linha->usuario_id === $administrador->id))->toBeTrue();
+    expect($registros[1]->dados['alteracoes'])->toHaveKey('ativo');
+});
+
+it('nao registra alteracao quando o formulario foi enviado sem mudar nada', function (): void {
+    CenarioAdmin::semearPapeis();
+    $administrador = CenarioAdmin::usuarioCom('administrador');
+    $cidade = Cidade::factory()->create(['nome' => 'Bauru', 'uf' => 'SP', 'ativo' => true]);
+
+    $this->actingAs($administrador)
+        ->put(route('admin.catalogo.cidades.update', $cidade), ['nome' => 'Bauru', 'uf' => 'SP', 'ativo' => true])
+        ->assertRedirect();
+
+    expect(
+        LogAuditoria::query()
+            ->where('acao', AcaoAuditada::Alterou->value)
+            ->daEntidade('cidade', (int) $cidade->id)
+            ->count()
+    )->toBe(0);
+});
+
+it('registra a criacao de conta administrativa pela linha de comando', function (): void {
+    CenarioAdmin::semearPapeis();
+
+    $this->artisan('usuario:criar-administrador', [
+        'email' => 'novo@exemplo.test',
+        '--nome' => 'Novo Administrador',
+        '--papel' => 'organizador',
+    ])->expectsQuestion('Senha (nao aparece na tela, minimo de 8 caracteres)', 'senha-bem-comprida-123')
+        ->assertSuccessful();
+
+    $registro = LogAuditoria::query()
+        ->where('acao', AcaoAuditada::CriouUsuarioAdministrativo->value)
+        ->where('entidade_id', User::query()->where('email', 'novo@exemplo.test')->value('id'))
+        ->sole();
+
+    expect($registro->entidade)->toBe('usuario')
+        ->and($registro->dados['email'])->toBe('novo@exemplo.test')
+        ->and($registro->dados['papel'])->toBe('organizador')
+        ->and(json_encode($registro->dados))->not->toContain('senha-bem-comprida-123');
 });

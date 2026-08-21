@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Pagamentos;
 
+use App\Enums\AcaoAuditada;
 use App\Enums\MetodoPagamento;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
@@ -11,6 +12,7 @@ use App\Exceptions\Pagamentos\ConfirmacaoManualRecusadaException;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
 use App\Models\User;
+use App\Services\Auditoria\RegistrarAcao;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 
@@ -40,6 +42,7 @@ class ConfirmarPagamentoManual
 {
     public function __construct(
         private readonly ConfirmarPagamento $confirmarPagamento,
+        private readonly RegistrarAcao $registrarAcao,
     ) {}
 
     /**
@@ -93,6 +96,24 @@ class ConfirmarPagamentoManual
 
         if ($confirmou) {
             $this->registrarOrigemManual($pagamento, $responsavel, $metodo, $observacao);
+
+            // E a unica acao do sistema que declara entrada de dinheiro sem
+            // nenhuma fonte externa ter reconhecido nada. Por isso o rastro
+            // guarda quem declarou, quanto, por qual meio e a explicacao
+            // escrita — nada do payload do provedor, que aqui nem existe.
+            ($this->registrarAcao)(
+                AcaoAuditada::ConfirmouPagamentoManual,
+                'inscricao',
+                (int) $inscricao->getKey(),
+                [
+                    'codigo_publico' => $inscricao->codigo_publico,
+                    'pagamento_id' => (int) $pagamento->getKey(),
+                    'valor_centavos' => (int) $pagamento->valor_centavos,
+                    'metodo' => $metodo->value,
+                ],
+                $observacao,
+                $responsavel,
+            );
 
             return true;
         }

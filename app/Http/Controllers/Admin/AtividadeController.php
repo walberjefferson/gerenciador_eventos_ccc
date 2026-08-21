@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\CuidaDaEstruturaDoEvento;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AtividadeRequest;
 use App\Models\Atividade;
@@ -23,13 +24,16 @@ use Illuminate\Http\RedirectResponse;
 class AtividadeController extends Controller
 {
     use CuidaDaEstruturaDoEvento;
+    use RegistraAuditoria;
 
     public function store(AtividadeRequest $request, Evento $evento): RedirectResponse
     {
         $this->authorize('update', $evento);
         $this->confirmarQueEDoEvento($evento, $this->eventoDoGrupo($request->integer('grupo_atividade_id')));
 
-        Atividade::create($request->dadosDaAtividade());
+        $atividade = Atividade::create($request->dadosDaAtividade());
+
+        $this->auditarCriacao($atividade, 'atividade');
 
         return back()->with('sucesso', 'Atividade acrescentada.');
     }
@@ -39,7 +43,11 @@ class AtividadeController extends Controller
         $this->authorize('update', $evento);
         $this->confirmarQueEDoEvento($evento, $this->eventoDaAtividade($atividade));
 
+        $antes = $atividade->getRawOriginal();
+
         $atividade->update($request->dadosDaAtividade());
+
+        $this->auditarAlteracao($atividade, $antes, 'atividade');
 
         return back()->with('sucesso', 'Atividade atualizada.');
     }
@@ -56,6 +64,8 @@ class AtividadeController extends Controller
         }
 
         $atividade->delete();
+
+        $this->auditarRemocao($atividade, 'atividade');
 
         return back()->with('sucesso', 'Atividade excluída.');
     }

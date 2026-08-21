@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\CuidaDaEstruturaDoEvento;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DiaEventoRequest;
 use App\Models\DiaEvento;
@@ -21,12 +22,15 @@ use Illuminate\Http\RedirectResponse;
 class DiaEventoController extends Controller
 {
     use CuidaDaEstruturaDoEvento;
+    use RegistraAuditoria;
 
     public function store(DiaEventoRequest $request, Evento $evento): RedirectResponse
     {
         $this->authorize('update', $evento);
 
-        DiaEvento::create($request->dadosDoDia());
+        $dia = DiaEvento::create($request->dadosDoDia());
+
+        $this->auditarCriacao($dia, 'dia-evento');
 
         return back()->with('sucesso', 'Dia acrescentado à programação.');
     }
@@ -36,7 +40,11 @@ class DiaEventoController extends Controller
         $this->authorize('update', $evento);
         $this->confirmarQueEDoEvento($evento, $diaEvento->evento_id);
 
+        $antes = $diaEvento->getRawOriginal();
+
         $diaEvento->update($request->dadosDoDia());
+
+        $this->auditarAlteracao($diaEvento, $antes, 'dia-evento');
 
         return back()->with('sucesso', 'Dia atualizado.');
     }
@@ -60,6 +68,8 @@ class DiaEventoController extends Controller
         }
 
         $diaEvento->delete();
+
+        $this->auditarRemocao($diaEvento, 'dia-evento');
 
         return back()->with('sucesso', 'Dia excluído.');
     }

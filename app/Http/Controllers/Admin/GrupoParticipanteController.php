@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GrupoParticipanteRequest;
 use App\Models\Cidade;
@@ -20,6 +21,8 @@ use Inertia\Response;
  */
 class GrupoParticipanteController extends Controller
 {
+    use RegistraAuditoria;
+
     public function index(): Response
     {
         $this->authorize('viewAny', GrupoParticipante::class);
@@ -59,6 +62,8 @@ class GrupoParticipanteController extends Controller
 
         $grupo = GrupoParticipante::create($request->dadosDoGrupo());
 
+        $this->auditarCriacao($grupo, 'grupo-participante');
+
         return back()->with('sucesso', "Grupo {$grupo->nome} cadastrado.");
     }
 
@@ -66,7 +71,11 @@ class GrupoParticipanteController extends Controller
     {
         $this->authorize('update', $grupoParticipante);
 
+        $antes = $grupoParticipante->getRawOriginal();
+
         $grupoParticipante->update($request->dadosDoGrupo());
+
+        $this->auditarAlteracao($grupoParticipante, $antes, 'grupo-participante');
 
         return back()->with('sucesso', "Grupo {$grupoParticipante->nome} atualizado.");
     }
@@ -87,6 +96,8 @@ class GrupoParticipanteController extends Controller
         $nome = $grupoParticipante->nome;
 
         $grupoParticipante->delete();
+
+        $this->auditarRemocao($grupoParticipante, 'grupo-participante');
 
         return back()->with('sucesso', "Grupo {$nome} excluído.");
     }

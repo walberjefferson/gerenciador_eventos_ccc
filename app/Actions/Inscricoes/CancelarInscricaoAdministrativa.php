@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Inscricoes;
 
 use App\Actions\Pagamentos\CancelarPagamento;
+use App\Enums\AcaoAuditada;
 use App\Enums\SituacaoInscricao;
 use App\Events\InscricaoCancelada;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
 use App\Models\User;
+use App\Services\Auditoria\RegistrarAcao;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -45,6 +47,7 @@ class CancelarInscricaoAdministrativa
     public function __construct(
         private readonly LiberarVagas $liberarVagas,
         private readonly CancelarPagamento $cancelarPagamento,
+        private readonly RegistrarAcao $registrarAcao,
     ) {}
 
     /**
@@ -102,6 +105,32 @@ class CancelarInscricaoAdministrativa
         }
 
         $inscricao->refresh();
+
+        // O rastro e gravado depois do commit e so na chamada que de fato
+        // cancelou. Fica fora da transacao de proposito: se a gravacao falhar,
+        // a vaga ja voltou e a inscricao ja esta cancelada — auditoria e
+        // testemunha, e testemunha nao desfaz o que viu.
+        //
+        // Nada de dado pessoal entra aqui: o registro diz de qual situacao
+        // para qual situacao a inscricao foi, e o codigo publico serve para
+        // encontrar a pessoa sem repetir nome, e-mail nem documento.
+        ($this->registrarAcao)(
+            AcaoAuditada::CancelouInscricao,
+            'inscricao',
+            (int) $inscricao->getKey(),
+            [
+                'codigo_publico' => $inscricao->codigo_publico,
+                'situacao' => [
+                    'antes' => $estavaConfirmada
+                        ? SituacaoInscricao::Confirmada->value
+                        : SituacaoInscricao::AguardandoPagamento->value,
+                    'depois' => SituacaoInscricao::Cancelada->value,
+                ],
+                'estava_confirmada' => $estavaConfirmada,
+            ],
+            $motivo,
+            $responsavel,
+        );
 
         // O anuncio sai depois do commit e so na chamada que de fato mudou a
         // situacao: ninguem deve ser avisado de um cancelamento que o banco

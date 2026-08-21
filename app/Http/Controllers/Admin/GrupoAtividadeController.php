@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\CuidaDaEstruturaDoEvento;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GrupoAtividadeRequest;
 use App\Models\DiaEvento;
@@ -22,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 class GrupoAtividadeController extends Controller
 {
     use CuidaDaEstruturaDoEvento;
+    use RegistraAuditoria;
 
     public function store(GrupoAtividadeRequest $request, Evento $evento): RedirectResponse
     {
@@ -33,6 +35,8 @@ class GrupoAtividadeController extends Controller
 
         $grupo->save();
 
+        $this->auditarCriacao($grupo, 'grupo-atividade');
+
         return back()->with('sucesso', 'Grupo acrescentado.');
     }
 
@@ -41,7 +45,11 @@ class GrupoAtividadeController extends Controller
         $this->authorize('update', $evento);
         $this->confirmarQueEDoEvento($evento, $grupoAtividade->diaEvento?->evento_id);
 
+        $antes = $grupoAtividade->getRawOriginal();
+
         $grupoAtividade->update($request->dadosDoGrupo());
+
+        $this->auditarAlteracao($grupoAtividade, $antes, 'grupo-atividade');
 
         return back()->with('sucesso', 'Grupo atualizado.');
     }
@@ -63,6 +71,8 @@ class GrupoAtividadeController extends Controller
         }
 
         $grupoAtividade->delete();
+
+        $this->auditarRemocao($grupoAtividade, 'grupo-atividade');
 
         return back()->with('sucesso', 'Grupo excluído.');
     }

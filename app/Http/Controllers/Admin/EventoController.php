@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\SituacaoEvento;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EventoRequest;
 use App\Http\Resources\Admin\EstruturaDoEventoResource;
@@ -25,6 +26,8 @@ use Inertia\Response;
  */
 class EventoController extends Controller
 {
+    use RegistraAuditoria;
+
     public function index(): Response
     {
         $this->authorize('viewAny', Evento::class);
@@ -70,6 +73,8 @@ class EventoController extends Controller
 
         $evento = Evento::create($request->dadosDoEvento());
 
+        $this->auditarCriacao($evento, 'evento');
+
         return to_route('admin.eventos.estrutura', $evento)
             ->with('sucesso', "Evento {$evento->nome} cadastrado. Agora monte a programação.");
     }
@@ -108,7 +113,11 @@ class EventoController extends Controller
     {
         $this->authorize('update', $evento);
 
+        $antes = $evento->getRawOriginal();
+
         $evento->update($request->dadosDoEvento());
+
+        $this->auditarAlteracao($evento, $antes, 'evento');
 
         return back()->with('sucesso', 'Evento atualizado.');
     }
@@ -142,6 +151,8 @@ class EventoController extends Controller
         $nome = $evento->nome;
 
         $evento->delete();
+
+        $this->auditarRemocao($evento, 'evento');
 
         return to_route('admin.eventos.index')->with('sucesso', "Evento {$nome} excluído.");
     }
