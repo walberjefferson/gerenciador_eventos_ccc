@@ -112,4 +112,3 @@ it('nao expoe rota para alterar nem apagar registro de auditoria', function (): 
     $this->actingAs($administrador)->delete('/admin/auditoria/1')->assertNotFound();
     $this->actingAs($administrador)->post('/admin/auditoria')->assertMethodNotAllowed();
 });
-
