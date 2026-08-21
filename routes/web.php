@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
+use App\Http\Controllers\Admin\CidadeController;
+use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
@@ -80,6 +82,27 @@ Route::middleware(['auth', 'verified'])
         Route::get('painel', [PainelController::class, 'index'])
             ->middleware('permission:painel.ver')
             ->name('painel');
+
+        // Catalogo global: cidades e grupos de participantes. Sao listas que
+        // valem para todos os eventos, por isso vivem sob a mesma permissao.
+        Route::middleware('permission:catalogo.gerenciar')
+            ->prefix('catalogo')
+            ->name('catalogo.')
+            ->group(function (): void {
+                Route::get('cidades', [CidadeController::class, 'index'])->name('cidades');
+                Route::post('cidades', [CidadeController::class, 'store'])->name('cidades.store');
+                Route::put('cidades/{cidade}', [CidadeController::class, 'update'])->name('cidades.update');
+                Route::delete('cidades/{cidade}', [CidadeController::class, 'destroy'])->name('cidades.destroy');
+
+                Route::get('grupos-participantes', [GrupoParticipanteController::class, 'index'])
+                    ->name('grupos-participantes');
+                Route::post('grupos-participantes', [GrupoParticipanteController::class, 'store'])
+                    ->name('grupos-participantes.store');
+                Route::put('grupos-participantes/{grupo_participante}', [GrupoParticipanteController::class, 'update'])
+                    ->name('grupos-participantes.update');
+                Route::delete('grupos-participantes/{grupo_participante}', [GrupoParticipanteController::class, 'destroy'])
+                    ->name('grupos-participantes.destroy');
+            });
     });
 
 require __DIR__.'/settings.php';
