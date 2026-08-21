@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\MetodoPagamento;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Http\Controllers\Controller;
@@ -13,6 +14,7 @@ use App\Models\Cidade;
 use App\Models\Evento;
 use App\Models\GrupoParticipante;
 use App\Models\Inscricao;
+use App\Models\Pagamento;
 use App\Services\Admin\FiltroDeInscricoes;
 use Illuminate\Http\Request;
 use Inertia\Response;
@@ -59,6 +61,108 @@ class InscricaoAdminController extends Controller
             'pode_exportar' => $pedido->user()?->can('inscricoes.exportar') ?? false,
             'sucesso' => session('sucesso'),
         ]);
+    }
+
+    /**
+     * A ficha de uma inscricao, com o historico da cobranca.
+     *
+     * O historico e a parte que importa: cada cobranca emitida, com a situacao
+     * em que parou e — quando o pagamento foi reconhecido na mao — quem
+     * declarou isso e o que escreveu. Sem esse registro, "esta pago" e so uma
+     * afirmacao sem dono.
+     *
+     * O CPF nao aparece. Nem cifrado, nem em pedaco, nem a impressao digital.
+     */
+    public function show(Request $pedido, Inscricao $inscricao): Response
+    {
+        $this->authorize('view', $inscricao);
+
+        $inscricao->load([
+            'evento:id,nome,slug',
+            'grupoParticipante:id,nome,cidade_id',
+            'grupoParticipante.cidade:id,nome,uf',
+            'atividades:id,nome,comeca_em,termina_em',
+            'pagamentos',
+        ]);
+
+        $usuario = $pedido->user();
+
+        return inertia('Admin/Inscricoes/Show', [
+            'inscricao' => [
+                'id' => $inscricao->id,
+                'codigo_publico' => $inscricao->codigo_publico,
+                'nome_completo' => $inscricao->nome_completo,
+                'email' => $inscricao->email,
+                'telefone' => $inscricao->telefone,
+                'evento' => $inscricao->evento?->nome ?? '',
+                'cidade' => LinhaDaInscricaoResource::cidade($inscricao),
+                'grupo' => $inscricao->grupoParticipante?->nome ?? '',
+                'situacao' => $inscricao->situacao->value,
+                'situacao_rotulo' => $inscricao->situacao->rotulo(),
+                'valor_centavos' => $inscricao->valor_centavos,
+                'prazo_pagamento' => $inscricao->prazo_pagamento?->toIso8601String(),
+                'criada_em' => $inscricao->created_at?->toIso8601String(),
+                'confirmada_em' => $inscricao->confirmada_em?->toIso8601String(),
+                'expirada_em' => $inscricao->expirada_em?->toIso8601String(),
+                'cancelada_em' => $inscricao->cancelada_em?->toIso8601String(),
+                'motivo_cancelamento' => $inscricao->motivo_cancelamento,
+                'atividades' => $inscricao->atividades
+                    ->map(fn ($atividade): array => [
+                        'id' => (int) $atividade->id,
+                        'nome' => $atividade->nome,
+                        'comeca_em' => $atividade->comeca_em->toIso8601String(),
+                        'termina_em' => $atividade->termina_em->toIso8601String(),
+                    ])
+                    ->all(),
+                'esta_ativa' => $inscricao->situacao->estaAtiva(),
+                'foi_paga' => $inscricao->pagamentos->contains(
+                    fn (Pagamento $pagamento): bool => $pagamento->situacao === SituacaoPagamento::Pago
+                ),
+            ],
+            'cobrancas' => $this->historicoDeCobrancas($inscricao),
+            'metodos_manuais' => array_map(
+                fn (MetodoPagamento $metodo): array => ['valor' => $metodo->value, 'rotulo' => $metodo->rotulo()],
+                MetodoPagamento::manuais(),
+            ),
+            'pode_cancelar' => $usuario?->can('inscricoes.cancelar') ?? false,
+            'pode_confirmar_manualmente' => $usuario?->can('pagamentos.confirmar-manual') ?? false,
+            'sucesso' => session('sucesso'),
+        ]);
+    }
+
+    /**
+     * O historico da cobranca, da mais recente para a mais antiga.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function historicoDeCobrancas(Inscricao $inscricao): array
+    {
+        return $inscricao->pagamentos
+            ->sortByDesc('id')
+            ->values()
+            ->map(function (Pagamento $pagamento): array {
+                $metadados = is_array($pagamento->metadados) ? $pagamento->metadados : [];
+                $responsavel = is_array($metadados['responsavel'] ?? null) ? $metadados['responsavel'] : null;
+
+                return [
+                    'id' => $pagamento->id,
+                    'codigo_publico' => $pagamento->codigo_publico,
+                    'gateway' => $pagamento->gateway,
+                    'metodo' => $pagamento->metodo->value,
+                    'metodo_rotulo' => $pagamento->metodo->rotulo(),
+                    'situacao' => $pagamento->situacao->value,
+                    'situacao_rotulo' => $pagamento->situacao->rotulo(),
+                    'valor_centavos' => $pagamento->valor_centavos,
+                    'criada_em' => $pagamento->created_at?->toIso8601String(),
+                    'expira_em' => $pagamento->expira_em?->toIso8601String(),
+                    'pago_em' => $pagamento->pago_em?->toIso8601String(),
+                    'cancelado_em' => $pagamento->cancelado_em?->toIso8601String(),
+                    'origem_manual' => ($metadados['origem'] ?? null) === 'manual',
+                    'observacao' => is_string($metadados['observacao'] ?? null) ? $metadados['observacao'] : null,
+                    'responsavel' => is_string($responsavel['nome'] ?? null) ? $responsavel['nome'] : null,
+                ];
+            })
+            ->all();
     }
 
     /**

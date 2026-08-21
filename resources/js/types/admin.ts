@@ -212,3 +212,56 @@ export interface PaginaDeInscricoes {
         proxima: string | null;
     };
 }
+
+/** Uma atividade escolhida por quem se inscreveu. */
+export interface AtividadeEscolhida {
+    id: number;
+    nome: string;
+    comeca_em: string;
+    termina_em: string;
+}
+
+/** A ficha da inscrição. Sem CPF: ele fica cifrado e não é mostrado. */
+export interface FichaDaInscricao {
+    id: number;
+    codigo_publico: string;
+    nome_completo: string;
+    email: string;
+    telefone: string | null;
+    evento: string;
+    cidade: string;
+    grupo: string;
+    situacao: string;
+    situacao_rotulo: string;
+    valor_centavos: number;
+    prazo_pagamento: string | null;
+    criada_em: string | null;
+    confirmada_em: string | null;
+    expirada_em: string | null;
+    cancelada_em: string | null;
+    motivo_cancelamento: string | null;
+    atividades: AtividadeEscolhida[];
+    esta_ativa: boolean;
+    /** Se alguma cobrança desta inscrição chegou a ser paga. */
+    foi_paga: boolean;
+}
+
+/** Uma cobrança do histórico da inscrição. */
+export interface CobrancaDaFicha {
+    id: number;
+    codigo_publico: string;
+    gateway: string;
+    metodo: string;
+    metodo_rotulo: string;
+    situacao: string;
+    situacao_rotulo: string;
+    valor_centavos: number;
+    criada_em: string | null;
+    expira_em: string | null;
+    pago_em: string | null;
+    cancelado_em: string | null;
+    /** Verdadeiro quando o pagamento foi reconhecido na mão por alguém. */
+    origem_manual: boolean;
+    observacao: string | null;
+    responsavel: string | null;
+}

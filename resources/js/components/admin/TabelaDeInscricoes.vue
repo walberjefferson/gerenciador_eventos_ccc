@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { InscricaoDaLista } from '@/types/admin';
+import { Link } from '@inertiajs/vue3';
 
 /**
  * A tabela de inscrições encontradas.
@@ -40,6 +41,7 @@ function momento(iso: string | null): string {
                     <th scope="col" class="px-4 py-2 font-medium">Cobrança</th>
                     <th scope="col" class="px-4 py-2 font-medium">Valor</th>
                     <th scope="col" class="px-4 py-2 font-medium">Prazo</th>
+                    <th scope="col" class="px-4 py-2 font-medium">Ficha</th>
                 </tr>
             </thead>
             <tbody>
@@ -55,6 +57,15 @@ function momento(iso: string | null): string {
                     <td class="px-4 py-2">{{ inscricao.situacao_pagamento_rotulo ?? '—' }}</td>
                     <td class="px-4 py-2 whitespace-nowrap">{{ moeda(inscricao.valor_centavos) }}</td>
                     <td class="px-4 py-2 whitespace-nowrap">{{ momento(inscricao.prazo_pagamento) }}</td>
+                    <td class="px-4 py-2">
+                        <Link
+                            :href="route('admin.inscricoes.show', { inscricao: inscricao.id })"
+                            class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <span class="sr-only">Abrir a ficha de {{ inscricao.nome_completo }}</span>
+                            <span aria-hidden="true">Abrir</span>
+                        </Link>
+                    </td>
                 </tr>
             </tbody>
         </table>

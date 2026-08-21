@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
+use App\Http\Controllers\Admin\AcaoInscricaoController;
 use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
@@ -150,6 +151,18 @@ Route::middleware(['auth', 'verified'])
             ->name('inscricoes.')
             ->group(function (): void {
                 Route::get('/', [InscricaoAdminController::class, 'index'])->name('index');
+                Route::get('{inscricao}', [InscricaoAdminController::class, 'show'])->name('show');
+
+                // Cancelar devolve vaga; confirmar na mao declara que entrou
+                // dinheiro. Cada uma cobra a sua propria permissao, e a
+                // confirmacao manual e exclusiva do administrador (DA-13).
+                Route::post('{inscricao}/cancelar', [AcaoInscricaoController::class, 'cancelar'])
+                    ->middleware('permission:inscricoes.cancelar')
+                    ->name('cancelar');
+
+                Route::post('{inscricao}/confirmar-pagamento', [AcaoInscricaoController::class, 'confirmarPagamento'])
+                    ->middleware('permission:pagamentos.confirmar-manual')
+                    ->name('confirmar-pagamento');
             });
     });
 
