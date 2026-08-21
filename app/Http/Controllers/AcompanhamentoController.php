@@ -53,6 +53,10 @@ class AcompanhamentoController extends Controller
             )->resolve(),
             'pode_pagar' => $podePagar,
             'url_pagamento' => $podePagar ? $this->urlAssinada($inscricao, 'inscricoes.pagamento') : null,
+            'url_segunda_via' => $podePagar ? $this->urlAssinada($inscricao, 'inscricoes.segunda-via') : null,
+            // Explicacao deixada por quem redirecionou para ca — por exemplo,
+            // um pedido de segunda via fora do prazo.
+            'aviso' => session('aviso'),
         ]);
     }
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
 use App\Http\Controllers\PagamentoController;
+use App\Http\Controllers\SegundaViaPagamentoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -43,6 +44,12 @@ Route::get('inscricoes/{codigo_publico}/situacao', [PagamentoController::class, 
 Route::get('inscricoes/{codigo_publico}/acompanhar', [AcompanhamentoController::class, 'show'])
     ->middleware('signed')
     ->name('inscricoes.acompanhar');
+
+// Segunda via do Pix, a pedido do participante. Assinada e com limite de
+// tentativas: a Action e idempotente, mas ninguem pede cobranca em serie.
+Route::post('inscricoes/{codigo_publico}/segunda-via', [SegundaViaPagamentoController::class, 'store'])
+    ->middleware(['signed', 'throttle:'.config('inscricoes.limites.segunda_via')])
+    ->name('inscricoes.segunda-via');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

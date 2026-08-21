@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarDataHora } from '@/lib/formato';
 import type { PropsDoAcompanhamento } from '@/types/participante';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { CalendarClock, CheckCircle2, CircleAlert, QrCode } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { CalendarClock, CheckCircle2, CircleAlert, Info, QrCode, RefreshCw } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 /**
@@ -39,6 +39,31 @@ const temCobrancaAberta = computed(() => props.pagamentos.some((pagamento) => pa
 const faltaCobranca = computed(() => props.pode_pagar && !temCobrancaAberta.value);
 
 const encerrada = computed(() => !props.pode_pagar && props.inscricao.situacao !== 'confirmada');
+
+/**
+ * O pedido de segunda via do Pix.
+ *
+ * Nao cria cobranca nova por conta propria: o servidor chama a Action
+ * idempotente, que devolve a cobranca pendente quando ja existe uma. Enquanto
+ * o pedido esta indo e voltando, o botao diz o que esta acontecendo.
+ */
+const pedido = useForm({});
+const falhouOPedido = ref(false);
+
+function pedirSegundaVia(): void {
+    if (props.url_segunda_via === null) {
+        return;
+    }
+
+    falhouOPedido.value = false;
+
+    pedido.post(props.url_segunda_via, {
+        preserveScroll: true,
+        onError: () => {
+            falhouOPedido.value = true;
+        },
+    });
+}
 </script>
 
 <template>
@@ -53,6 +78,15 @@ const encerrada = computed(() => !props.pode_pagar && props.inscricao.situacao !
                     Aqui você vê o que já aconteceu com a sua inscrição e o que ainda falta.
                 </p>
             </header>
+
+            <!-- Explicacao de quem mandou a pessoa para ca (por exemplo, um
+                 pedido de segunda via fora do prazo). Anunciada ao leitor de
+                 tela sem interromper o que ele estiver lendo. -->
+            <Alert v-if="aviso" variant="atencao" role="status" data-testid="aviso-do-servidor">
+                <Info aria-hidden="true" />
+                <AlertTitle>Sobre o seu pedido</AlertTitle>
+                <AlertDescription>{{ aviso }}</AlertDescription>
+            </Alert>
 
             <ResumoDaInscricao :inscricao="inscricao" />
 
@@ -84,6 +118,10 @@ const encerrada = computed(() => !props.pode_pagar && props.inscricao.situacao !
                         </AlertDescription>
                     </Alert>
 
+                    <p v-if="falhouOPedido" role="alert" class="text-sm font-medium text-destructive" data-testid="erro-da-segunda-via">
+                        Não consegui gerar o Pix agora. Confira sua conexão e tente de novo em alguns instantes.
+                    </p>
+
                     <Button
                         v-if="url_pagamento && temCobrancaAberta"
                         as-child
@@ -93,6 +131,26 @@ const encerrada = computed(() => !props.pode_pagar && props.inscricao.situacao !
                         <Link :href="url_pagamento" @click="navegando = true">
                             {{ navegando ? 'Abrindo a cobrança...' : 'Ver o Pix para pagar' }}
                         </Link>
+                    </Button>
+
+                    <!-- Segunda via: serve tanto para quem ficou sem cobranca
+                         quanto para quem perdeu o Pix de vista. -->
+                    <Button
+                        v-if="url_segunda_via"
+                        type="button"
+                        :variant="temCobrancaAberta ? 'outline' : 'default'"
+                        :class="[
+                            'h-12 w-full',
+                            temCobrancaAberta ? '' : 'bg-acao text-base text-acao-foreground hover:bg-acao/90',
+                        ]"
+                        :disabled="pedido.processing"
+                        data-testid="botao-segunda-via"
+                        @click="pedirSegundaVia"
+                    >
+                        <RefreshCw :class="pedido.processing ? 'animate-spin' : ''" aria-hidden="true" />
+                        <template v-if="pedido.processing">Gerando o Pix...</template>
+                        <template v-else-if="temCobrancaAberta">Não achei o Pix. Gerar de novo</template>
+                        <template v-else>Gerar o Pix da minha inscrição</template>
                     </Button>
                 </CardContent>
             </Card>

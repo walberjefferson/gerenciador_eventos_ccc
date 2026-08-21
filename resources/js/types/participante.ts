@@ -84,4 +84,8 @@ export interface PropsDoAcompanhamento {
     pode_pagar: boolean;
     /** URL assinada da tela de cobranca; null quando nao ha mais o que pagar. */
     url_pagamento: string | null;
+    /** URL assinada que pede a segunda via do Pix; null quando nao ha o que pagar. */
+    url_segunda_via: string | null;
+    /** Explicacao deixada por quem redirecionou para esta tela. */
+    aviso: string | null;
 }
