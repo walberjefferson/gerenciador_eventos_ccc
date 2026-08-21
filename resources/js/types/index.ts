@@ -3,6 +3,12 @@ import type { LucideIcon } from 'lucide-vue-next';
 export interface Auth {
     /** Fica nulo quando quem visita a pagina nao esta autenticado. */
     user: User | null;
+    /**
+     * Os nomes das permissoes de quem esta logado. Serve so para a tela nao
+     * oferecer caminho que o servidor recusaria; a tranca de verdade continua
+     * no middleware da rota.
+     */
+    permissoes: string[];
 }
 
 export interface BreadcrumbItem {

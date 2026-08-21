@@ -80,6 +80,16 @@ function limparCancelamentoCommitado(Cenario $cenario): void
         ->pluck('id')
         ->all();
 
+    // O rastro de auditoria gravado pelo processo separado tambem foi
+    // commitado de verdade e ficaria no banco para sempre, aparecendo nos
+    // testes seguintes como registro fantasma. Nao ha FK ligando o log a
+    // inscricao, entao ele sai por "entidade_id" — e pelo construtor de
+    // consultas, nunca pelo model, que recusa remocao de proposito.
+    $conexao->table('logs_auditoria')
+        ->where('entidade', 'inscricao')
+        ->whereIn('entidade_id', $inscricoes)
+        ->delete();
+
     $conexao->table('pagamentos')->whereIn('inscricao_id', $inscricoes)->delete();
     // Pelo mesmo motivo, os registros de e-mail enviado saem antes: a chave
     // tambem e "restrict", para que nenhum comprovante de envio se perca.

@@ -4,6 +4,7 @@ use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
 use App\Http\Controllers\Admin\AcaoInscricaoController;
 use App\Http\Controllers\Admin\AtividadeController;
+use App\Http\Controllers\Admin\AuditoriaController;
 use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
 use App\Http\Controllers\Admin\DiaEventoController;
@@ -172,6 +173,12 @@ Route::middleware(['auth', 'verified'])
                     ->middleware('permission:pagamentos.confirmar-manual')
                     ->name('confirmar-pagamento');
             });
+
+        // O rastro das acoes administrativas. So leitura, e so administrador:
+        // nao existe rota para criar, alterar nem apagar registro de auditoria.
+        Route::get('auditoria', [AuditoriaController::class, 'index'])
+            ->middleware('permission:auditoria.ver')
+            ->name('auditoria');
     });
 
 require __DIR__.'/settings.php';
