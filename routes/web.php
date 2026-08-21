@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DiaEventoController;
 use App\Http\Controllers\Admin\EventoController;
 use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
+use App\Http\Controllers\Admin\InscricaoAdminController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
@@ -140,6 +141,15 @@ Route::middleware(['auth', 'verified'])
                 Route::post('{evento}/conflitos', [ConflitoAtividadeController::class, 'store'])->name('conflitos.store');
                 Route::delete('{evento}/conflitos/{conflito_atividade}', [ConflitoAtividadeController::class, 'destroy'])
                     ->name('conflitos.destroy');
+            });
+
+        // A lista de inscricoes. Ver e uma permissao; agir sobre uma inscricao
+        // sao outras, cobradas mais adiante, perto de cada acao.
+        Route::middleware('permission:inscricoes.ver')
+            ->prefix('inscricoes')
+            ->name('inscricoes.')
+            ->group(function (): void {
+                Route::get('/', [InscricaoAdminController::class, 'index'])->name('index');
             });
     });
 

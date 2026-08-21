@@ -152,3 +152,63 @@ export interface OpcaoDeAtividade {
     nome: string;
     escolhida_por: number;
 }
+
+/** Uma linha da lista de inscrições. Sem CPF — nem cifrado, nem em pedaço. */
+export interface InscricaoDaLista {
+    id: number;
+    codigo_publico: string;
+    nome_completo: string;
+    email: string;
+    evento: string;
+    cidade: string;
+    grupo: string;
+    situacao: string;
+    situacao_rotulo: string;
+    valor_centavos: number;
+    prazo_pagamento: string | null;
+    criada_em: string | null;
+    situacao_pagamento: string | null;
+    situacao_pagamento_rotulo: string | null;
+}
+
+/** O que o organizador pediu para filtrar. Cada campo vira um pedaço da URL. */
+export interface FiltrosAplicados {
+    evento_id: string | null;
+    situacao: string | null;
+    cidade_id: string | null;
+    grupo_participante_id: string | null;
+    atividade_id: string | null;
+    situacao_pagamento: string | null;
+    criada_de: string | null;
+    criada_ate: string | null;
+    busca: string | null;
+}
+
+/** Uma opção simples de seletor, identificada por número. */
+export interface OpcaoComId {
+    id: number;
+    nome: string;
+}
+
+/** As listas que alimentam os seletores de filtro. */
+export interface OpcoesDeFiltro {
+    eventos: OpcaoComId[];
+    cidades: OpcaoComId[];
+    grupos: OpcaoComId[];
+    atividades: OpcaoComId[];
+    situacoes: OpcaoDeSituacao[];
+    situacoes_pagamento: OpcaoDeSituacao[];
+}
+
+/** A página de resultados, com o suficiente para navegar sem perder o filtro. */
+export interface PaginaDeInscricoes {
+    dados: InscricaoDaLista[];
+    pagina_atual: number;
+    ultima_pagina: number;
+    total: number;
+    por_pagina: number;
+    links: {
+        anterior: string | null;
+        proxima: string | null;
+    };
+}
