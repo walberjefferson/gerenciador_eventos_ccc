@@ -1,7 +1,7 @@
 # Progresso
 
 > Atualizado ao final de cada etapa de trabalho. Escrito para ser lido por qualquer pessoa da equipe.
-> **Última atualização:** 2026-08-20 — Etapa 12 (Fase 5b: área do participante, linha do tempo, histórico da cobrança e recuperação do link de acesso). **Fases 0 a 5b concluídas: o participante se inscreve, paga, acompanha a própria inscrição e volta sozinho quando perde o link.**
+> **Última atualização:** 2026-08-20 — Etapa 13 (Fase 6a: papéis e permissões, cadastro público fechado, conta administrativa por comando e o painel de números por evento). **Fases 0 a 6a concluídas: o participante se inscreve, paga e acompanha a própria inscrição; do lado de dentro, quem administra entra por convite e vê, num relance, como está o evento.**
 
 ---
 
@@ -37,13 +37,29 @@
 
 **Com isso, a Fase 5b está concluída**, e com ela todo o caminho do participante: descobrir o evento, se inscrever, pagar, acompanhar e voltar. Nenhuma regra de negócio nova foi criada nesta fase — nenhuma Action, nenhum Enum, nenhuma migração —, e o único e-mail que sai do sistema continua sendo o do link de acesso. O **cancelamento da inscrição pela própria participante continua fora do escopo**: é decisão que ainda cabe ao dono do produto. A próxima entrega é a **Fase 6 — Administração**. A pendência **P-09** (os 20 erros de verificação de tipos nas telas do pacote inicial) segue aberta de propósito, para ser resolvida justamente na Fase 6, que reescreve essas telas.
 
+- [x] Etapa 13 — **Fase 6a, acesso administrativo e painel de números**: até aqui o sistema tinha um problema silencioso — qualquer visitante podia criar uma conta na tela de cadastro que veio junto com o pacote inicial do Laravel, e essa conta entrava no lado de dentro sem que ninguém tivesse convidado. Esta etapa fechou essa porta e acendeu a luz.
+
+    **Papéis e permissões.** Entrou o pacote `spatie/laravel-permission`, com **dois papéis**: `administrador`, que responde pelo sistema inteiro, e `organizador`, que toca o evento no dia a dia. As **nove permissões** são nomeadas em português e por assunto (`painel.ver`, `catalogo.gerenciar`, `eventos.gerenciar`, `inscricoes.ver`, `inscricoes.exportar`, `inscricoes.cancelar`, `pagamentos.confirmar-manual`, `usuarios.gerenciar` e `auditoria.ver`). O organizador alcança tudo, **menos** confirmar pagamento na mão, mexer em contas e ler o histórico de auditoria: confirmar pagamento manualmente é a única ação do sistema que declara "entrou dinheiro" sem que fonte externa nenhuma tenha reconhecido nada, e quanto menos gente puder fazer isso, melhor. O `PapeisSeeder` é idempotente — rodar duas vezes não duplica nem tira permissão de quem já tem.
+
+    **Cadastro público fechado.** As rotas `GET /register` e `POST /register` saíram do ar, junto com a tela `Register.vue`, o controller que a atendia e o link "cadastre-se" da tela de login. O teste que existia para provar que o cadastro funcionava foi **reescrito para provar o contrário**: hoje ele exige o 404 nas duas rotas. Um teste que prova que a porta está trancada vale mais do que a ausência de teste. No lugar do cadastro, a conta administrativa nasce por comando: `php artisan usuario:criar-administrador {e-mail} --nome= --papel=`, que pede a senha de forma escondida (ela nunca aparece na tela nem no histórico do terminal), recusa e-mail repetido, confere se o papel existe de verdade e diz em português o que fez. Há também um `AdminDemoSeeder` com uma conta de demonstração que **só nasce em ambiente `local`**, com a mesma dupla trava das rotas de simulação de pagamento (D-29): conta previsível em servidor de verdade é porta aberta com o endereço escrito na placa.
+
+    **Toda rota administrativa exige permissão.** O grupo `/admin` passa por três travas, nesta ordem: estar logado, ter o e-mail confirmado e ter a permissão daquela tela. Estar logado não diz o que a pessoa pode fazer — por isso nenhuma rota do lado de dentro fica só com autenticação.
+
+    **O painel.** Uma tela, um evento por vez, com seletor (o padrão é o evento mais recente que não seja rascunho). Três blocos: **inscrições por situação** (total, confirmadas, aguardando pagamento, expiradas, canceladas e lista de espera, cada uma com a explicação do que aquele número significa); **vagas por atividade** (capacidade, reservadas, confirmadas e restantes, em tabela com cabeçalho de linha e de coluna e legenda); e **dinheiro** (recebido, a receber e estornado, sempre em centavos no servidor e formatado só na tela). Todos os números saem de **consultas agregadas** — o banco conta e soma —, nunca de carregar milhares de inscrições na memória para mostrar quatro números. E a vaga restante é lida do **contador gravado na própria atividade**, que é a fonte da verdade do domínio: recontar as escolhas criaria uma segunda versão do mesmo número, e as duas divergiriam no primeiro caso de borda. Evento publicado que ainda não recebeu ninguém mostra **zeros com explicação**, não tela vazia nem erro.
+
+    **Verificação de tipos limpa pela primeira vez.** A pendência **P-09** — os 20 erros de tipo herdados do pacote inicial — foi fechada aqui, e não adiada de novo, porque é justamente esta fase que passa a usar de verdade aquelas telas. Corrigir foi tipar direito, sem apagar erro com atalho.
+
+    **O painel só lê.** Nenhuma Action, Enum, Model, migração ou evento de domínio foi alterado. **Suíte Pest: 268 testes, 1207 asserções** — 27 testes e 159 asserções a mais que ao final da Fase 5b. **Suíte Playwright: 25 cenários** — os 21 anteriores intactos e verdes, mais 4 novos: visitante mandado para o login, pessoa logada sem papel recebendo a recusa, administrador vendo os três blocos de números e o cadastro público confirmadamente fora do ar.
+
+**Com isso, a Fase 6a está concluída.** A próxima entrega é a **Fase 6b — cadastros e gestão de inscrições**.
+
 ## Em andamento
 
-- [ ] Nada em andamento. O backend do MVP (Fases 0 a 4) e todo o caminho do participante (Fases 5a e 5b) estão fechados. A próxima entrega é a **Fase 6 — Administração**: painel com os números do evento, cadastros, lista de inscrições com filtros e políticas de acesso — em plano separado
+- [ ] Nada em andamento. O backend do MVP (Fases 0 a 4), todo o caminho do participante (Fases 5a e 5b) e a fundação do lado administrativo (Fase 6a) estão fechados. A próxima entrega é a **Fase 6b — cadastros e gestão de inscrições**: os CRUDs de evento, dias, grupos de atividades, atividades, conflitos, cidades e grupos de participantes; a lista de inscrições com filtros, exportação e a visão de uma inscrição; e as duas ações administrativas que ficaram de fora de propósito — cancelamento de inscrição alheia e confirmação manual de pagamento — em plano separado
 
 ## Próximas tarefas
 
-O que **está pronto** hoje: todo o núcleo transacional e todo o caminho do participante. Evento configurável, inscrição com reserva de vaga à prova de venda a mais, regras de seleção de atividades, cobrança Pix simulada, aviso automático (webhook) idempotente, expiração agendada que devolve vaga, reconciliação server-to-server e, pelo celular, a vitrine do evento, o formulário em quatro etapas, a tela de cobrança, o acompanhamento da inscrição e a recuperação do link de acesso. Ainda não existe nenhuma tela de administração, o único e-mail que sai é o do link de acesso e nenhum dinheiro real circula.
+O que **está pronto** hoje: todo o núcleo transacional, todo o caminho do participante e a fundação do lado administrativo. Evento configurável, inscrição com reserva de vaga à prova de venda a mais, regras de seleção de atividades, cobrança Pix simulada, aviso automático (webhook) idempotente, expiração agendada que devolve vaga, reconciliação server-to-server e, pelo celular, a vitrine do evento, o formulário em quatro etapas, a tela de cobrança, o acompanhamento da inscrição e a recuperação do link de acesso. Do lado de dentro, quem administra entra por convite (papéis, permissões e conta criada por comando) e tem o painel com os números do evento. Ainda **não existe nenhuma tela de cadastro nem a lista de inscrições**, o único e-mail que sai é o do link de acesso e nenhum dinheiro real circula.
 
 O que **falta**, por fase:
 
@@ -61,11 +77,19 @@ O que **falta**, por fase:
 - [x] Nove cenários novos de ponta a ponta com Playwright, sem tocar nos 12 da Fase 5a
 - [ ] Cancelamento da própria inscrição pelo participante — **continua fora do escopo** (decisão D-45). O dono do produto ainda não decidiu se quer oferecê-lo; enquanto não decidir, quem precisa desistir fala com a organização, que cancela pelo painel da Fase 6
 
-### Fase 6 — Administração
-- [ ] Painel: total de inscrições por situação, vagas restantes por atividade, receita reconhecida
+### Fase 6a — Acesso administrativo e painel ✅ concluída
+- [x] Papéis (`administrador`, `organizador`) e nove permissões em português, com seeder idempotente (decisão D-50)
+- [x] Cadastro público fechado; conta administrativa por `php artisan usuario:criar-administrador` (decisão D-51)
+- [x] Grupo de rotas `/admin` com autenticação, e-mail confirmado e permissão obrigatória em cada rota
+- [x] Painel: inscrições por situação, vagas restantes por atividade e dinheiro recebido/pendente, por evento, tudo em consulta agregada
+- [x] Pendência **P-09** fechada: `vue-tsc --noEmit` roda com zero erros (decisão D-52)
+- [x] Quatro cenários novos de ponta a ponta, sem tocar nos 21 anteriores
+
+### Fase 6b — Cadastros e gestão de inscrições
 - [ ] CRUDs de evento, dias, grupos de atividades, atividades, conflitos, cidades e grupos de participantes
 - [ ] Lista de inscrições com filtros e exportação; visualização de uma inscrição com o histórico da cobrança
-- [ ] Policies de acesso administrativo (hoje só existe a autenticação do pacote inicial)
+- [ ] Cancelamento administrativo de inscrição (permissão `inscricoes.cancelar`, já criada)
+- [ ] Confirmação manual de pagamento (permissão `pagamentos.confirmar-manual`, já criada e restrita ao administrador)
 
 ### Fase 7 — Comunicação
 - [ ] Ouvintes de `InscricaoCriada`, `InscricaoConfirmada` e `InscricaoExpirada` — os três anúncios já são disparados pelo domínio e **não têm nenhum ouvinte** (decisão D-12). É só plugar
@@ -79,7 +103,7 @@ O que **falta**, por fase:
 - [ ] Definir a política de reembolso (**P-02**) e ligar `refundPayment()` a uma Action de estorno (hoje o contrato existe, o fluxo de domínio não)
 
 ### Fase 9 — Endurecimento
-- [ ] Registro de auditoria das ações administrativas
+- [ ] Registro de auditoria das ações administrativas — a permissão `auditoria.ver` **já existe** desde a Fase 6a, restrita ao administrador, para que esta fase só precise criar a tabela e a tela
 - [ ] Revisão de desempenho com volume real (índices já existem; falta medir)
 - [ ] Revisão de LGPD: prazo de retenção e descarte (**P-04**)
 - [ ] Decidir o que fazer com pagamento reconhecido depois do prazo (**P-03**) — ver a decisão D-34
@@ -139,6 +163,11 @@ O que **falta**, por fase:
 | D-47 | A **segunda via do Pix reemite sob demanda** chamando `CriarPagamentoDaInscricao`, que já é repetível: havendo cobrança pendente, devolve a mesma; não havendo, emite outra com o mesmo prazo | Fecha o buraco deixado pela decisão D-27. Como a cobrança é emitida fora da transação que cria a inscrição, uma falha de conexão pode deixar a inscrição de pé e sem cobrança nenhuma. Antes, essa pessoa não tinha saída; agora ela mesma resolve com um toque, sem ganhar prazo novo e sem mexer em vaga |
 | D-48 | A resposta neutra do pedido de link de acesso é garantida por **três medidas juntas**: o limite de tentativas é contado dentro do controller (nunca por um 429 do middleware), o e-mail vira impressão digital antes de virar chave do limite, e há um piso de tempo de resposta de 400 ms; falha no envio é registrada no log e engolida | Cada brecha sozinha entrega a mesma informação: um 429 confirma que o endereço acertou o alvo, uma resposta rápida demais denuncia que nenhum e-mail foi enviado, e um erro 500 conta que a inscrição existe. Sem as três, o formulário viraria uma máquina de descobrir quem está inscrito |
 | D-49 | Nas telas do participante, os títulos de cartão são `<h2>` escritos à mão, e não o componente `CardTitle` do pacote inicial | O `CardTitle` desenha um `<h3>`. Depois do `<h1>` da página, isso pularia um nível, e quem navega por leitor de tela usa exatamente esses níveis como sumário. O texto de recuperação de acesso ganhou o mesmo cuidado: o campo aponta ao mesmo tempo para a ajuda e para o erro (`aria-describedby="ajuda-email erro-email"`), em vez de trocar uma coisa pela outra e fazer a dica sumir justo quando ela é mais necessária |
+| D-50 | Autorização com **`spatie/laravel-permission`**, com dois papéis (`administrador`, `organizador`) e nove permissões. As tabelas do pacote ficam em inglês (`roles`, `permissions`, `model_has_roles`); os **nomes dos papéis e das permissões são em português** | É a primeira dependência pesada do projeto, e o custo foi assumido de olhos abertos: escrever à mão papéis, permissões, cache e middleware seria reimplementar um pacote maduro para chegar ao mesmo lugar. As tabelas em inglês são coerentes com a **D-02** — estrutura de ferramenta fica em inglês; o que é do negócio fica em português, e "quem pode confirmar pagamento" é do negócio. Dois papéis, e não cinco: tesoureiro, credenciador e "só leitura" são fáceis de acrescentar depois, porque as permissões já são granulares; criar perfil sem alguém para ocupá-lo é inventar requisito |
+| D-51 | **Cadastro público fechado.** As rotas de registro, a tela `Register.vue` e o `RegisteredUserController` foram removidos; `tests/Feature/Auth/RegistrationTest.php` **passa a provar o 404** nas duas rotas, em vez de ser apagado; a conta administrativa nasce pelo comando `usuario:criar-administrador` | A tela de cadastro veio no pacote inicial e ninguém a pediu: enquanto existisse, qualquer visitante criaria uma conta do lado de dentro. Manter o arquivo de teste, com o propósito invertido, é o que impede que alguém reponha a rota sem perceber — a porta trancada passa a ter alarme. A senha é pedida de forma escondida porque senha em argumento de comando fica gravada no histórico do terminal |
+| D-52 | Os **20 erros de tipo da pendência P-09** foram corrigidos nesta fase, e não adiados de novo | Eles viviam exatamente nas telas do pacote inicial que a Fase 6a passa a usar de verdade — barra lateral, cabeçalho, menu da conta, telas de autenticação. Construir o painel sobre código que a verificação de tipos nunca leu seria empilhar em cima de chão não conferido. Corrigir foi **tipar de verdade**: nenhum erro foi silenciado com `any`, `as unknown as` ou `@ts-ignore` |
+| D-53 | Os tipos compartilhados do pacote inicial foram **corrigidos, não contornados**: `Auth.user` passou a ser `User \| null`, `SharedData` ganhou índice aberto e o `NavItem` duplicado dentro de `NavMain` foi eliminado | Ao tipar, apareceu um defeito de verdade: `NavMain` tinha uma cópia própria de `NavItem` com o campo chamado `url`, enquanto o resto do projeto usa `href`. O item da barra lateral **nunca acendia como ativo** — não por decisão de design, mas porque os dois tipos nunca conversaram. `Auth.user` também mentia: a página de boas-vindas é aberta por visitante, e ali não há usuário nenhum. Onde o valor pode faltar, quem consome trata a falta; onde a tela só existe atrás do login, o valor de partida é vazio em vez de forçado |
+| D-54 | A declaração das variáveis de ambiente do Vite (`ImportMetaEnv`) saiu de dentro de `app.ts` e virou o arquivo `resources/js/types/vite-env.d.ts` | O pacote inicial tentava aumentar `vite/client` com `declare module`, e isso simplesmente não funciona: `vite/client` é um arquivo de declarações globais. Declarada no escopo global, a interface se junta à definição do próprio Vite — que é o comportamento que o código original esperava e nunca teve |
 
 ---
 
@@ -154,7 +183,7 @@ O que **falta**, por fase:
 | P-06 | Confirmar as taxas de Pagar.me, Mercado Pago e Asaas diretamente com o comercial | Dono do produto. Ver seção 6.3 de `PAYMENTS.md` |
 | P-08 | Conferir no `.env` local as chaves `PAYMENT_GATEWAY`, `PAYMENT_FAKE_SIMULATION_ENABLED` e `PAYMENT_FAKE_WEBHOOK_SECRET`, como já estão em `.env.example`. Sem o segredo do webhook, o provedor simulado recusa todo aviso (falha para o lado seguro) | Pessoa desenvolvedora, na própria máquina |
 | P-07 | Ajustar o arquivo `.env` local para `DB_PORT=55432` e `FORWARD_PGSQL_PORT=55432`, como já está em `.env.example` (decisão D-19) | Pessoa desenvolvedora, na própria máquina |
-| P-09 | Corrigir os **20 erros de verificação de tipos** revelados pela decisão D-43. Todos estão em arquivos do pacote inicial — `AppHeader`, `AppSidebar`, `AppSidebarHeader`, `NavMain`, `NavUser`, `UserInfo`, `TextLink`, `Welcome`, `AuthSplitLayout`, as telas de autenticação e `app.ts` — e **nenhum** no código da Fase 5a. Foram deixados de fora de propósito: a **Fase 6** reescreve justamente essas telas, e mexer nelas no meio do fluxo público alargaria o escopo sem necessidade | Pessoa desenvolvedora, na Fase 6 |
+| P-09 | ~~Corrigir os **20 erros de verificação de tipos** revelados pela decisão D-43~~ — **resolvida na Fase 6a** (decisões D-52, D-53 e D-54): `npx vue-tsc --noEmit` termina com **zero erros**, e o projeto passou a ter verificação de tipos rodando limpa pela primeira vez. Nenhum erro foi silenciado; um deles era defeito de verdade (o item ativo da barra lateral nunca acendia) | Concluída |
 
 ---
 
@@ -186,7 +215,10 @@ Nenhuma contradição exigiu correção. As decisões D-13 a D-18 foram registra
 |--------|-----------|---------|
 | `bacon/bacon-qr-code` | `app/Services/Pagamentos/GeradorQrCodePix.php` | Desenha o QR Code do Pix como SVG no próprio HTML, sem `imagick` no servidor e sem peso no pacote que o celular baixa |
 | `@playwright/test` (desenvolvimento) | `tests/e2e/` | Prova o caminho do participante num navegador de verdade, imitando um celular |
+| `spatie/laravel-permission` | `app/Models/User.php` (trait `HasRoles`), `database/seeders/PapeisSeeder.php`, `bootstrap/app.php` (apelidos `permission` e `role`) e o grupo de rotas `/admin` | Dá papéis e permissões ao lado administrativo. Escrever isso à mão significaria reimplementar tabelas, cache de permissões e middleware — um pacote maduro inteiro — para chegar exatamente ao mesmo lugar. Ver a decisão **D-50** |
 
-Nada além destes dois. O `@vueuse/core`, que já vinha no pacote inicial, resolve a cópia do código Pix e o contador regressivo.
+O `@vueuse/core`, que já vinha no pacote inicial, resolve a cópia do código Pix e o contador regressivo.
 
 **A Fase 5b não adicionou nenhuma dependência**, nem no PHP nem no navegador: o envio do e-mail é o `Mail` do próprio Laravel, o QR Code da segunda via reaproveita o gerador da Fase 5a e a linha do tempo é HTML e Tailwind sobre os componentes que já existiam.
+
+**A Fase 6a adicionou uma só**, o `spatie/laravel-permission`. O painel não trouxe nenhuma biblioteca de gráfico nem de tabela: os números são texto grande com explicação ao lado, e a tabela de vagas é HTML com cabeçalho de linha e de coluna — que é o que um leitor de tela consegue ler e uma biblioteca de gráfico, não.

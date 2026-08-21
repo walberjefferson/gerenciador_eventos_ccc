@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.3 · **Data:** 2026-08-20 · **Revisado ao final da Fase 5b**
+> **Versão:** 1.4 · **Data:** 2026-08-20 · **Revisado ao final da Fase 6a**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-20:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix) e a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) estão **concluídas e verificadas** — 241 testes Pest passando (1048 asserções), 21 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos. Com isso, todo o caminho do participante está de pé. As fases 6 a 9 não foram iniciadas; a próxima é a **Fase 6 — Administração**.
+> **Estado real em 2026-08-20:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números por evento) estão **concluídas e verificadas** — 268 testes Pest passando (1207 asserções), 25 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e, pela primeira vez no projeto, `vue-tsc --noEmit` com **zero erros**. Com isso, todo o caminho do participante está de pé e o lado administrativo tem porta com fechadura. A próxima é a **Fase 6b — cadastros e gestão de inscrições**.
 
 ---
 
@@ -18,6 +18,7 @@
 | 4 | Pagamento simulado | ✅ | Cobrança Pix, aviso automático, expiração e reconciliação |
 | 5a | Site público | ✅ | Página do evento, formulário de inscrição em quatro etapas e cobrança Pix |
 | 5b | Área do participante | ✅ | Acompanhamento da inscrição por link assinado, histórico da cobrança, segunda via do Pix e recuperação do link por e-mail |
+| 6a | Acesso administrativo e painel | ✅ | Papéis e permissões, cadastro público fechado, conta por comando artisan e painel com os números de cada evento |
 | 6 | Administração | ❌ | Painel com números e cadastros |
 | 7 | Comunicação | ❌ | E-mails em fila |
 | 8 | Provedor real | ❌ | Pix de verdade em produção |
@@ -191,13 +192,34 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 6 — Administração ❌
+## Fase 6a — Acesso administrativo e painel ✅
 
-- Painel com capacidade, inscritos, confirmados, aguardando pagamento, expirados, cancelados, vagas restantes, valor recebido e valor pendente.
-- Cadastro de eventos, dias, grupos de atividades, atividades, cidades e grupos de participantes.
-- Busca e filtros de inscrições por evento, cidade, grupo, atividade, situação, pagamento e período.
-- Ações administrativas: cancelar, confirmar manualmente quando permitido, registrar motivo.
-- Políticas de acesso (`Policies`) por perfil.
+**Entregue.** A Fase 6 foi partida em duas: primeiro a fundação do lado de dentro (quem entra e o que pode ver), depois os cadastros e a gestão de inscrições.
+
+| Entrega | Estado |
+|---------|:------:|
+| Papéis `administrador` e `organizador` e nove permissões em português, com seeder idempotente | ✅ |
+| Cadastro público removido; `GET`/`POST /register` respondem 404, provado por teste | ✅ |
+| Conta administrativa pelo comando `usuario:criar-administrador`, com senha pedida de forma escondida | ✅ |
+| Conta de demonstração travada em ambiente `local`, no mesmo molde da decisão D-29 | ✅ |
+| Grupo de rotas `/admin` com autenticação, e-mail confirmado e **permissão obrigatória em cada rota** | ✅ |
+| Layout administrativo e navegação real sobre o esqueleto do pacote inicial | ✅ |
+| Painel por evento: inscrições por situação, vagas por atividade e dinheiro recebido/pendente/estornado | ✅ |
+| Números vindos de consulta agregada; vaga restante lida do contador materializado | ✅ |
+| Pendência **P-09** fechada: `vue-tsc --noEmit` com zero erros | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 4 cenários novos, os 21 anteriores intactos |
+| Cancelamento administrativo e confirmação manual de pagamento | ❌ adiados para a Fase 6b, de propósito |
+
+**Regra que não muda:** o painel apenas **lê**. Nenhuma Action, Enum, modelo, migração de domínio ou evento foi alterado nesta fase; as únicas migrações novas são as tabelas de papéis e permissões do pacote.
+
+---
+
+## Fase 6b — Cadastros e gestão de inscrições ❌
+
+- Cadastro de eventos, dias, grupos de atividades, atividades, conflitos, cidades e grupos de participantes.
+- Busca e filtros de inscrições por evento, cidade, grupo, atividade, situação, pagamento e período; exportação.
+- Visualização de uma inscrição com o histórico da cobrança.
+- Ações administrativas: cancelar inscrição alheia e confirmar pagamento manualmente, cada uma atrás da permissão já criada na Fase 6a, sempre com motivo registrado.
 
 ---
 
@@ -245,7 +267,7 @@ flowchart LR
     F2 --> F3[Fase 3<br/>Inscrição]
     F3 --> F4[Fase 4<br/>Pagamento]
     F4 --> F5[Fase 5a<br/>Site público]
-    F4 --> F6[Fase 6<br/>Administração]
+    F4 --> F6[Fase 6a/6b<br/>Administração]
     F4 --> F7[Fase 7<br/>Comunicação]
     F4 --> F8[Fase 8<br/>Provedor real]
     F5 --> F9[Fase 9<br/>Endurecimento]
