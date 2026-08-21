@@ -143,3 +143,25 @@ it('mostra o motivo do cancelamento e nenhuma cobranca a pagar', function (): vo
             ->etc()
         );
 });
+
+it('oferece, na tela da cobranca, o link assinado da pagina de acompanhamento', function (): void {
+    $inscricao = Cenario::montar()->inscrever();
+
+    $resposta = $this->get(linkDoParticipante($inscricao, 'inscricoes.pagamento'))->assertOk();
+
+    $url = $resposta->viewData('page')['props']['url_acompanhamento'];
+
+    expect($url)->toBeString()
+        ->toContain('/acompanhar')
+        ->toContain('signature=');
+
+    // O link entregue a tela precisa abrir de verdade: e por ele que o
+    // participante sai da cobranca e chega ao acompanhamento.
+    $this->get($url)
+        ->assertOk()
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->component('Inscricoes/Acompanhar')
+            ->where('inscricao.codigo_publico', $inscricao->codigo_publico)
+            ->etc()
+        );
+});

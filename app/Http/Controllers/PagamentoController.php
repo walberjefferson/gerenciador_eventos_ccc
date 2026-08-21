@@ -62,7 +62,10 @@ class PagamentoController extends Controller
             // A tela pergunta por aqui, de tempos em tempos, se o dinheiro
             // chegou. Assinada tambem: consultar situacao e ler dado de
             // inscricao alheia.
-            'url_situacao' => $this->urlDaSituacao($inscricao),
+            'url_situacao' => $this->urlAssinada($inscricao, 'inscricoes.situacao'),
+            // A pagina do participante: linha do tempo e historico da
+            // cobranca. Assinada tambem, pelo mesmo motivo.
+            'url_acompanhamento' => $this->urlAssinada($inscricao, 'inscricoes.acompanhar'),
         ]);
     }
 
@@ -131,15 +134,17 @@ class PagamentoController extends Controller
     }
 
     /**
+     * Link assinado para outra tela do participante.
+     *
      * A validade acompanha a da tela: prazo de pagamento com 24 horas de
-     * folga, para a consulta nao morrer antes da pagina que a usa.
+     * folga, para o link nao morrer antes da pagina que o usa.
      */
-    private function urlDaSituacao(Inscricao $inscricao): string
+    private function urlAssinada(Inscricao $inscricao, string $rota): string
     {
         $prazo = $inscricao->prazo_pagamento ?? Carbon::now()->addDay();
 
         return URL::temporarySignedRoute(
-            'inscricoes.situacao',
+            $rota,
             $prazo->copy()->addDay(),
             ['codigo_publico' => $inscricao->codigo_publico],
         );

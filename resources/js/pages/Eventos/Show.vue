@@ -79,6 +79,18 @@ const enderecoDaInscricao = computed<string>(() => `/eventos/${evento.value?.slu
                         {{ evento.motivo_inscricoes_fechadas }}
                     </AlertDescription>
                 </Alert>
+
+                <!-- Quem ja se inscreveu e perdeu o link volta por aqui: informa
+                     o e-mail e recebe o endereco da sua inscricao de novo. -->
+                <p class="text-sm">
+                    <Link
+                        :href="`/acesso?evento=${evento.slug}`"
+                        class="inline-flex min-h-11 items-center font-medium text-informacao-texto underline underline-offset-4"
+                        data-testid="link-ja-me-inscrevi"
+                    >
+                        Já me inscrevi — acessar minha inscrição
+                    </Link>
+                </p>
             </section>
 
             <section aria-labelledby="titulo-programacao" class="space-y-4">

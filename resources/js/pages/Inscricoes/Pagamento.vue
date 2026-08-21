@@ -5,8 +5,8 @@ import QrCodePix from '@/components/pagamento/QrCodePix.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatarDataHora, formatarValor } from '@/lib/formato';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
+import { formatarDataHora, formatarValor } from '@/lib/formato';
 import type { EstadoDaCobranca, PropsDaCobranca, SituacaoDaCobranca } from '@/types/pagamento';
 import { Head, Link } from '@inertiajs/vue3';
 import { useIntervalFn } from '@vueuse/core';
@@ -149,7 +149,10 @@ onBeforeUnmount(() => pararConsulta());
                             <h2 class="text-base font-semibold">Como pagar, passo a passo</h2>
                             <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed">
                                 <li>Abra o aplicativo do banco onde você tem conta.</li>
-                                <li>Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou <strong>Pix copia e cola</strong>.</li>
+                                <li>
+                                    Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou
+                                    <strong>Pix copia e cola</strong>.
+                                </li>
                                 <li>Se escolher QR Code, aponte a câmera do celular para a imagem acima.</li>
                                 <li>Se preferir, toque em <strong>Copiar código Pix</strong> aqui e cole no campo do aplicativo.</li>
                                 <li>Confira o valor de {{ valor }} e conclua o pagamento.</li>
@@ -269,6 +272,32 @@ onBeforeUnmount(() => pararConsulta());
                     </CardContent>
                 </Card>
             </template>
+
+            <!-- O caminho para a pagina do participante. Ela vale em qualquer
+                 estado: e la que ficam a linha do tempo, o historico da
+                 cobranca e a explicacao do que ja aconteceu.
+
+                 Com o prazo vencido, o link desta pagina tambem envelhece —
+                 por isso oferecemos, so nesse caso, o pedido de um link novo
+                 por e-mail. -->
+            <nav aria-label="Outras páginas da sua inscrição" class="flex flex-col gap-1 border-t border-border pt-4">
+                <Link
+                    :href="url_acompanhamento"
+                    class="inline-flex min-h-11 items-center text-sm font-medium text-informacao-texto underline underline-offset-4"
+                    data-testid="link-acompanhamento"
+                >
+                    Acompanhar minha inscrição
+                </Link>
+
+                <Link
+                    v-if="estado === 'expirada'"
+                    :href="evento.slug ? `/acesso?evento=${evento.slug}` : '/acesso'"
+                    class="inline-flex min-h-11 items-center text-sm font-medium text-informacao-texto underline underline-offset-4"
+                    data-testid="link-recuperar-acesso"
+                >
+                    Perdi o link da minha inscrição. Receber outro por e-mail
+                </Link>
+            </nav>
         </div>
     </PublicoLayout>
 </template>
