@@ -30,20 +30,46 @@ abstract class OuvinteDeComunicacao implements ShouldQueue
 {
     use InteractsWithQueue;
 
-    public ?string $connection = null;
-
-    public ?string $queue = null;
-
-    public ?int $tries = null;
-
     public function __construct(
         protected readonly RegistrarEnvio $registrar,
         protected readonly GeradorLinkDeAcesso $links,
-    ) {
+    ) {}
+
+    /*
+    |--------------------------------------------------------------------------
+    | Por que fila, tentativas e espera sao metodos, e nao propriedades
+    |--------------------------------------------------------------------------
+    |
+    | Para descobrir em qual fila enfileirar um ouvinte, o Laravel cria uma
+    | copia dele SEM chamar o construtor (Dispatcher::createListenerAndJob).
+    | Qualquer valor que o construtor atribuisse seria perdido justamente na
+    | hora em que ele importa, e o trabalho cairia na fila "default" — o que
+    | um trabalhador dedicado a fila "emails" nunca veria.
+    |
+    | Por isso tudo aqui e metodo: metodo funciona na copia sem construtor, e o
+    | valor continua vindo da configuracao.
+    |
+    */
+
+    public function viaConnection(): ?string
+    {
         $conexao = config('inscricoes.comunicacao.conexao');
-        $this->connection = is_string($conexao) && $conexao !== '' ? $conexao : null;
-        $this->queue = (string) config('inscricoes.comunicacao.fila', 'emails');
-        $this->tries = (int) config('inscricoes.comunicacao.tentativas', 3);
+
+        return is_string($conexao) && $conexao !== '' ? $conexao : null;
+    }
+
+    public function viaQueue(): string
+    {
+        return (string) config('inscricoes.comunicacao.fila', 'emails');
+    }
+
+    /**
+     * Quantas vezes a fila insiste antes de desistir. Desistir significa ir
+     * para "failed_jobs" — nunca desfazer nada da inscricao.
+     */
+    public function tries(mixed ...$argumentos): int
+    {
+        return (int) config('inscricoes.comunicacao.tentativas', 3);
     }
 
     /**
@@ -51,7 +77,7 @@ abstract class OuvinteDeComunicacao implements ShouldQueue
      *
      * @return array<int, int>
      */
-    public function backoff(): array
+    public function backoff(mixed ...$argumentos): array
     {
         /** @var array<int, int> $espera */
         $espera = config('inscricoes.comunicacao.espera_entre_tentativas', [60, 300, 900]);

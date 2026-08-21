@@ -3,7 +3,7 @@
 > **Versão:** 1.5 · **Data:** 2026-08-21 · **Revisado ao final da Fase 6b**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-21:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6 inteira** — **6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números) e **6b** (cadastros do evento pela tela, lista de inscrições com filtros, exportação em CSV, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento) — estão **concluídas e verificadas**: 370 testes Pest passando (1805 asserções), 28 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. Com isso, o caminho do participante está de pé e a organização opera o evento inteiro pela tela, sem ninguém abrir o banco de dados. A próxima é a **Fase 7 — Comunicação**.
+> **Estado real em 2026-08-21:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6 inteira** — **6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números) e **6b** (cadastros do evento pela tela, lista de inscrições com filtros, exportação em CSV, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento) e a **Fase 7** (os cinco e-mails do participante, o lembrete de prazo agendado e o registro de envio que impede a mensagem repetida) estão **concluídas e verificadas**: 407 testes Pest passando (2036 asserções), 28 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. Com isso, o caminho do participante está de pé, a organização opera o evento inteiro pela tela e quem se inscreve é avisado por e-mail em cada passo — sem ninguém abrir o banco de dados. A próxima é a **Fase 9 — Endurecimento**; a **Fase 8** depende de decisões do dono do produto (**P-01** e **P-06**). ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
 
 ---
 
@@ -233,7 +233,7 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 | Anúncio de domínio `InscricaoCancelada` disparado — **sem ouvinte**, que é trabalho da Fase 7 | ✅ |
 | Testes de ponta a ponta com Playwright | ✅ 3 cenários novos, os 25 anteriores intactos |
 | Registro de auditoria das ações administrativas | ❌ adiado para a Fase 9, de propósito |
-| E-mails de aviso do cancelamento e da confirmação | ❌ Fase 7 |
+| E-mails de aviso do cancelamento e da confirmação | ❌ na 6b — **entregues na Fase 7**, sem que uma linha da 6b precisasse mudar |
 
 **Duas decisões que dependem de pendência aberta:** cancelar inscrição já confirmada **não estorna** (a política de reembolso, **P-02**, não existe) e a confirmação manual **recusa** inscrição expirada (a vaga já voltou para a fila — **P-03** segue aberta). As duas são a leitura segura enquanto ninguém decide, e as duas dizem isso na tela em português.
 
@@ -241,15 +241,18 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 7 — Comunicação ❌
+## Fase 7 — Comunicação ✅ concluída
 
-- Ouvintes para os anúncios já disparados: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada` e `InscricaoCancelada` — os quatro saem do domínio hoje e **nenhum tem ouvinte**.
-- E-mails: inscrição criada com link de pagamento, lembrete antes do prazo, pagamento confirmado, inscrição expirada, cancelamento.
-- Tudo em fila, para que lentidão de servidor de e-mail nunca atrase a inscrição.
-- Momento do lembrete configurável (decisão DA-08).
-- Estrutura preparada para acrescentar WhatsApp depois sem tocar no domínio.
+- ✅ Ouvintes dos quatro anúncios já disparados pelo domínio: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada` e `InscricaoCancelada`. A decisão **D-12** está **encerrada** — eles finalmente têm quem os escute.
+- ✅ Cinco e-mails (decisão **D-65**): inscrição recebida com o link de pagamento, lembrete antes do prazo, pagamento confirmado, prazo vencido e cancelamento. Todos em HTML **e** em texto puro, sempre com link assinado e **nunca** com CPF, telefone, impressão digital ou código Pix inteiro (**D-68**).
+- ✅ Lembrete de prazo pelo comando agendado `inscricoes:lembrar-prazo` (a cada 15 minutos, janela configurável, padrão de 24 horas — decisão DA-08 cumprida).
+- ✅ Tudo na fila `emails`, com 3 tentativas e espera de 1, 5 e 15 minutos; falha definitiva vai para `failed_jobs` sem afetar inscrição, vaga ou pagamento (**D-67**).
+- ✅ Tabela `comunicacoes_enviadas` com unicidade `(inscricao_id, tipo, canal)`: é o **banco** que impede a segunda cópia, não uma verificação em PHP (**D-66**).
+- ✅ Estrutura pronta para um segundo canal: só a coluna `canal` e o Enum `TipoComunicacao`, sem contrato nem adaptador de WhatsApp (**D-70**).
 
-**Nenhuma regra de inscrição é alterada nesta fase.** Se for preciso alterar, o desenho de eventos de domínio falhou.
+**Nenhuma regra de inscrição foi alterada nesta fase** — nenhuma Action, nenhum Enum de domínio, nenhum Model de domínio, nenhuma migração existente, e nenhum anúncio mudou de momento. O desenho de eventos de domínio se pagou.
+
+⚠️ **Pendência de infraestrutura, não de código:** nenhum trabalhador de fila roda hoje. Sem `php artisan queue:work redis --queue=emails` de pé (seção 9.1 de `ARCHITECTURE.md`), os e-mails ficam parados na fila.
 
 ---
 

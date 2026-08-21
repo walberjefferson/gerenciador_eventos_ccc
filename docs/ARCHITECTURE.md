@@ -288,7 +288,8 @@ Dois testes obrigatórios:
 |-------|-----------------|
 | Envio duplicado do formulário | O formulário gera uma `chave_idempotencia`. Existe uma regra de unicidade `(evento_id, chave_idempotencia)` no banco. Se a chave repetir, devolvemos a inscrição já criada, sem reservar de novo |
 | Aviso do provedor repetido | Regra de unicidade `(gateway, id_evento_externo)` na tabela de avisos. O segundo aviso idêntico é registrado como ignorado e não altera contador |
-| Rotinas agendadas | Expiração e reconciliação atualizam apenas registros na situação de origem esperada. Rodar duas vezes seguidas não muda nada na segunda |
+| Rotinas agendadas | Expiração, reconciliação e lembrete de prazo atualizam apenas registros na situação de origem esperada. Rodar duas vezes seguidas não muda nada na segunda |
+| E-mail enviado duas vezes | Regra de unicidade `(inscricao_id, tipo, canal)` na tabela `comunicacoes_enviadas`. O registro é gravado antes do envio; se o banco recusar, alguém já mandou e o trabalho encerra em silêncio (ver 9.2) |
 
 ---
 
@@ -391,8 +392,69 @@ Fora disso, respondem "não encontrado" (404). Existe teste automatizado que pro
 | `ProcessarWebhookPagamento` (job) | Assim que um aviso é recebido | Traduz o aviso e aplica o efeito no pagamento e na inscrição |
 | `inscricoes:expirar-vencidas` (comando) | A cada minuto | Expira inscrições com prazo vencido e devolve as vagas |
 | `pagamentos:reconciliar` (comando) | A cada 5 minutos | Consulta o provedor para pagamentos pendentes e confirma o que já foi pago |
+| `inscricoes:lembrar-prazo` (comando) | A cada 15 minutos | Avisa quem está a menos de 24 horas do fim do prazo de pagamento |
+| Envio de e-mail (ouvintes e mensagens) | Assim que o domínio anuncia um fato | Monta e entrega os cinco e-mails do participante, na fila `emails` |
 
 A expiração processa em lotes com `chunkById` (percorre por faixas de identificador), para funcionar bem mesmo com muitos registros.
+
+### 9.1 O trabalhador da fila — sem ele, nenhum e-mail sai
+
+Nenhum e-mail é enviado durante o pedido da pessoa. O sistema apenas **deixa o
+trabalho na fila** e responde. Quem tira o trabalho da fila e entrega de fato é
+um processo à parte, o **trabalhador** (*worker*).
+
+Isso é deliberado: um servidor de e-mail lento pode levar segundos para
+responder, e nenhuma inscrição pode esperar por isso. Mas tem uma consequência
+que precisa ser dita sem rodeio: **enquanto ninguém subir o trabalhador, os
+e-mails ficam parados na fila e não chegam a ninguém.** O sistema não avisa,
+não dá erro e não reclama — a fila simplesmente cresce.
+
+Em desenvolvimento, com o Sail de pé, o comando é este:
+
+```bash
+./vendor/bin/sail artisan queue:work redis --queue=emails
+```
+
+Sem o Sail (PHP no próprio computador):
+
+```bash
+php artisan queue:work redis --queue=emails
+```
+
+Em produção, o trabalhador precisa ser um serviço supervisionado (`supervisord`,
+`systemd` ou equivalente), que sobe junto com o servidor e volta sozinho se
+cair. O agendador (`php artisan schedule:work` ou a entrada de `cron`) é outro
+processo e continua sendo necessário: é ele que dispara a expiração, a
+reconciliação e o lembrete de prazo.
+
+**Quando um e-mail não é entregue:** o trabalhador tenta 3 vezes, esperando
+1 minuto, 5 minutos e 15 minutos entre as tentativas — servidor de e-mail fora
+do ar costuma ser problema de minutos. Se as três falharem, o trabalho vai para
+a tabela `failed_jobs`, com o erro completo, e **nada acontece com a inscrição,
+a vaga ou o pagamento**. O prejuízo máximo de uma falha de e-mail é um e-mail
+que não chegou.
+
+```bash
+php artisan queue:failed         # o que falhou e por quê
+php artisan queue:retry all      # tentar de novo depois de resolver a causa
+```
+
+### 9.2 A mesma mensagem nunca chega duas vezes
+
+Antes de enviar, o sistema grava uma linha em `comunicacoes_enviadas` com
+`(inscricao, tipo de mensagem, canal)`. Existe uma **regra de unicidade no
+banco** sobre essas três colunas, e é ela — não uma verificação no código — que
+impede a segunda cópia.
+
+A diferença importa: dois trabalhadores rodando ao mesmo tempo podem pegar o
+mesmo trabalho e passar juntos por qualquer "já mandei?" escrito em PHP. O
+banco, não: o segundo esbarra na regra e desiste em silêncio. A gravação e o
+envio acontecem na mesma transação, então um envio que falha não deixa registro
+para trás e a próxima tentativa encontra o caminho livre.
+
+A coluna `canal` guarda hoje sempre `email`. Ela existe para que um segundo
+meio de aviso (WhatsApp, por exemplo) entre um dia sem migração e sem reescrever
+a regra de "uma vez só".
 
 ---
 
