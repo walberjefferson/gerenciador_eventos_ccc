@@ -15,11 +15,6 @@ defineProps<{
 
 <template>
     <ol class="space-y-0" data-testid="linha-do-tempo">
-        <MarcoDaLinhaDoTempo
-            v-for="(marco, indice) in marcos"
-            :key="marco.chave"
-            :marco="marco"
-            :ultimo="indice === marcos.length - 1"
-        />
+        <MarcoDaLinhaDoTempo v-for="(marco, indice) in marcos" :key="marco.chave" :marco="marco" :ultimo="indice === marcos.length - 1" />
     </ol>
 </template>

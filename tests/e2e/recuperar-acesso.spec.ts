@@ -65,6 +65,6 @@ test('o formulario recusa e-mail malformado sem dizer se ele existe', async ({ p
     // O erro fala do formato do campo, nunca da existencia da inscricao.
     const erro = page.locator('#erro-email');
     await expect(erro).toBeVisible();
-    await expect(page.getByTestId('campo-email')).toHaveAttribute('aria-describedby', 'erro-email');
+    await expect(page.getByTestId('campo-email')).toHaveAttribute('aria-describedby', 'ajuda-email erro-email');
     await expect(page.getByTestId('mensagem-do-acesso')).toHaveCount(0);
 });

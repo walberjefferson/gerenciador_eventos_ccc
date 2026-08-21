@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.2 · **Data:** 2026-08-20 · **Revisado ao final da Fase 5a**
+> **Versão:** 1.3 · **Data:** 2026-08-20 · **Revisado ao final da Fase 5b**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-20:** as fases 0 a 4 e a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix) estão **concluídas e verificadas** — 205 testes Pest passando (795 asserções), 12 cenários Playwright passando num navegador que imita um celular, `pint`, `eslint` e `npm run build` limpos. Falta a **Fase 5b** (área do participante) e as fases 6 a 9 não foram iniciadas.
+> **Estado real em 2026-08-20:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix) e a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) estão **concluídas e verificadas** — 241 testes Pest passando (1048 asserções), 21 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos. Com isso, todo o caminho do participante está de pé. As fases 6 a 9 não foram iniciadas; a próxima é a **Fase 6 — Administração**.
 
 ---
 
@@ -17,7 +17,7 @@
 | 3 | Inscrição | ✅ | Inscrição válida com reserva de vaga à prova de concorrência |
 | 4 | Pagamento simulado | ✅ | Cobrança Pix, aviso automático, expiração e reconciliação |
 | 5a | Site público | ✅ | Página do evento, formulário de inscrição em quatro etapas e cobrança Pix |
-| 5b | Área do participante | ❌ | Acompanhamento da inscrição por link assinado |
+| 5b | Área do participante | ✅ | Acompanhamento da inscrição por link assinado, histórico da cobrança, segunda via do Pix e recuperação do link por e-mail |
 | 6 | Administração | ❌ | Painel com números e cadastros |
 | 7 | Comunicação | ❌ | E-mails em fila |
 | 8 | Provedor real | ❌ | Pix de verdade em produção |
@@ -162,7 +162,7 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 | Tela de pagamento com QR Code, código copia e cola, botão de copiar e contador regressivo | ✅ |
 | Volta à cobrança por URL assinada com validade (decisão DA-05, agora tomada) | ✅ |
 | Testes de ponta a ponta com Playwright | ✅ 12 cenários |
-| Área do participante (linha do tempo, histórico, reenvio do link) | ❌ Fase 5b |
+| Área do participante (linha do tempo, histórico, reenvio do link) | ✅ entregue na Fase 5b |
 
 **Regra que não muda:** tudo que a tela valida é conforto. A regra continua sendo a do servidor — e o 422 dele devolve o participante ao passo do campo com problema, com o campo em foco.
 
@@ -170,14 +170,24 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 5b — Área do participante ❌
+## Fase 5b — Área do participante ✅
 
 **Objetivo:** deixar o participante acompanhar a própria inscrição depois de fechar o navegador.
 
-- Linha do tempo da inscrição: criada, aguardando pagamento, confirmada ou expirada.
-- Histórico da cobrança e segunda via do Pix enquanto o prazo não venceu.
-- Reenvio do link de acesso (por enquanto o link assinado só chega no redirecionamento logo após a inscrição; e-mail é Fase 7).
-- Decidir se o participante pode cancelar a própria inscrição.
+| Entrega | Situação |
+|---------|:--------:|
+| Página `/inscricoes/{código}/acompanhar` por link assinado, com resumo da inscrição | ✅ |
+| Linha do tempo com os oito marcos, derivada dos carimbos de tempo que o domínio já grava — sem tabela nova | ✅ |
+| Histórico completo da cobrança, sem expor identificador do provedor, dados internos do aviso nem o código Pix fora da tela de pagamento | ✅ |
+| Segunda via do Pix sob demanda enquanto o prazo não venceu; vencido, a tela explica em vez de oferecer o botão | ✅ |
+| Recuperação do link de acesso por e-mail em `/acesso`, com resposta sempre neutra e link válido por sete dias | ✅ |
+| Ligação entre as telas: pagamento → acompanhamento, e página do evento → "já me inscrevi" | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 9 cenários novos, os 12 da Fase 5a intactos |
+| Cancelamento da própria inscrição pelo participante | ❌ fora do escopo (decisão D-45) — segue com o dono do produto |
+
+**Regra que não muda:** a área do participante é uma tela de leitura. A única escrita que ela faz é pedir a segunda via do Pix, que chama a Action repetível de sempre. Nenhuma Action, Enum, modelo ou migração foi criada na fase.
+
+**Acessibilidade:** a linha do tempo é uma lista ordenada de verdade, e cada passo diz por escrito em que pé está, sem depender de cor. Os títulos descem um nível de cada vez, o campo de e-mail aponta ao mesmo tempo para a ajuda e para o erro, a mensagem neutra é anunciada com `role="status"`, o foco fica sempre visível, os alvos de toque têm 44 px e nada escapa da largura de uma tela de 320 px.
 
 ---
 

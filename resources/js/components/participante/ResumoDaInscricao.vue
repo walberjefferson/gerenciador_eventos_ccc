@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatarValor } from '@/lib/formato';
 import type { InscricaoAcompanhada } from '@/types/participante';
 import { computed } from 'vue';
@@ -42,7 +42,7 @@ const grupo = computed(() => {
 <template>
     <Card data-testid="resumo-da-inscricao">
         <CardHeader class="pb-3">
-            <CardTitle class="text-base font-medium text-muted-foreground">Sua inscrição</CardTitle>
+            <h2 class="text-base font-medium leading-none tracking-tight text-muted-foreground">Sua inscrição</h2>
 
             <div class="flex flex-wrap items-center gap-2">
                 <Badge :variant="variante" data-testid="situacao-da-inscricao">{{ inscricao.situacao_rotulo }}</Badge>

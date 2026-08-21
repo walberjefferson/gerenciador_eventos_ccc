@@ -4,7 +4,7 @@ import LinhaDoTempo from '@/components/participante/LinhaDoTempo.vue';
 import ResumoDaInscricao from '@/components/participante/ResumoDaInscricao.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarDataHora } from '@/lib/formato';
 import type { PropsDoAcompanhamento } from '@/types/participante';
@@ -74,9 +74,7 @@ function pedirSegundaVia(): void {
             <header class="space-y-1">
                 <p class="text-sm text-muted-foreground">{{ inscricao.evento.nome }}</p>
                 <h1 class="text-2xl font-semibold leading-tight sm:text-3xl">Acompanhe sua inscrição</h1>
-                <p class="text-sm text-muted-foreground">
-                    Aqui você vê o que já aconteceu com a sua inscrição e o que ainda falta.
-                </p>
+                <p class="text-sm text-muted-foreground">Aqui você vê o que já aconteceu com a sua inscrição e o que ainda falta.</p>
             </header>
 
             <!-- Explicacao de quem mandou a pessoa para ca (por exemplo, um
@@ -113,8 +111,8 @@ function pedirSegundaVia(): void {
                         <CircleAlert aria-hidden="true" />
                         <AlertTitle>O código Pix ainda não foi gerado</AlertTitle>
                         <AlertDescription>
-                            Isso acontece de vez em quando quando a conexão falha na hora de emitir a cobrança. Toque no botão abaixo para
-                            gerar o Pix desta inscrição.
+                            Isso acontece de vez em quando quando a conexão falha na hora de emitir a cobrança. Toque no botão abaixo para gerar o Pix
+                            desta inscrição.
                         </AlertDescription>
                     </Alert>
 
@@ -139,10 +137,7 @@ function pedirSegundaVia(): void {
                         v-if="url_segunda_via"
                         type="button"
                         :variant="temCobrancaAberta ? 'outline' : 'default'"
-                        :class="[
-                            'h-12 w-full',
-                            temCobrancaAberta ? '' : 'bg-acao text-base text-acao-foreground hover:bg-acao/90',
-                        ]"
+                        :class="['h-12 w-full', temCobrancaAberta ? '' : 'bg-acao text-base text-acao-foreground hover:bg-acao/90']"
                         :disabled="pedido.processing"
                         data-testid="botao-segunda-via"
                         @click="pedirSegundaVia"
@@ -159,9 +154,7 @@ function pedirSegundaVia(): void {
             <Alert v-else-if="inscricao.situacao === 'confirmada'" variant="sucesso" data-testid="aviso-confirmada">
                 <CheckCircle2 aria-hidden="true" />
                 <AlertTitle>Sua inscrição está confirmada</AlertTitle>
-                <AlertDescription>
-                    Guarde o código da inscrição: é por ele que a organização encontra você no dia do evento.
-                </AlertDescription>
+                <AlertDescription> Guarde o código da inscrição: é por ele que a organização encontra você no dia do evento. </AlertDescription>
             </Alert>
 
             <!-- Prazo vencido, cancelamento: explicamos em vez de oferecer um botao que nao resolve. -->
@@ -185,7 +178,7 @@ function pedirSegundaVia(): void {
 
             <Card>
                 <CardHeader class="pb-3">
-                    <CardTitle class="text-lg">O que já aconteceu</CardTitle>
+                    <h2 class="text-lg font-semibold leading-none tracking-tight">O que já aconteceu</h2>
                 </CardHeader>
 
                 <CardContent>
@@ -195,7 +188,7 @@ function pedirSegundaVia(): void {
 
             <Card>
                 <CardHeader class="pb-3">
-                    <CardTitle class="text-lg">Histórico da cobrança</CardTitle>
+                    <h2 class="text-lg font-semibold leading-none tracking-tight">Histórico da cobrança</h2>
                 </CardHeader>
 
                 <CardContent>

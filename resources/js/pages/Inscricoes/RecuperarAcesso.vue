@@ -71,12 +71,10 @@ function enviar(): void {
                                 inputmode="email"
                                 class="h-12"
                                 :aria-invalid="erro ? 'true' : undefined"
-                                :aria-describedby="erro ? 'erro-email' : 'ajuda-email'"
+                                :aria-describedby="erro ? 'ajuda-email erro-email' : 'ajuda-email'"
                                 data-testid="campo-email"
                             />
-                            <p id="ajuda-email" class="text-sm text-muted-foreground">
-                                Use o mesmo e-mail que você informou ao se inscrever.
-                            </p>
+                            <p id="ajuda-email" class="text-sm text-muted-foreground">Use o mesmo e-mail que você informou ao se inscrever.</p>
                             <p v-if="erro" id="erro-email" role="alert" class="text-sm font-medium text-destructive">{{ erro }}</p>
                         </div>
 
