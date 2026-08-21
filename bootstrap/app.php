@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CabecalhosDeSeguranca;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Global, e nao so no grupo "web": o aviso do provedor de pagamento
+        // roda fora do grupo web, e cabecalho de seguranca que depende de a
+        // rota estar no grupo certo e cabecalho que um dia vai faltar.
+        $middleware->append(CabecalhosDeSeguranca::class);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

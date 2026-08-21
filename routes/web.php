@@ -38,7 +38,13 @@ Route::get('eventos/{slug}/inscricao', [InscricaoPublicaController::class, 'crea
 
 // Envio do formulario de inscricao. Responde JSON: as telas publicas entram
 // na fase do site do participante.
-Route::post('inscricoes', [InscricaoController::class, 'store'])->name('inscricoes.store');
+//
+// O limite por IP e definido em AppServiceProvider, com resposta em portugues:
+// e a unica porta publica de escrita sem assinatura na URL, entao e por ela que
+// um script tentaria criar inscricao em serie.
+Route::post('inscricoes', [InscricaoController::class, 'store'])
+    ->middleware('throttle:inscricoes')
+    ->name('inscricoes.store');
 
 // Cobranca Pix. O codigo publico nunca autentica sozinho: sem a assinatura
 // valida na URL, o middleware responde 403.

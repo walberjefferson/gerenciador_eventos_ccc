@@ -29,6 +29,36 @@ return [
     */
 
     'limites' => [
+        // Envio do formulario de inscricao, por endereco de internet (IP).
+        //
+        // Muita gente sai pelo mesmo endereco sem ter nada a ver uma com a
+        // outra: a familia inteira no sofa, a fila do salao da paroquia com
+        // uma pessoa ajudando a inscrever os outros no mesmo celular, o wi-fi
+        // da escola. Punir esse pessoal e pior do que nao ter limite nenhum,
+        // porque o prejuizo aparece justamente no dia da abertura.
+        //
+        // Por isso o teto e alto para gente e baixo para programa: trinta por
+        // minuto e mais rapido do que qualquer mao consegue preencher quatro
+        // etapas de formulario, e duzentas por hora e mais do que um evento
+        // deste porte recebe num dia inteiro. Um script, sem limite, faria
+        // milhares por minuto.
+        //
+        // Os dois numeros sao ajustaveis por variavel de ambiente: se a
+        // organizacao planejar um mutirao de inscricao num unico lugar, e so
+        // subir o teto naquele dia em vez de tirar a protecao do ar.
+        'criar_por_minuto' => (int) env('INSCRICOES_LIMITE_CRIAR_MINUTO', 30),
+        'criar_por_hora' => (int) env('INSCRICOES_LIMITE_CRIAR_HORA', 200),
+
+        // Aviso do provedor de pagamento. Limite alto de proposito: quem chama
+        // e um servidor, e um pico legitimo de avisos (varias confirmacoes ao
+        // mesmo tempo) nao pode ser confundido com enxurrada.
+        'webhook_por_minuto' => (int) env('PAGAMENTOS_LIMITE_WEBHOOK_MINUTO', 300),
+
+        // Login administrativo, por IP. E um teto grosso, POR CIMA do limite
+        // que o proprio Laravel ja aplica por e-mail (cinco tentativas): este
+        // aqui pega quem tenta muitos e-mails diferentes do mesmo lugar.
+        'login_por_minuto' => (int) env('ADMIN_LIMITE_LOGIN_MINUTO', 20),
+
         'segunda_via' => env('INSCRICOES_LIMITE_SEGUNDA_VIA', '5,1'),
         'acesso_por_minuto' => env('INSCRICOES_LIMITE_ACESSO_MINUTO', '5,1'),
         'acesso_por_hora' => env('INSCRICOES_LIMITE_ACESSO_HORA', '15,60'),

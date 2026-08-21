@@ -47,10 +47,15 @@ class PaymentServiceProvider extends ServiceProvider
 
         // Quem chama e um servidor, nao um navegador: a rota fica fora do grupo
         // "web" de proposito — sem sessao, sem cookie e, portanto, sem CSRF.
+        // O limite e alto e por IP. Ele NAO muda a regra de responder 200 a
+        // assinatura invalida (D-18): quem manda aviso com assinatura errada
+        // continua recebendo 200 e sendo ignorado. O limite so existe para o
+        // caso de enxurrada — e, mesmo estourado, nao revela nada sobre a
+        // assinatura, porque a recusa vem antes de o aviso ser lido.
         Route::post(
             (string) config('payments.webhook.path', 'webhooks/pagamentos'),
             PaymentWebhookController::class
-        )->name('webhooks.pagamentos');
+        )->middleware('throttle:webhooks-pagamento')->name('webhooks.pagamentos');
 
         // As rotas de simulacao so nascem em local/testing e com a chave ligada.
         // Ainda assim, cada uma passa por um middleware que confere as duas

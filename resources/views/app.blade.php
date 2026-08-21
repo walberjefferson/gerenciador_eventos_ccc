@@ -9,7 +9,10 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
 
-        @routes
+        {{-- O nonce vem do middleware CabecalhosDeSeguranca. Sem ele, a CSP
+             bloquearia a tabela de rotas do Ziggy, que e escrita na propria
+             pagina, e nenhum link do sistema funcionaria. --}}
+        @routes(nonce: \Illuminate\Support\Facades\Vite::cspNonce())
         @vite(['resources/js/app.ts'])
         @inertiaHead
     </head>

@@ -43,6 +43,15 @@ export const ambienteDeTeste: Record<string, string> = {
     PAYMENT_FAKE_WEBHOOK_SECRET: 'pepper-de-teste-do-webhook',
     DOCUMENTO_HASH_PEPPER: 'pepper-de-teste-do-documento',
 
+    // A suite inteira sai de um endereco so e envia dezenas de inscricoes em
+    // poucos minutos — ou seja, ela se parece com um script, que e exatamente
+    // o que o limite existe para conter. Aqui os tetos sao declarados bem
+    // acima do padrao para que o navegador teste as telas, e nao o limite.
+    // Quem prova o limite, com o numero real de producao, e o Pest
+    // (tests/Feature/Seguranca/LimitesTest.php).
+    INSCRICOES_LIMITE_CRIAR_MINUTO: '1000',
+    INSCRICOES_LIMITE_CRIAR_HORA: '5000',
+
     // O servidor embutido do PHP atende uma requisicao por vez. A tela da
     // cobranca consulta a situacao enquanto a pessoa navega: sem estes
     // trabalhadores extras, uma consulta seguraria a proxima pagina.
