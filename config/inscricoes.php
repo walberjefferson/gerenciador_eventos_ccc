@@ -34,4 +34,18 @@ return [
         'acesso_por_hora' => env('INSCRICOES_LIMITE_ACESSO_HORA', '15,60'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tempo minimo de resposta do pedido de link de acesso
+    |--------------------------------------------------------------------------
+    |
+    | Em milissegundos. O pedido responde sempre a mesma coisa, exista ou nao
+    | inscricao para o e-mail informado — mas enviar mensagem demora mais do
+    | que nao enviar. Este piso apaga essa diferenca: sem ele, dava para
+    | descobrir quem esta inscrito cronometrando a resposta.
+    |
+    */
+
+    'tempo_minimo_resposta_ms' => (int) env('INSCRICOES_TEMPO_MINIMO_RESPOSTA_ACESSO', 400),
+
 ];

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
@@ -50,6 +51,15 @@ Route::get('inscricoes/{codigo_publico}/acompanhar', [AcompanhamentoController::
 Route::post('inscricoes/{codigo_publico}/segunda-via', [SegundaViaPagamentoController::class, 'store'])
     ->middleware(['signed', 'throttle:'.config('inscricoes.limites.segunda_via')])
     ->name('inscricoes.segunda-via');
+
+// Recuperacao do link de acesso. O limite de tentativas por IP e por e-mail
+// e contado dentro do controller, para que a resposta continue neutra; o
+// throttle da rota e apenas um teto grosso contra enxurrada de pedidos.
+Route::get('acesso', [AcessoInscricaoController::class, 'create'])->name('inscricoes.acesso');
+
+Route::post('acesso', [AcessoInscricaoController::class, 'store'])
+    ->middleware('throttle:60,1')
+    ->name('inscricoes.acesso.enviar');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
