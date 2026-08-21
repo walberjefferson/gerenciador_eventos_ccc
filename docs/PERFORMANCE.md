@@ -16,14 +16,16 @@ a que travaria a tela no dia do evento.
 Este documento registra o que acontece quando o banco tem **10.000 inscrições**, que é
 uma ordem de grandeza acima do evento real esperado. Ele responde a três perguntas:
 
-1. O painel e a lista de inscrições continuam rápidos?
-2. Alguma coisa precisa ser corrigida?
-3. Existe algum ponto que merece atenção antes do evento?
+1. O painel e a lista de inscrições continuam rápidos? **Sim** — dez milésimos de segundo
+   ou menos, com dez mil inscrições no banco.
+2. Alguma coisa precisou ser corrigida? **Não.** Nenhum índice novo, nenhum cache. A
+   seção 5 explica por que **não mexer também é uma decisão**, e uma decisão cara de errar.
+3. Existe algum ponto que merece atenção antes do evento? **Sim, um:** a varredura de
+   inscrições vencidas, seção 4.6.
 
-> **Estado deste documento:** medição **antes** concluída. A seção 5 (o que foi corrigido)
-> e a seção 6 (teste de carga) são preenchidas nos passos seguintes da fase. A ordem é
-> proposital: medir primeiro, corrigir depois. Otimização sem linha de base é melhoria que
-> ninguém consegue provar.
+A ordem em que este documento foi escrito é proposital: primeiro a medição (seções 3 e 4),
+depois a conclusão (seção 5). Otimização sem linha de base é melhoria que ninguém consegue
+provar.
 
 ---
 
@@ -90,12 +92,17 @@ o custo de encher a memória do banco e não representa o dia a dia.
 
 | # | Consulta | **ANTES** (mediana) | Pior caso | Consultas SQL | O que foi feito | **DEPOIS** |
 |---|----------|--------------------:|----------:|--------------:|-----------------|-----------:|
-| 1 | Painel — os três blocos | **5,1 ms** | 15,4 ms | 3 | a decidir | — |
-| 2a | Lista de inscrições — sem filtro | **4,9 ms** | 10,2 ms | 6 | a decidir | — |
-| 2b | Lista de inscrições — filtros combinados | **10,0 ms** | 12,7 ms | 7 | a decidir | — |
-| 3 | Exportação CSV — evento inteiro | **690,5 ms** | 760,7 ms | 1 | a decidir | — |
-| 4 | Página pública do evento | **9,9 ms** | 37,3 ms | 4 | a decidir | — |
-| 5 | Expirar 2.000 inscrições vencidas de uma vez | **17.934 ms** | 18.961 ms | 17.990 | a decidir | — |
+| 1 | Painel — os três blocos | **5,1 ms** | 15,4 ms | 3 | nada — §5.1 | **4,8 ms** |
+| 2a | Lista de inscrições — sem filtro | **4,9 ms** | 10,2 ms | 6 | nada — §5.1 | **4,9 ms** |
+| 2b | Lista de inscrições — filtros combinados | **10,0 ms** | 12,7 ms | 7 | nada — §5.1 | **10,7 ms** |
+| 3 | Exportação CSV — evento inteiro | **690,5 ms** | 760,7 ms | 1 | nada — §5.2 | **699,6 ms** |
+| 4 | Página pública do evento | **9,9 ms** | 37,3 ms | 4 | nada — §5.1 | **7,7 ms** |
+| 5 | Expirar 2.000 inscrições vencidas de uma vez | **17.934 ms** | 18.961 ms | 17.990 | nada — §5.3, corrigir mudaria regra de negócio | **18.058 ms** |
+
+A coluna **DEPOIS** é uma segunda medição completa, feita com o banco recarregado do zero,
+depois de fechada a análise. Como nada foi alterado, ela serve a dois propósitos: mostrar
+que a linha de base **se repete** (diferença de menos de 1 ms nas telas) e deixar registrado
+o número contra o qual uma futura otimização terá de se comparar.
 
 **Leitura em uma frase:** as quatro consultas que uma pessoa espera na tela respondem em
 **dez milésimos de segundo ou menos**, com dez mil inscrições no banco. A exportação do
@@ -159,7 +166,7 @@ memória do servidor não cresce com o tamanho do evento.
 **690 ms para gerar um arquivo de dez mil linhas é aceitável.** É um download que a pessoa
 pede conscientemente e espera; não é uma tela que precisa aparecer instantaneamente.
 
-Duas observações honestas, registradas como **hipóteses** a avaliar na §5:
+Duas observações honestas, registradas como **hipóteses não confirmadas** (§5.2):
 
 - O banco precisou usar disco para ordenar (`external merge Disk: 5984kB`), porque ordena
   linhas largas — inclui o documento cifrado, que é um campo grande e que o CSV **nem
@@ -193,14 +200,72 @@ do evento, devolver a vaga de cada atividade, encerrar a cobrança, recarregar o
 anunciar o evento interno que dispara o e-mail). Cada ida custa em torno de um milésimo de
 segundo; o problema é a quantidade, não a velocidade de cada uma.
 
-O que fazer com esse número está na §5.
+**Por que não foi corrigido.** Corrigir significaria fazer tudo em lote: um único comando
+marcando as 2.000 inscrições, um único comando devolvendo os contadores. Isso mudaria
+**regra de negócio**, não desempenho:
+
+- a escrita condicional por linha deixaria de existir, e com ela a garantia contra
+  devolução dupla de vaga quando duas execuções se cruzam;
+- o anúncio por inscrição — que dispara o e-mail de "prazo vencido" para a pessoa certa —
+  deixaria de acontecer naturalmente.
+
+O plano da Fase 9 é explícito: *"consulta lenta cuja correção exigiria mudar regra de
+domínio → PARE. Desempenho não paga o preço de correção."* Foi o que se fez.
+
+**O risco de verdade, em português claro.** A rotina agendada roda a cada minuto e, no dia
+a dia, encontra poucas inscrições vencidas por vez; 18 segundos só aconteceriam se 2.000
+prazos vencessem no mesmo minuto, que não é o comportamento esperado. Só que a mesma
+rotina é chamada **na hora da inscrição**, quando o contador diz "lotado": antes de recusar
+alguém, o sistema varre as reservas vencidas daquele evento para ver se alguma vaga já
+voltou. Se houver acúmulo grande de vencidas nesse momento, **a pessoa que está se
+inscrevendo espera pela varredura**.
+
+**Recomendação registrada, não implementada:** limitar a varredura sob demanda a um teto de
+inscrições por chamada (por exemplo, as 100 mais antigas), deixando o resto para a rotina
+agendada. É mudança de regra de negócio — precisa de decisão do dono do produto e de plano
+próprio. Fica como pendência **P-10** em `PROGRESS.md`.
 
 ---
 
-## 5. O que foi corrigido
+## 5. O que foi corrigido — e por que quase nada foi
 
-> **A preencher no passo seguinte da fase.** Esta versão do documento registra apenas a
-> medição **antes**, sem nenhuma otimização aplicada.
+### 5.1 Nenhum índice novo foi criado
+
+**Esta é a conclusão principal do relatório, e ela é boa notícia.**
+
+Todas as consultas que uma pessoa espera olhando para a tela respondem em 10 ms ou menos
+com 10.000 inscrições no banco. Os índices criados na Fase 1 —
+`inscricoes(evento_id, situacao)`, `inscricoes(situacao, prazo_pagamento)`,
+`pagamentos(inscricao_id, situacao)`, `pagamentos(situacao, expira_em)` e
+`inscricoes_atividades(atividade_id)` — apareceram nos planos de execução sendo usados
+(§4.3), ou foram corretamente **ignorados** pelo banco quando ler a tabela inteira era mais
+barato (§4.1). Nos dois casos, a decisão original se sustentou na medição.
+
+Criar índice "por precaução" seria o erro fácil de cometer aqui. **Todo índice custa na
+escrita**, e escrita é justamente o caminho da inscrição — o único que não pode ficar
+lento, porque é o que a pessoa faz enquanto disputa uma vaga com outras. Índice sem medição
+que o justifique é custo garantido em troca de benefício imaginário.
+
+### 5.2 Nenhum cache foi ligado
+
+O painel responde em 5 ms. Um cache de 60 segundos existiria para economizar 5 ms e, em
+troca, mostraria número velho ao organizador no dia em que ele mais precisa do número
+certo. **Não compensa.**
+
+Como não há cache, também **não há aviso de atraso na tela** — e não deve haver: o painel
+mostra o número de agora, e escrever "pode estar até um minuto atrasado" seria mentira.
+
+As duas observações da §4.4 (a ordenação que vai ao disco na exportação e as subconsultas
+repetidas sobre tabelas minúsculas) ficam registradas como **hipóteses não confirmadas**:
+são coisas que *pareceriam* úteis de otimizar, mas que a medição não pediu. Se um dia a
+exportação passar de dois segundos, este é o primeiro lugar para olhar.
+
+### 5.3 Nenhuma regra de negócio foi alterada
+
+O único número desconfortável do relatório — os 18 segundos da §4.6 — tem correção
+conhecida e ela foi **recusada de propósito**, porque custaria uma garantia de
+concorrência e um e-mail ao participante. O motivo completo está na §4.6, e a
+recomendação virou a pendência **P-10**.
 
 ---
 
