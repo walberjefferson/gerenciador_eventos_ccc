@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 /**
  * O diálogo que pede a justificativa antes de uma ação administrativa.
@@ -10,9 +10,10 @@ import { computed } from 'vue';
  * obrigatório — ação administrativa sem justificativa é rastro que não explica
  * nada, e daqui a algumas fases esses textos viram o registro de auditoria.
  *
- * O diálogo prende o foco enquanto está aberto, fecha com Esc e devolve o foco
- * ao botão que o abriu: isso vem do componente de diálogo do projeto, que já
- * cuida disso.
+ * O diálogo prende o foco enquanto está aberto e fecha com Esc — isso vem do
+ * componente de diálogo do projeto. Devolver o foco ao botão que o abriu, esse
+ * é trabalho daqui: como o diálogo é comandado por uma propriedade, e não por
+ * um gatilho, ninguém mais sabe de onde a pessoa veio.
  */
 const props = defineProps<{
     aberto: boolean;
@@ -44,11 +45,39 @@ const descritoPor = computed(() => {
 
     return partes.join(' ');
 });
+
+/**
+ * O botão que abriu o diálogo, guardado para devolver o foco a ele no fim.
+ *
+ * O diálogo é controlado por uma propriedade, e não por um `DialogTrigger`,
+ * então o `radix-vue` não tem como saber de onde a pessoa veio. Sem isto, quem
+ * navega por teclado fecha o diálogo e cai no começo da página, perdendo o
+ * lugar onde estava.
+ */
+const origemDoFoco = ref<HTMLElement | null>(null);
+
+watch(
+    () => props.aberto,
+    (aberto) => {
+        if (aberto && document.activeElement instanceof HTMLElement) {
+            origemDoFoco.value = document.activeElement;
+        }
+    },
+);
+
+function devolverOFoco(evento: Event): void {
+    if (origemDoFoco.value === null) {
+        return;
+    }
+
+    evento.preventDefault();
+    origemDoFoco.value.focus();
+}
 </script>
 
 <template>
     <Dialog :open="props.aberto" @update:open="(valor: boolean) => emit('update:aberto', valor)">
-        <DialogContent>
+        <DialogContent @close-auto-focus="devolverOFoco">
             <DialogHeader>
                 <DialogTitle>{{ props.titulo }}</DialogTitle>
                 <DialogDescription>{{ props.descricao }}</DialogDescription>

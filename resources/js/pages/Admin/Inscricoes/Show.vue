@@ -208,7 +208,7 @@ function confirmarPagamento(): void {
                 <button
                     v-if="podeCancelarAgora"
                     type="button"
-                    data-teste="abrir-cancelamento"
+                    data-testid="abrir-cancelamento"
                     class="h-10 rounded-md border border-destructive px-4 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     @click="cancelamentoAberto = true"
                 >
@@ -218,7 +218,7 @@ function confirmarPagamento(): void {
                 <button
                     v-if="podeConfirmarAgora"
                     type="button"
-                    data-teste="abrir-confirmacao-manual"
+                    data-testid="abrir-confirmacao-manual"
                     class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     @click="confirmacaoAberta = true"
                 >

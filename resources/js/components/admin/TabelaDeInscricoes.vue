@@ -58,9 +58,16 @@ function momento(iso: string | null): string {
                     <td class="px-4 py-2 whitespace-nowrap">{{ moeda(inscricao.valor_centavos) }}</td>
                     <td class="px-4 py-2 whitespace-nowrap">{{ momento(inscricao.prazo_pagamento) }}</td>
                     <td class="px-4 py-2">
+                        <!--
+                            "relative": o texto que só o leitor de tela ouve fica
+                            posicionado de forma absoluta. Sem uma âncora aqui, ele
+                            se prende à moldura da página inteira, escapa da caixa
+                            que rola e estica o documento para a largura da tabela —
+                            no celular, a página inteira encolhe por causa disso.
+                        -->
                         <Link
                             :href="route('admin.inscricoes.show', { inscricao: inscricao.id })"
-                            class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="relative rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <span class="sr-only">Abrir a ficha de {{ inscricao.nome_completo }}</span>
                             <span aria-hidden="true">Abrir</span>

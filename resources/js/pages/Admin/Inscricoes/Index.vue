@@ -65,7 +65,7 @@ const enderecoDaExportacao = computed(() => {
             <a
                 v-if="props.pode_exportar"
                 :href="enderecoDaExportacao"
-                data-teste="exportar-csv"
+                data-testid="exportar-csv"
                 class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Exportar para planilha (CSV)

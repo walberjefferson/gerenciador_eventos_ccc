@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.4 · **Data:** 2026-08-20 · **Revisado ao final da Fase 6a**
+> **Versão:** 1.5 · **Data:** 2026-08-21 · **Revisado ao final da Fase 6b**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-20:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números por evento) estão **concluídas e verificadas** — 268 testes Pest passando (1207 asserções), 25 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e, pela primeira vez no projeto, `vue-tsc --noEmit` com **zero erros**. Com isso, todo o caminho do participante está de pé e o lado administrativo tem porta com fechadura. A próxima é a **Fase 6b — cadastros e gestão de inscrições**.
+> **Estado real em 2026-08-21:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6 inteira** — **6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números) e **6b** (cadastros do evento pela tela, lista de inscrições com filtros, exportação em CSV, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento) — estão **concluídas e verificadas**: 370 testes Pest passando (1805 asserções), 28 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. Com isso, o caminho do participante está de pé e a organização opera o evento inteiro pela tela, sem ninguém abrir o banco de dados. A próxima é a **Fase 7 — Comunicação**.
 
 ---
 
@@ -19,6 +19,7 @@
 | 5a | Site público | ✅ | Página do evento, formulário de inscrição em quatro etapas e cobrança Pix |
 | 5b | Área do participante | ✅ | Acompanhamento da inscrição por link assinado, histórico da cobrança, segunda via do Pix e recuperação do link por e-mail |
 | 6a | Acesso administrativo e painel | ✅ | Papéis e permissões, cadastro público fechado, conta por comando artisan e painel com os números de cada evento |
+| 6b | Cadastros e gestão de inscrições | ✅ | Cadastro do evento pela tela, lista de inscrições com filtros e exportação, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento |
 | 6 | Administração | ❌ | Painel com números e cadastros |
 | 7 | Comunicação | ❌ | E-mails em fila |
 | 8 | Provedor real | ❌ | Pix de verdade em produção |
@@ -214,18 +215,35 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 6b — Cadastros e gestão de inscrições ❌
+## Fase 6b — Cadastros e gestão de inscrições ✅
 
-- Cadastro de eventos, dias, grupos de atividades, atividades, conflitos, cidades e grupos de participantes.
-- Busca e filtros de inscrições por evento, cidade, grupo, atividade, situação, pagamento e período; exportação.
-- Visualização de uma inscrição com o histórico da cobrança.
-- Ações administrativas: cancelar inscrição alheia e confirmar pagamento manualmente, cada uma atrás da permissão já criada na Fase 6a, sempre com motivo registrado.
+**Entregue.** Com ela, a **Fase 6 está concluída**: a organização passa a operar o evento inteiro pela tela.
+
+| Entrega | Estado |
+|---------|:------:|
+| Cadastro de cidades e grupos de participantes, com recusa amigável de apagar registro em uso | ✅ |
+| Cadastro de eventos, dias, grupos de atividades, atividades e conflitos, com **cada restrição do banco espelhada em português** antes de o PostgreSQL recusar | ✅ |
+| Trava para mudança de estrutura em evento com inscrição ativa — recusa com explicação e caminho alternativo | ✅ |
+| Lista de inscrições com filtros combináveis (evento, situação, cidade, grupo, atividade, pagamento e período) e paginação que preserva o filtro | ✅ |
+| Busca por nome, e-mail e código público; **CPF não filtra e não busca**, e não aparece na lista | ✅ |
+| Exportação em CSV respeitando os filtros da tela, em fluxo com cursor, `;` e BOM UTF-8, sem CPF | ✅ |
+| Ficha da inscrição com o histórico completo da cobrança | ✅ |
+| **Cancelamento administrativo** (`inscricoes.cancelar`): motivo obrigatório, devolução de vaga na ordem canônica, gravação condicional e teste de concorrência real | ✅ |
+| **Confirmação manual de pagamento** (`pagamentos.confirmar-manual`, só do administrador): observação obrigatória, origem manual registrada, nenhum identificador de provedor forjado | ✅ |
+| Anúncio de domínio `InscricaoCancelada` disparado — **sem ouvinte**, que é trabalho da Fase 7 | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 3 cenários novos, os 25 anteriores intactos |
+| Registro de auditoria das ações administrativas | ❌ adiado para a Fase 9, de propósito |
+| E-mails de aviso do cancelamento e da confirmação | ❌ Fase 7 |
+
+**Duas decisões que dependem de pendência aberta:** cancelar inscrição já confirmada **não estorna** (a política de reembolso, **P-02**, não existe) e a confirmação manual **recusa** inscrição expirada (a vaga já voltou para a fila — **P-03** segue aberta). As duas são a leitura segura enquanto ninguém decide, e as duas dizem isso na tela em português.
+
+**Nenhuma migração e nenhuma dependência nova.** As duas Actions escrevem em colunas que já existiam desde a Fase 3.
 
 ---
 
 ## Fase 7 — Comunicação ❌
 
-- Ouvintes para os anúncios já disparados: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada`.
+- Ouvintes para os anúncios já disparados: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada` e `InscricaoCancelada` — os quatro saem do domínio hoje e **nenhum tem ouvinte**.
 - E-mails: inscrição criada com link de pagamento, lembrete antes do prazo, pagamento confirmado, inscrição expirada, cancelamento.
 - Tudo em fila, para que lentidão de servidor de e-mail nunca atrase a inscrição.
 - Momento do lembrete configurável (decisão DA-08).
