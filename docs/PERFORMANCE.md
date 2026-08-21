@@ -271,7 +271,53 @@ recomendação virou a pendência **P-10**.
 
 ## 6. Teste de carga — 50 processos disputando as últimas vagas
 
-Preenchido no fechamento da fase. Ver `tests/Feature/Inscricoes/CargaTest.php`.
+### 6.1 O que foi simulado
+
+O momento em que este sistema fica realmente sob pressão não é o dia do evento: é o
+minuto em que o link das inscrições cai no grupo da comunidade e todo mundo abre ao mesmo
+tempo. **Cinquenta processos** de sistema operacional, cada um com a sua própria conexão
+com o banco, largando no mesmo instante para disputar **cinco vagas** da mesma atividade.
+
+Não é simulação de tela: cada processo percorre o caminho de verdade da inscrição —
+reserva de vaga no evento, reserva de vaga na atividade e gravação da inscrição, tudo
+dentro da mesma transação. É o mesmo teste que `ConcorrenciaTest` já fazia com seis
+processos desde a Fase 3, agora com pressão de verdade. O código está em
+`tests/Feature/Inscricoes/CargaTest.php`, e a máquina de disputa que os dois testes
+compartilham, em `tests/Feature/Inscricoes/Disputa.php`.
+
+### 6.2 O resultado
+
+| O que precisava ficar provado | Resultado |
+|---|---|
+| A capacidade nunca é furada, nem por uma | ✅ **5 entraram, 45 foram recusados.** `vagas_reservadas + vagas_confirmadas = 5`, exatamente a capacidade |
+| Ninguém trava esperando outro (sem impasse) | ✅ Nenhum erro de *deadlock*; nenhum processo falhou por motivo alheio à disputa |
+| Nenhuma vaga fica presa por quem foi recusado | ✅ O contador do evento também ficou em 5 — a transação inteira volta atrás quando a vaga falta na atividade |
+
+**Tempo de resposta do caminho da inscrição, sob disputa de 50 processos:**
+
+| Medida | Tempo |
+|---|---|
+| Mínimo | **0,200 s** |
+| Mediana | **0,396 s** |
+| p95 | **0,442 s** |
+| Máximo | **0,455 s** |
+
+### 6.3 Como ler esses números
+
+O pior caso entre cinquenta pedidos simultâneos ficou em **menos de meio segundo**. Mais
+importante que o valor: a diferença entre o mais rápido e o mais lento é de um quarto de
+segundo. Quando existe fila — alguém esperando a tranca de outro para poder gravar —, essa
+distância cresce e o último a chegar espera o tempo de todos os anteriores somado. Aqui ela
+não cresceu, e é isso que confirma na prática a decisão de arquitetura: a garantia de vaga
+vem de **gravação condicional**, não de `lockForUpdate()`. Quem perde a disputa recebe
+"esgotado" na hora, em vez de ficar parado numa fila invisível esperando para descobrir
+que não havia vaga.
+
+O teste registra o tempo no relatório, mas **não transforma esses números em teto de
+falha**. O único limite que ele cobra é largo — mediana abaixo de cinco segundos —, e serve
+apenas para pegar regressão grosseira. Máquina de desenvolvimento oscila, e teste que falha
+por milissegundo é teste que a equipe aprende a ignorar. O que o teste cobra com rigor é a
+capacidade, e essa não tem folga nenhuma.
 
 ---
 

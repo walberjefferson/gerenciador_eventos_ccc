@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.5 · **Data:** 2026-08-21 · **Revisado ao final da Fase 6b**
+> **Versão:** 1.6 · **Data:** 2026-08-21 · **Revisado ao final da Fase 9**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-21:** as fases 0 a 4, a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix), a **Fase 5b** (área do participante: acompanhamento, histórico da cobrança, segunda via do Pix e recuperação do link de acesso) e a **Fase 6 inteira** — **6a** (papéis e permissões, cadastro público fechado, conta administrativa por comando e painel de números) e **6b** (cadastros do evento pela tela, lista de inscrições com filtros, exportação em CSV, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento) e a **Fase 7** (os cinco e-mails do participante, o lembrete de prazo agendado e o registro de envio que impede a mensagem repetida) estão **concluídas e verificadas**: 407 testes Pest passando (2036 asserções), 28 cenários Playwright passando num navegador que imita um celular, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. Com isso, o caminho do participante está de pé, a organização opera o evento inteiro pela tela e quem se inscreve é avisado por e-mail em cada passo — sem ninguém abrir o banco de dados. A próxima é a **Fase 9 — Endurecimento**; a **Fase 8** depende de decisões do dono do produto (**P-01** e **P-06**). ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
+> **Estado real em 2026-08-21:** **todas as fases planejadas estão concluídas e verificadas, exceto a Fase 8.** As fases 0 a 4 (núcleo transacional), a **5a** e a **5b** (todo o caminho do participante), a **6a** e a **6b** (todo o lado administrativo), a **7** (os cinco e-mails, o lembrete de prazo e o registro que impede a mensagem repetida) e a **9** (auditoria append-only, medição de desempenho com 10.000 inscrições, limites de requisição, cabeçalhos de segurança com CSP e teste de carga com 50 processos) estão de pé: **452 testes Pest passando (2334 asserções)**, **32 cenários Playwright** passando num navegador que imita um celular, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. A **Fase 8 — Provedor de pagamento real** é a única que falta, e ela **não está bloqueada por código**: depende da **P-01** (escolher o provedor) e da **P-06** (confirmar as taxas), as duas com o dono do produto. ⚠️ **A revisão de LGPD NÃO foi feita** — retenção, prazo de descarte e anonimização não existem, e dependem da **P-04** e da **P-03**. ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
 
 ---
 
@@ -20,10 +20,10 @@
 | 5b | Área do participante | ✅ | Acompanhamento da inscrição por link assinado, histórico da cobrança, segunda via do Pix e recuperação do link por e-mail |
 | 6a | Acesso administrativo e painel | ✅ | Papéis e permissões, cadastro público fechado, conta por comando artisan e painel com os números de cada evento |
 | 6b | Cadastros e gestão de inscrições | ✅ | Cadastro do evento pela tela, lista de inscrições com filtros e exportação, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento |
-| 6 | Administração | ❌ | Painel com números e cadastros |
-| 7 | Comunicação | ❌ | E-mails em fila |
-| 8 | Provedor real | ❌ | Pix de verdade em produção |
-| 9 | Endurecimento | ❌ | Auditoria, desempenho, revisão de segurança e LGPD |
+| 6 | Administração (6a + 6b) | ✅ | Painel com números e cadastros — concluída nas duas metades |
+| 7 | Comunicação | ✅ | Cinco e-mails na fila, lembrete de prazo e nenhuma mensagem repetida |
+| 8 | Provedor real | ❌ **única fase pendente** | Pix de verdade em produção — espera a P-01 e a P-06, com o dono do produto |
+| 9 | Endurecimento | ✅ | Auditoria append-only, desempenho medido com 10.000 inscrições, limites e cabeçalhos com CSP, teste de carga. **A LGPD ficou de fora** (decisão D-76): depende da P-04 e da P-03 |
 
 ---
 
@@ -256,7 +256,7 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 8 — Provedor de pagamento real ❌
+## Fase 8 — Provedor de pagamento real ❌ **a única fase pendente**
 
 - Escolher o provedor com base na matriz de `PAYMENTS.md` e na proposta comercial (decisão DA-01).
 - Implementar a classe do provedor cumprindo o contrato existente.
@@ -268,14 +268,15 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 9 — Endurecimento ❌
+## Fase 9 — Endurecimento ✅ concluída
 
-- Tabela `logs_auditoria` e registro de ações administrativas sensíveis.
-- Revisão de desempenho: consultas do painel, índices, cache dos números.
-- Revisão de segurança: limite de requisições, cabeçalhos, revisão de dependências.
-- Revisão de LGPD: política de retenção e rotina de anonimização (decisão DA-04).
-- Testes de carga no caminho de inscrição.
-- Credenciamento (check-in) e lista de espera, se o negócio priorizar.
+- ✅ Tabela `logs_auditoria` **append-only** — o model recusa `update` e `delete`, sempre —, sete ações administrativas registradas e a tela de auditoria somente leitura, atrás da permissão `auditoria.ver`.
+- ✅ Revisão de desempenho com **10.000 inscrições** no banco: as cinco consultas mais pesadas medidas com o plano de execução do banco. **Nenhum índice novo e nenhum cache** — a medição concluiu que mexer pioraria, e o motivo está escrito em `docs/PERFORMANCE.md`.
+- ✅ Revisão de segurança: limite de requisições em inscrição, login e webhook (sem tocar na D-18 nem na D-48); cabeçalhos em toda resposta e **CSP por número de uso único, sem `unsafe-inline` em `script-src`**, provada em navegador; `composer audit` sem aviso e `npm audit` com zero vulnerabilidades.
+- ✅ Teste de carga: **50 processos disputando 5 vagas**, capacidade nunca furada, sem impasse, com os tempos registrados.
+- ✅ Revisão de superfície: dupla trava das rotas de simulação (D-29) intacta, nenhuma rota administrativa só com login, e `APP_DEBUG=false` para produção documentado em `docs/ARCHITECTURE.md` (§11.4).
+- ❌ **Revisão de LGPD — NÃO foi feita.** Política de retenção, prazo de descarte e anonimização não existem neste sistema. Ficou fora da fase **de propósito** (decisão D-76): descarte de dado pessoal é decisão jurídica, e implementá-lo sob um prazo inventado seria o software decidindo por conta própria. Depende da **P-04** e da **P-03**, e vira plano próprio quando forem respondidas.
+- ❌ Credenciamento (check-in) e lista de espera continuam **fora do escopo** — nunca foram priorizados.
 
 ---
 
@@ -294,10 +295,11 @@ flowchart LR
     F5 --> F9[Fase 9<br/>Endurecimento]
     F6 --> F9
     F7 --> F9
-    F8 --> F9
 ```
 
 As fases 5, 6, 7 e 8 dependem apenas da fase 4 e podem ser feitas em paralelo por pessoas diferentes. Foi para isso que o domínio foi isolado das telas e do provedor de pagamento.
+
+**O plano original punha a Fase 9 depois da Fase 8, e a ordem real foi outra** — a Fase 9 foi concluída antes, com a Fase 8 ainda parada à espera de decisão comercial. Isso não deixou dívida: o que a Fase 9 endureceu foi a aplicação (auditoria, desempenho, limites, cabeçalhos e concorrência sob carga), e nada disso muda quando o provedor real entrar, porque ele entra atrás do mesmo contrato `PaymentGateway`. O que a Fase 8 vai precisar rever por conta própria é apenas o que é dela: a assinatura do webhook real e o vocabulário de status do provedor.
 
 ---
 

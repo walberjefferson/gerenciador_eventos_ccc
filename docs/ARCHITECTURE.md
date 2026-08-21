@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.0 · **Data:** 2026-08-20
+> **Versão:** 1.1 · **Data:** 2026-08-21 (seção 11 ampliada na Fase 9)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -479,6 +479,93 @@ Assim, comparar "esta atividade começa antes daquela terminar" funciona mesmo e
 | Enumeração de inscrições | Identificadores públicos ULID, não sequenciais |
 | Endereços de simulação em produção | Middleware que exige ambiente e configuração, respondendo 404 |
 | Regra burlada pelo navegador | Toda regra revalidada no servidor dentro da transação |
+| Insistência numa porta pública | Limite de requisições por endereço de internet em inscrição, login, webhook e recuperação de acesso (§11.1) |
+| Script injetado numa tela | Cabeçalhos de segurança em toda resposta, com CSP por número de uso único (§11.2) |
+| Rastro de quem fez o quê | `logs_auditoria`, que o model recusa alterar ou apagar (§11.3) |
+| Mensagem de erro revelando o sistema | `APP_DEBUG=false` obrigatório em produção (§11.4) |
+
+### 11.1 Limites de requisição
+
+Porta pública sem limite é porta que um programa consegue bater milhares de vezes por
+minuto. Cada limite é contado por **endereço de internet (IP)** — não há nada melhor
+disponível numa porta que não exige login, e pedir login para se inscrever seria inverter o
+produto para resolver um problema de infraestrutura. Os números ficam em
+`config/inscricoes.php`, cada um com a conta que o justifica escrita ao lado.
+
+| Porta | Limite | Observação |
+|-------|--------|------------|
+| `POST /inscricoes` | **dois ao mesmo tempo**: um por minuto (folgado) e um por hora (apertado) | O do minuto não pune a família que sai pela mesma conexão; o da hora é o que segura um programa automatizado. A recusa é uma frase **em português**, não a página crua do framework |
+| `POST /login` | por IP, **por cima** do limite por e-mail que o Laravel já traz | Sem ele, quem varre uma lista de e-mails diferentes do mesmo lugar nunca esbarraria em limite nenhum |
+| `POST /webhooks/pagamentos` | alto, por IP | Quem chama é um servidor; várias confirmações juntas são dia movimentado, não ataque. A recusa por excesso acontece **antes** de o aviso ser lido, então continua sem contar nada sobre a assinatura: aviso com assinatura inválida segue recebendo 200 |
+| `POST /acesso` | já existia, contado dentro do controller | Fica no controller de propósito, para preservar a resposta neutra: a tela responde sempre a mesma frase, no mesmo tempo, exista ou não inscrição para aquele e-mail |
+
+### 11.2 Cabeçalhos de segurança e a CSP
+
+Cabeçalho de segurança é instrução dada ao navegador da pessoa, obedecida **antes** de
+qualquer código nosso rodar: "não adivinhe o tipo deste arquivo", "não deixe ninguém
+colocar esta página dentro de um quadro", "só execute script que veio daqui". São baratos
+de ligar e caros de esquecer — a maioria dos ataques que eles impedem só aparece depois que
+a aplicação está na internet.
+
+O middleware `CabecalhosDeSeguranca` é registrado **globalmente**, e não no grupo `web`: a
+rota do webhook fica fora desse grupo de propósito, e cabeçalho que depende de a rota estar
+no grupo certo é cabeçalho que um dia vai faltar justamente na rota esquecida.
+
+| Cabeçalho | Valor | Quando |
+|-----------|-------|--------|
+| `X-Content-Type-Options` | `nosniff` | sempre |
+| `X-Frame-Options` | `DENY` | sempre |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | sempre |
+| `X-Permitted-Cross-Domain-Policies` | `none` | sempre |
+| `Strict-Transport-Security` | um ano, com subdomínios | **só em HTTPS** — mandá-lo em desenvolvimento faria o navegador guardar por um ano que o endereço é sempre seguro, e quem desenvolve passaria dias sem abrir o próprio ambiente |
+| `Content-Security-Policy` | ver abaixo | **só em resposta HTML** — num CSV baixado ou num JSON de webhook ela não protege nada |
+
+A **Content-Security-Policy** é a peça central: ela diz de onde o navegador pode carregar
+cada coisa e, se um dia alguém conseguir injetar um `<script>` numa tela, é ela que impede
+o script de rodar. Os scripts legítimos são liberados por **número de uso único (nonce)**
+sorteado a cada resposta, que vai no cabeçalho e nas poucas tags de script que o servidor
+escreve na página — a tabela de rotas do Ziggy e os arquivos do Vite. Script injetado por
+terceiro não tem como adivinhar o número da vez. **Não existe `unsafe-inline` em
+`script-src`**, e é esse o ponto de toda a defesa.
+
+**Uma concessão, escrita para ninguém confundir com descuido:** `style-src` **tem**
+`'unsafe-inline'`. A interface é Vue com Tailwind, e componente Vue escreve `style="..."`
+direto no elemento (barra de progresso, altura calculada, cor de estado); sem essa
+permissão, as telas quebrariam visualmente em produção. CSS injetado permite disfarce
+visual, o que é ruim; JavaScript injetado permite roubar sessão e enviar formulário no
+lugar da pessoa, o que é muito pior. A defesa fica onde o estrago é maior.
+
+Dois pontos que costumam assustar e não são problema: o **QR Code do Pix** é SVG que chega
+pronto do servidor e é inserido no HTML — SVG embutido não é script, e a CSP não o bloqueia;
+e os **dados do Inertia** viajam num atributo `data-page` do HTML, não num `<script>`, e
+atributo não é script. Em `local`, enquanto o servidor do Vite estiver no ar, o endereço
+dele entra na política — a exceção some sozinha em qualquer outro caso.
+
+CSP é o tipo de mudança que funciona na máquina de quem desenvolve e quebra depois do
+deploy. Por isso ela é verificada **em navegador de verdade**, em
+`tests/e2e/seguranca-csp.spec.ts`: a tela de pagamento tem que mostrar o QR Code e a
+recuperação de acesso tem que continuar funcionando, com a CSP ligada.
+
+### 11.3 O rastro das ações administrativas
+
+Toda ação administrativa que mexe em vaga, dinheiro ou cadastro grava uma linha em
+`logs_auditoria`: quem fez, o quê, sobre qual registro, com qual motivo, de qual endereço e
+quando. O model **recusa `update` e `delete`**, sempre, lançando exceção — registro que
+pode ser corrigido depois não prova nada. A gravação nunca derruba a ação: se o log falhar,
+o erro vai para o log da aplicação e a ação segue, porque auditoria é testemunha, não
+porteiro. E o campo `dados` guarda **o nome do campo que mudou, nunca o conteúdo sensível**.
+
+### 11.4 O que precisa estar certo no servidor
+
+Três coisas não são código e não têm como ser garantidas por teste — precisam estar certas
+no ambiente onde o sistema roda:
+
+- **`APP_DEBUG=false` em produção.** Com `true`, qualquer erro devolve à pessoa a pilha de
+  chamadas, o caminho dos arquivos no servidor e as variáveis de ambiente da requisição —
+  inclusive segredos. O `.env.example` traz `true` porque é arquivo de desenvolvimento;
+  em produção esse valor tem que mudar, junto com `APP_ENV=production`.
+- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura.
+- **O trabalhador da fila de pé** (§9.1), sem o qual nenhum e-mail sai.
 
 ---
 
