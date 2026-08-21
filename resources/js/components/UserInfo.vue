@@ -15,13 +15,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { getInitials } = useInitials();
 
-// Compute whether we should show the avatar image
-const showAvatar = computed(() => props.user.avatar && props.user.avatar !== '');
+// Endereco da foto, ja resolvido para texto: assim o componente de imagem
+// recebe sempre uma string, e o "v-if" decide se ela aparece.
+const enderecoDaFoto = computed<string>(() => props.user.avatar ?? '');
 </script>
 
 <template>
     <Avatar class="h-8 w-8 overflow-hidden rounded-lg">
-        <AvatarImage v-if="showAvatar" :src="user.avatar" :alt="user.name" />
+        <AvatarImage v-if="enderecoDaFoto !== ''" :src="enderecoDaFoto" :alt="user.name" />
         <AvatarFallback class="rounded-lg text-black dark:text-white">
             {{ getInitials(user.name) }}
         </AvatarFallback>

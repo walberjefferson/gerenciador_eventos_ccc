@@ -3,9 +3,14 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItemType } from '@/types';
 
-defineProps<{
-    breadcrumbs?: BreadcrumbItemType[];
-}>();
+// Sem o valor padrao, "breadcrumbs" chegaria como indefinido e a tela quebraria
+// ao perguntar o tamanho da lista.
+withDefaults(
+    defineProps<{
+        breadcrumbs?: BreadcrumbItemType[];
+    }>(),
+    { breadcrumbs: () => [] },
+);
 </script>
 
 <template>

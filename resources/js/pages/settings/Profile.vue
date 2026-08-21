@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { type BreadcrumbItem, type SharedData, type User } from '@/types';
+import { type BreadcrumbItem, type SharedData } from '@/types';
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -28,11 +28,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const page = usePage<SharedData>();
-const user = page.props.auth.user as User;
+// A tela so existe atras do login, mas o tipo compartilhado admite visita sem
+// conta; por isso o valor de partida e vazio em vez de forcado.
+const user = page.props.auth.user;
 
 const form = useForm({
-    name: user.name,
-    email: user.email,
+    name: user?.name ?? '',
+    email: user?.email ?? '',
 });
 
 const submit = () => {
@@ -71,7 +73,7 @@ const submit = () => {
                         <InputError class="mt-2" :message="form.errors.email" />
                     </div>
 
-                    <div v-if="mustVerifyEmail && !user.email_verified_at">
+                    <div v-if="mustVerifyEmail && !user?.email_verified_at">
                         <p class="mt-2 text-sm text-neutral-800">
                             Your email address is unverified.
                             <Link
