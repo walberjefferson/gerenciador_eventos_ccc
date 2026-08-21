@@ -17,8 +17,19 @@ use Illuminate\Queue\SerializesModels;
  * evento, situacao e link — so. Mensagem que circula em caixa de entrada, e as
  * vezes e encaminhada, nao pode virar ficha cadastral.
  *
- * O envio e sincrono. A Fase 7, que monta o envio em escala, troca isso
- * acrescentando "implements ShouldQueue".
+ * O envio e sincrono, e continua sincrono depois da Fase 7 — que colocou os
+ * outros cinco e-mails na fila. A decisao foi reavaliada la e mantida (D-49),
+ * por tres motivos:
+ *
+ * 1. Este e-mail responde a um pedido humano imediato: a pessoa esta parada na
+ *    tela esperando o link chegar. Os outros cinco sao consequencia de um fato
+ *    que ja aconteceu, e ninguem esta esperando por eles.
+ * 2. O custo ja esta limitado: o pedido de acesso tem piso de tempo de
+ *    resposta (D-48), que existe para que nao se descubra quem esta inscrito
+ *    cronometrando a resposta. Enfileirar nao economizaria tempo nenhum, so
+ *    esconderia a falha de envio da pessoa que a provocou.
+ * 3. Enquanto nenhum trabalhador de fila estiver de pe, enfileirar este e-mail
+ *    seria o mesmo que deixar de envia-lo.
  */
 class LinkDeAcessoInscricao extends Mailable
 {
