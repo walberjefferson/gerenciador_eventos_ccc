@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AcessoInscricaoController;
 use App\Http\Controllers\AcompanhamentoController;
+use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
@@ -60,6 +61,26 @@ Route::get('acesso', [AcessoInscricaoController::class, 'create'])->name('inscri
 Route::post('acesso', [AcessoInscricaoController::class, 'store'])
     ->middleware('throttle:60,1')
     ->name('inscricoes.acesso.enviar');
+
+/*
+|--------------------------------------------------------------------------
+| Lado administrativo
+|--------------------------------------------------------------------------
+|
+| Tres travas, nesta ordem: "auth" exige estar logado, "verified" exige o
+| e-mail confirmado e "permission" exige a permissao daquela tela. Nenhuma
+| rota daqui pode ficar so com "auth": estar logado nao diz o que a pessoa
+| pode fazer.
+|
+*/
+Route::middleware(['auth', 'verified'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function (): void {
+        Route::get('painel', [PainelController::class, 'index'])
+            ->middleware('permission:painel.ver')
+            ->name('painel');
+    });
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Database\Seeders\PapeisSeeder;
+use Illuminate\Support\Facades\Route;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\Feature\Admin\Cenario;
@@ -64,5 +66,66 @@ it('nao da permissao nenhuma a quem nao tem papel', function (): void {
 
     foreach (array_keys(PapeisSeeder::PERMISSOES) as $permissao) {
         expect($semPapel->can($permissao))->toBeFalse("usuario sem papel nao deveria poder {$permissao}");
+    }
+});
+
+it('manda o visitante para o login antes de mostrar o painel', function (): void {
+    Cenario::semearPapeis();
+
+    $this->get('/admin/painel')->assertRedirect('/login');
+});
+
+it('recusa com 403 quem esta logado mas nao tem papel nenhum', function (): void {
+    Cenario::semearPapeis();
+
+    $this->actingAs(Cenario::usuarioCom())
+        ->get('/admin/painel')
+        ->assertForbidden();
+});
+
+it('mantem a exigencia de e-mail confirmado no grupo administrativo', function (): void {
+    // O grupo carrega "verified". Ele so passa a barrar de fato quando o model
+    // User declarar MustVerifyEmail — hoje a declaracao vem comentada do pacote
+    // inicial, e mexer nisso muda a autenticacao inteira, o que nao e desta
+    // fase. Fica registrado como pendencia no PROGRESS.
+    $painel = Route::getRoutes()->getByName('admin.painel');
+
+    expect($painel)->not->toBeNull()
+        ->and($painel->gatherMiddleware())->toContain('verified');
+});
+
+it('abre o painel para o administrador', function (): void {
+    Cenario::semearPapeis();
+
+    $this->actingAs(Cenario::usuarioCom('administrador'))
+        ->get('/admin/painel')
+        ->assertOk()
+        ->assertInertia(fn (Assert $pagina) => $pagina->component('Admin/Painel'));
+});
+
+it('abre o painel para o organizador', function (): void {
+    Cenario::semearPapeis();
+
+    $this->actingAs(Cenario::usuarioCom('organizador'))
+        ->get('/admin/painel')
+        ->assertOk();
+});
+
+it('nao deixa nenhuma rota administrativa protegida apenas por login', function (): void {
+    $rotasAdministrativas = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($rota): bool => str_starts_with((string) $rota->getName(), 'admin.'));
+
+    expect($rotasAdministrativas)->not->toBeEmpty();
+
+    foreach ($rotasAdministrativas as $rota) {
+        $middlewares = $rota->gatherMiddleware();
+
+        $temPermissao = collect($middlewares)->contains(
+            fn ($middleware): bool => is_string($middleware)
+                && (str_starts_with($middleware, 'permission:') || str_starts_with($middleware, 'role:'))
+        );
+
+        expect($middlewares)->toContain('auth')
+            ->and($temPermissao)->toBeTrue(sprintf('a rota %s precisa exigir uma permissao', $rota->getName()));
     }
 });
