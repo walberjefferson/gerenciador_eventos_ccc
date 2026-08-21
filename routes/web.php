@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AcompanhamentoController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
@@ -36,6 +37,12 @@ Route::get('inscricoes/{codigo_publico}/pagamento', [PagamentoController::class,
 Route::get('inscricoes/{codigo_publico}/situacao', [PagamentoController::class, 'situacao'])
     ->middleware('signed')
     ->name('inscricoes.situacao');
+
+// A pagina do participante: linha do tempo, historico da cobranca e o
+// caminho de volta ao Pix. Assinada, pelo mesmo motivo da cobranca.
+Route::get('inscricoes/{codigo_publico}/acompanhar', [AcompanhamentoController::class, 'show'])
+    ->middleware('signed')
+    ->name('inscricoes.acompanhar');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
