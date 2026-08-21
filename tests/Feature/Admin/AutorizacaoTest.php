@@ -2,41 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
 use Database\Seeders\PapeisSeeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
-
-/**
- * Semeia papeis e permissoes e limpa o cache do pacote.
- *
- * Sem limpar, a asserção seguinte le o retrato antigo e falha sem explicacao
- * nenhuma na tela.
- */
-function semearPapeis(): void
-{
-    (new PapeisSeeder)->run();
-
-    app(PermissionRegistrar::class)->forgetCachedPermissions();
-}
-
-/**
- * Cria um usuario ja verificado com o papel pedido.
- */
-function usuarioCom(?string $papel = null): User
-{
-    $usuario = User::factory()->create();
-
-    if ($papel !== null) {
-        $usuario->assignRole($papel);
-    }
-
-    return $usuario->fresh();
-}
+use Tests\Feature\Admin\Cenario;
 
 it('cria os dois papeis e as nove permissoes', function (): void {
-    semearPapeis();
+    Cenario::semearPapeis();
 
     expect(Role::count())->toBe(2)
         ->and(Permission::count())->toBe(9)
@@ -44,8 +16,8 @@ it('cria os dois papeis e as nove permissoes', function (): void {
 });
 
 it('roda duas vezes sem duplicar papel nem permissao', function (): void {
-    semearPapeis();
-    semearPapeis();
+    Cenario::semearPapeis();
+    Cenario::semearPapeis();
 
     expect(Role::count())->toBe(2)
         ->and(Permission::count())->toBe(9);
@@ -56,9 +28,9 @@ it('roda duas vezes sem duplicar papel nem permissao', function (): void {
 });
 
 it('da todas as permissoes ao administrador', function (): void {
-    semearPapeis();
+    Cenario::semearPapeis();
 
-    $administrador = usuarioCom('administrador');
+    $administrador = Cenario::usuarioCom('administrador');
 
     foreach (array_keys(PapeisSeeder::PERMISSOES) as $permissao) {
         expect($administrador->can($permissao))->toBeTrue("administrador deveria poder {$permissao}");
@@ -66,9 +38,9 @@ it('da todas as permissoes ao administrador', function (): void {
 });
 
 it('nega ao organizador confirmar pagamento na mao, gerenciar usuarios e ver auditoria', function (): void {
-    semearPapeis();
+    Cenario::semearPapeis();
 
-    $organizador = usuarioCom('organizador');
+    $organizador = Cenario::usuarioCom('organizador');
 
     foreach (PapeisSeeder::FORA_DO_ORGANIZADOR as $permissao) {
         expect($organizador->can($permissao))->toBeFalse("organizador nao deveria poder {$permissao}");
@@ -76,9 +48,9 @@ it('nega ao organizador confirmar pagamento na mao, gerenciar usuarios e ver aud
 });
 
 it('permite ao organizador o trabalho do dia a dia', function (): void {
-    semearPapeis();
+    Cenario::semearPapeis();
 
-    $organizador = usuarioCom('organizador');
+    $organizador = Cenario::usuarioCom('organizador');
 
     foreach (PapeisSeeder::permissoesDoOrganizador() as $permissao) {
         expect($organizador->can($permissao))->toBeTrue("organizador deveria poder {$permissao}");
@@ -86,9 +58,9 @@ it('permite ao organizador o trabalho do dia a dia', function (): void {
 });
 
 it('nao da permissao nenhuma a quem nao tem papel', function (): void {
-    semearPapeis();
+    Cenario::semearPapeis();
 
-    $semPapel = usuarioCom();
+    $semPapel = Cenario::usuarioCom();
 
     foreach (array_keys(PapeisSeeder::PERMISSOES) as $permissao) {
         expect($semPapel->can($permissao))->toBeFalse("usuario sem papel nao deveria poder {$permissao}");

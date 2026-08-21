@@ -21,8 +21,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            PapeisSeeder::class,
             CidadeSeeder::class,
             EventoDemoSeeder::class,
+            // So faz alguma coisa em ambiente local; nos demais, avisa e sai.
+            AdminDemoSeeder::class,
         ]);
     }
 }
