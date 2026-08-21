@@ -35,6 +35,19 @@ const resumo = computed(() => {
 
     return `Mostrando ${primeira} a ${ultima} de ${props.inscricoes.total} inscrição(ões).`;
 });
+
+/**
+ * O endereço da exportação leva os mesmos filtros que estão na tela.
+ *
+ * É o ponto em que a planilha deixa de ser "tudo o que existe" e passa a ser
+ * "exatamente o que eu estou vendo" — que é o que a pessoa espera ao clicar
+ * logo depois de filtrar.
+ */
+const enderecoDaExportacao = computed(() => {
+    const aplicados = Object.fromEntries(Object.entries(props.filtros).filter(([, valor]) => valor !== null && valor !== ''));
+
+    return route('admin.inscricoes.exportar', aplicados);
+});
 </script>
 
 <template>
@@ -48,6 +61,15 @@ const resumo = computed(() => {
 
         <div class="flex flex-wrap items-center justify-between gap-3">
             <p role="status" class="text-sm text-muted-foreground">{{ resumo }}</p>
+
+            <a
+                v-if="props.pode_exportar"
+                :href="enderecoDaExportacao"
+                data-teste="exportar-csv"
+                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                Exportar para planilha (CSV)
+            </a>
         </div>
 
         <TabelaDeInscricoes v-if="props.inscricoes.dados.length > 0" :inscricoes="props.inscricoes.dados" />

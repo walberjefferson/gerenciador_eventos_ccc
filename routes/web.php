@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
 use App\Http\Controllers\Admin\DiaEventoController;
 use App\Http\Controllers\Admin\EventoController;
+use App\Http\Controllers\Admin\ExportarInscricoesController;
 use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
@@ -151,6 +152,13 @@ Route::middleware(['auth', 'verified'])
             ->name('inscricoes.')
             ->group(function (): void {
                 Route::get('/', [InscricaoAdminController::class, 'index'])->name('index');
+
+                // Antes da rota com {inscricao}: senao "exportar" seria lido
+                // como o codigo de uma inscricao que nao existe.
+                Route::get('exportar', ExportarInscricoesController::class)
+                    ->middleware('permission:inscricoes.exportar')
+                    ->name('exportar');
+
                 Route::get('{inscricao}', [InscricaoAdminController::class, 'show'])->name('show');
 
                 // Cancelar devolve vaga; confirmar na mao declara que entrou
