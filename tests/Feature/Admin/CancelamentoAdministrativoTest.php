@@ -8,6 +8,7 @@ use App\Actions\Pagamentos\ConfirmarPagamento;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Events\InscricaoCancelada;
+use App\Listeners\EnviarEmailInscricaoCancelada;
 use App\Models\Inscricao;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -317,8 +318,12 @@ describe('inscricao ja confirmada', function () {
 });
 
 describe('anuncio de dominio', function () {
-    it('nao tem ouvinte registrado nesta fase', function () {
-        expect(Event::getRawListeners()[InscricaoCancelada::class] ?? [])->toBe([]);
+    // Ate a fase de comunicacao, este anuncio nao tinha ouvinte nenhum. Agora
+    // tem exatamente um — o e-mail de aviso — e a regra de cancelamento
+    // continuou sem mudar uma linha: foi so plugar quem escuta.
+    it('tem um unico ouvinte: o e-mail de aviso ao participante', function () {
+        expect(Event::getRawListeners()[InscricaoCancelada::class] ?? [])
+            ->toBe([EnviarEmailInscricaoCancelada::class]);
     });
 });
 

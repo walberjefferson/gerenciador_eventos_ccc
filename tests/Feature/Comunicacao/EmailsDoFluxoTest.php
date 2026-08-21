@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\TipoComunicacao;
+use App\Events\InscricaoCancelada;
 use App\Events\InscricaoConfirmada;
 use App\Events\InscricaoCriada;
+use App\Events\InscricaoExpirada;
+use App\Mail\InscricaoCanceladaMail;
 use App\Mail\InscricaoRecebidaMail;
 use App\Mail\PagamentoConfirmadoMail;
+use App\Mail\PrazoVencidoMail;
 use App\Models\ComunicacaoEnviada;
 use App\Models\Inscricao;
 use Illuminate\Support\Facades\Mail;
@@ -103,4 +107,65 @@ it('nao manda o mesmo e-mail duas vezes quando o anuncio se repete', function ()
 
     Mail::assertQueuedCount(1);
     expect(ComunicacaoEnviada::query()->count())->toBe(1);
+});
+
+it('avisa quando o prazo vence e convida a tentar de novo', function (): void {
+    $cenario = Cenario::montar(['nome' => 'Retiro de Carnaval', 'slug' => 'retiro-de-carnaval']);
+    $inscricao = Inscricao::factory()
+        ->for($cenario->evento)
+        ->for($cenario->grupoParticipante)
+        ->expirada()
+        ->create(['nome_completo' => 'Ana Clara Ribeiro']);
+
+    InscricaoExpirada::dispatch($inscricao);
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(PrazoVencidoMail::class, function (PrazoVencidoMail $email) use ($inscricao): bool {
+        $corpo = $email->render();
+
+        expect($email->hasTo($inscricao->email))->toBeTrue()
+            ->and($email->nome)->toBe('Ana')
+            // O convite aponta para a pagina do evento, e nao para a inscricao
+            // encerrada: a unica acao util agora e se inscrever de novo.
+            ->and($email->link)->toContain('/eventos/retiro-de-carnaval')
+            ->and($corpo)->toContain('voltou para a fila');
+
+        return true;
+    });
+});
+
+it('avisa o cancelamento sem repassar o motivo interno', function (): void {
+    $cenario = Cenario::montar(['nome' => 'Retiro de Carnaval', 'contato_email' => 'secretaria@paroquia.example']);
+    $inscricao = Inscricao::factory()
+        ->for($cenario->evento)
+        ->for($cenario->grupoParticipante)
+        ->cancelada('Participante criou confusao na edicao passada')
+        ->create(['nome_completo' => 'Pedro Henrique Alves']);
+
+    InscricaoCancelada::dispatch($inscricao, (string) $inscricao->motivo_cancelamento, null, true);
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(InscricaoCanceladaMail::class, function (InscricaoCanceladaMail $email) use ($inscricao): bool {
+        $corpo = $email->render();
+        // A parte em texto puro, renderizada a mao: o Mailable nao expoe um
+        // atalho para ela, e ela precisa ser conferida tanto quanto o HTML.
+        $conteudo = $email->content();
+        $texto = view((string) $conteudo->text, $conteudo->with)->render();
+
+        expect($email->nome)->toBe('Pedro')
+            ->and($email->contato)->toBe('secretaria@paroquia.example')
+            ->and($corpo)->toContain('cancelada pela organização')
+            // A anotacao administrativa nao aparece em nenhum dos dois corpos.
+            ->and($corpo)->not->toContain('confusao')
+            ->and($texto)->not->toContain('confusao')
+            // Nem sequer existe caminho para ela chegar aqui: o Mailable nao
+            // recebe o motivo.
+            ->and(property_exists($email, 'motivo'))->toBeFalse()
+            // Estava confirmada: a mensagem fala da devolucao do valor.
+            ->and($corpo)->toContain('devolução do valor');
+
+        expect($inscricao->motivo_cancelamento)->toContain('confusao');
+
+        return true;
+    });
 });

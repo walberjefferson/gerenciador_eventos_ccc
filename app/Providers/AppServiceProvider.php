@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Events\InscricaoCancelada;
 use App\Events\InscricaoConfirmada;
 use App\Events\InscricaoCriada;
+use App\Events\InscricaoExpirada;
+use App\Listeners\EnviarEmailInscricaoCancelada;
 use App\Listeners\EnviarEmailInscricaoRecebida;
 use App\Listeners\EnviarEmailPagamentoConfirmado;
+use App\Listeners\EnviarEmailPrazoVencido;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
     private const OUVINTES = [
         InscricaoCriada::class => [EnviarEmailInscricaoRecebida::class],
         InscricaoConfirmada::class => [EnviarEmailPagamentoConfirmado::class],
+        InscricaoExpirada::class => [EnviarEmailPrazoVencido::class],
+        InscricaoCancelada::class => [EnviarEmailInscricaoCancelada::class],
     ];
 
     /**
