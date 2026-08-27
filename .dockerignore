@@ -1,0 +1,81 @@
+# O que NAO entra na imagem. Cada linha aqui e tamanho a menos, superficie de
+# ataque a menos, ou segredo que nao vaza.
+
+# Dependencias e artefatos — reinstalados/reconstruidos dentro da imagem.
+node_modules
+vendor
+public/build
+public/hot
+
+# Ambiente e segredos. O .env real NUNCA entra: em producao a configuracao vem
+# das variaveis do stack (docker/compose.portainer.yaml).
+.env
+.env.*
+!.env.example
+env.docker.example
+
+# Certificados. O da Efi mora cifrado no banco e e materializado em runtime
+# (decisao DA-25); nenhum arquivo destes tem o que fazer numa imagem publicada.
+*.p12
+*.pem
+*.pfx
+storage/certificados
+
+# Git e metadados
+.git
+.gitignore
+.gitattributes
+.github
+
+# Ferramentas de desenvolvimento e planejamento
+.planning
+.idea
+.vscode
+.fleet
+.editorconfig
+.prettierrc
+.prettierignore
+eslint.config.js
+components.json
+
+# Testes e relatorios. Aqui os cenarios do Playwright vivem dentro de tests/,
+# entao a pasta cobre os dois tipos de teste.
+tests
+playwright.config.ts
+playwright-report
+test-results
+phpunit.xml
+coverage
+
+# Compose de desenvolvimento (Sail) e o ambiente do conteiner de dev — o de
+# producao e docker/compose.portainer.yaml e ele roda no Portainer, nao aqui.
+docker-compose.yml
+docker/ambiente-do-conteiner
+
+# Caches compilados do framework. Sao regenerados no boot pelo entrypoint; o
+# manifesto gerado na maquina de quem desenvolve referencia pacotes de
+# desenvolvimento (Pail, Sail) que nao existem na imagem --no-dev, e carregar
+# esse manifesto quebraria o boot.
+bootstrap/cache/*.php
+
+# Storage volatil (recriado em runtime pelo Dockerfile). Nada do que a maquina
+# de desenvolvimento acumulou aqui tem valor em producao — e "acumulou" nao e
+# figura de linguagem: os comprovantes do provedor simulado sozinhos passavam de
+# 60 MB e entravam na imagem sem nenhuma utilidade.
+storage/app/private/*
+storage/app/public/*
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+
+# Documentacao e planilhas: nao fazem parte do runtime.
+docs
+*.md
+*.xlsx
+*.pdf
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
