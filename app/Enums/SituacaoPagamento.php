@@ -24,7 +24,7 @@ enum SituacaoPagamento: string
         return match ($this) {
             self::Pendente => 'Aguardando pagamento',
             self::Pago => 'Pago',
-            self::Falhou => 'Nao concluido',
+            self::Falhou => 'Não concluído',
             self::Expirado => 'Prazo vencido',
             self::Cancelado => 'Cancelado',
             self::Estornado => 'Estornado',

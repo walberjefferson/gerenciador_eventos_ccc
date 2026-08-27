@@ -44,9 +44,9 @@ enum AcaoAuditada: string
             self::Criou => 'Cadastrou',
             self::Alterou => 'Alterou',
             self::Removeu => 'Removeu',
-            self::CancelouInscricao => 'Cancelou inscricao',
-            self::ConfirmouPagamentoManual => 'Confirmou pagamento na mao',
-            self::PromoveuUsuario => 'Mudou o papel de um usuario',
+            self::CancelouInscricao => 'Cancelou inscrição',
+            self::ConfirmouPagamentoManual => 'Confirmou pagamento na mão',
+            self::PromoveuUsuario => 'Mudou o papel de um usuário',
             self::CriouUsuarioAdministrativo => 'Criou conta administrativa',
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
         };

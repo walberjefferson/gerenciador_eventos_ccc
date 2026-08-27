@@ -24,7 +24,7 @@ enum MetodoPagamento: string
     {
         return match ($this) {
             self::Pix => 'Pix',
-            self::CartaoCredito => 'Cartao de credito',
+            self::CartaoCredito => 'Cartão de crédito',
             self::Dinheiro => 'Dinheiro',
             self::Transferencia => 'Transferência',
             self::Outro => 'Outro',

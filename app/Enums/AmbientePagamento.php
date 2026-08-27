@@ -23,8 +23,8 @@ enum AmbientePagamento: string
     public function rotulo(): string
     {
         return match ($this) {
-            self::Homologacao => 'Homologacao (teste)',
-            self::Producao => 'Producao (dinheiro de verdade)',
+            self::Homologacao => 'Homologação (teste)',
+            self::Producao => 'Produção (dinheiro de verdade)',
         };
     }
 
