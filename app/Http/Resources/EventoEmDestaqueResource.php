@@ -46,6 +46,11 @@ class EventoEmDestaqueResource extends JsonResource
             'data_inicio' => $this->data_inicio->toDateString(),
             'data_fim' => $this->data_fim->toDateString(),
             'periodo_rotulo' => $this->periodoEmPalavras(),
+            // O valor vai para a home porque o convite principal o mostra
+            // dentro do proprio botao: quem toca em "Fazer inscricao" ja sabe
+            // quanto custa, e nao descobre duas telas adiante. E um campo do
+            // proprio evento — nao custa consulta nem agregacao.
+            'valor_centavos' => (int) $this->valor_centavos,
             'situacao' => $this->situacao->value,
             'situacao_rotulo' => $this->situacao->rotulo(),
             // Quem decide se da para se inscrever e o servidor, sempre. A tela

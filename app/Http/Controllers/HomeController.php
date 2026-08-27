@@ -51,6 +51,7 @@ class HomeController extends Controller
             ->select([
                 'nome',
                 'slug',
+                'valor_centavos',
                 'descricao',
                 'data_inicio',
                 'data_fim',

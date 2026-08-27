@@ -225,6 +225,7 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
         'situacao',
         'situacao_rotulo',
         'slug',
+        'valor_centavos',
     ];
 
     $eventos = collect([$props['destaque'], $props['proximo'], ...$props['outros_abertos']])->filter();
@@ -234,6 +235,15 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
     // Cada evento entregue tem exatamente estas chaves. Nenhum id interno — o
     // slug e o identificador publico —, nenhuma contagem de inscritos, nenhuma
     // vaga restante e nenhum dado de participante.
+    //
+    // "valor_centavos" entrou na Etapa 24, e antes dela era proibido. A razao
+    // da proibicao era que a home apresentava e encaminhava, sem falar de
+    // dinheiro. A razao de ter mudado e o convite principal passar a dizer
+    // quanto custa dentro do proprio botao: quem toca ja sabe o preco, em vez
+    // de descobrir duas telas adiante. Foi decisao de quem encomendou.
+    //
+    // Vaga restante continua proibida, e por motivo que nao mudou: na porta de
+    // entrada vira pressao sem contexto e desatualiza no segundo seguinte.
     $eventos->each(function (array $evento) use ($esperadas): void {
         $chaves = array_keys($evento);
         sort($chaves);
@@ -250,7 +260,7 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
     // ninguem. Que nenhum evento leve o seu ja esta provado acima, nas chaves.
     $conteudo = $this->get('/')->getContent();
 
-    foreach (['vagas_reservadas', 'vagas_confirmadas', 'vagas_disponiveis', 'capacidade', 'valor_centavos'] as $proibido) {
+    foreach (['vagas_reservadas', 'vagas_confirmadas', 'vagas_disponiveis', 'capacidade'] as $proibido) {
         expect($conteudo)->not->toContain($proibido);
     }
 });
