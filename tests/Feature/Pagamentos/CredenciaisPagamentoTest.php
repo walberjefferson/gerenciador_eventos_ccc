@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\AmbientePagamento;
+use App\Exceptions\Payments\EfiException;
 use App\Models\CredencialPagamento;
+use App\Services\Payments\Efi\ConfiguracaoEfi;
+use App\Services\Payments\Efi\EfiClient;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -233,4 +237,124 @@ it('nao materializa arquivo nenhum quando nao ha certificado guardado', function
 
     expect($credencial->materializarCertificado())->toBe('')
         ->and($credencial->estaCompleta())->toBeFalse();
+});
+
+// ---------------------------------------------------------------------
+// De onde vem a configuracao (DA-26)
+// ---------------------------------------------------------------------
+
+it('cai para o arquivo de ambiente quando nao ha cadastro nenhum', function (): void {
+    config([
+        'payments.efi.environment' => 'homologacao',
+        'payments.efi.client_id' => 'id-vindo-do-ambiente',
+        'payments.efi.pix_key' => 'pix-do-ambiente@example.com',
+        'payments.efi.cert_path' => '/caminho/do/ambiente.pem',
+    ]);
+
+    $configuracao = app(ConfiguracaoEfi::class);
+    $configuracao->recarregar();
+
+    expect($configuracao->origem())->toBe('ambiente')
+        ->and($configuracao->clientId())->toBe('id-vindo-do-ambiente')
+        ->and($configuracao->chavePix())->toBe('pix-do-ambiente@example.com')
+        ->and($configuracao->caminhoDoCertificado())->toBe('/caminho/do/ambiente.pem')
+        ->and($configuracao->ambiente())->toBe('homologacao');
+});
+
+it('faz o cadastro ativo vencer o arquivo de ambiente', function (): void {
+    config([
+        'payments.efi.environment' => 'homologacao',
+        'payments.efi.client_id' => 'id-vindo-do-ambiente',
+        'payments.efi.pix_key' => 'pix-do-ambiente@example.com',
+    ]);
+
+    credencialDeTeste([
+        'ambiente' => AmbientePagamento::Producao,
+        'client_id' => 'id-vindo-do-banco',
+        'chave_pix' => 'pix-do-banco@example.com',
+        'ativo' => true,
+    ]);
+
+    $configuracao = app(ConfiguracaoEfi::class);
+    $configuracao->recarregar();
+
+    expect($configuracao->origem())->toBe('banco')
+        ->and($configuracao->clientId())->toBe('id-vindo-do-banco')
+        ->and($configuracao->chavePix())->toBe('pix-do-banco@example.com')
+        // O ambiente tambem vem do cadastro, e nao da variavel.
+        ->and($configuracao->ambiente())->toBe('producao')
+        ->and($configuracao->urlBase())->toBe('https://pix.api.efipay.com.br');
+
+    // E o certificado vira arquivo em disco, com o conteudo que estava cifrado.
+    $caminho = $configuracao->caminhoDoCertificado();
+
+    expect(file_get_contents($caminho))->toBe(conteudoDeCertificadoFalso());
+
+    @unlink($caminho);
+});
+
+it('nao completa com o arquivo de ambiente o que falta no cadastro ativo', function (): void {
+    config([
+        'payments.efi.client_id' => 'id-vindo-do-ambiente',
+        'payments.efi.client_secret' => 'valor-vindo-do-ambiente',
+    ]);
+
+    // Um cadastro pela metade: identificacao preenchida, o resto em branco.
+    credencialDeTeste([
+        'client_secret' => null,
+        'chave_pix' => null,
+        'ativo' => true,
+    ]);
+
+    $configuracao = app(ConfiguracaoEfi::class);
+    $configuracao->recarregar();
+
+    // Misturar a identificacao de uma origem com a chave de outra produziria a
+    // pior falha possivel: recusa da Efi na hora em que alguem tenta pagar.
+    expect($configuracao->clientSecret())->toBe('')
+        ->and($configuracao->chavePix())->toBe('')
+        ->and($configuracao->estaCompleta())->toBeFalse();
+
+    // E a recusa fala a lingua de quem cadastrou pela tela, nao a de quem
+    // edita arquivo de ambiente.
+    expect(fn () => $configuracao->exigirCompleta())->toThrow(EfiException::class);
+
+    try {
+        $configuracao->exigirCompleta();
+    } catch (EfiException $erro) {
+        expect($erro->getMessage())->toContain('Chave secreta da aplicacao')
+            ->and($erro->getMessage())->not->toContain('EFI_CLIENT_')
+            // E, como toda mensagem de erro do provedor, nao carrega valor.
+            ->and($erro->getMessage())->not->toContain('id-vindo-do-ambiente');
+    }
+});
+
+// ---------------------------------------------------------------------
+// O token guardado
+// ---------------------------------------------------------------------
+
+it('guarda o token da Efi exatamente sob a chave que a configuracao calcula', function (): void {
+    credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao, 'ativo' => true]);
+
+    app(ConfiguracaoEfi::class)->recarregar();
+
+    // A prova e de comportamento, e nao de leitura de codigo: se o EfiClient
+    // passar a usar outra chave, ele nao encontrara este valor e tentaria ir a
+    // rede — e o teste fica vermelho sem que ninguem precise lembrar dele.
+    Cache::put(ConfiguracaoEfi::chaveDoTokenDe('homologacao'), 'token-plantado-no-cache', 60);
+
+    expect(app(EfiClient::class)->token())->toBe('token-plantado-no-cache');
+});
+
+it('joga fora o token dos dois ambientes quando a credencial muda', function (): void {
+    Cache::put(ConfiguracaoEfi::chaveDoTokenDe('homologacao'), 'token-antigo-de-homologacao', 60);
+    Cache::put(ConfiguracaoEfi::chaveDoTokenDe('producao'), 'token-antigo-de-producao', 60);
+
+    app(ConfiguracaoEfi::class)->recarregar();
+
+    // Dos dois, e nao so do ativo: trocar de ambiente muda qual token vale, e
+    // o que sobrou do outro nao serve para nada. Sem isso, o sistema seguiria
+    // usando a credencial antiga por ate uma hora.
+    expect(Cache::get(ConfiguracaoEfi::chaveDoTokenDe('homologacao')))->toBeNull()
+        ->and(Cache::get(ConfiguracaoEfi::chaveDoTokenDe('producao')))->toBeNull();
 });
