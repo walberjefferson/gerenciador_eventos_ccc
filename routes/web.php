@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\AuditoriaController;
 use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
+use App\Http\Controllers\Admin\CredenciaisPagamentoController;
 use App\Http\Controllers\Admin\DiaEventoController;
 use App\Http\Controllers\Admin\EventoController;
 use App\Http\Controllers\Admin\ExportarInscricoesController;
@@ -185,6 +186,30 @@ Route::middleware(['auth', 'verified'])
         Route::get('auditoria', [AuditoriaController::class, 'index'])
             ->middleware('permission:auditoria.ver')
             ->name('auditoria');
+
+        // A credencial do provedor de pagamento. E a porta mais estreita do
+        // painel: "pagamentos.credenciais" so existe no papel administrador,
+        // e quem organiza o evento recebe 403 — nao uma tela vazia.
+        //
+        // O ambiente vai na URL, e nao no corpo, para que o rastro do servidor
+        // registre em qual deles se mexeu mesmo quando o envio falha.
+        Route::middleware('permission:pagamentos.credenciais')
+            ->prefix('pagamentos/credenciais')
+            ->name('pagamentos.credenciais')
+            ->group(function (): void {
+                Route::get('/', [CredenciaisPagamentoController::class, 'index']);
+
+                Route::post('{ambiente}', [CredenciaisPagamentoController::class, 'salvar'])
+                    ->name('.salvar');
+
+                // Trocar o ambiente ativo. A confirmacao explicita e cobrada
+                // no controller, e nao so na tela.
+                Route::post('{ambiente}/ativar', [CredenciaisPagamentoController::class, 'ativar'])
+                    ->name('.ativar');
+
+                Route::post('{ambiente}/testar', [CredenciaisPagamentoController::class, 'testar'])
+                    ->name('.testar');
+            });
     });
 
 require __DIR__.'/settings.php';

@@ -7,9 +7,13 @@ use App\Exceptions\Payments\EfiException;
 use App\Models\CredencialPagamento;
 use App\Services\Payments\Efi\ConfiguracaoEfi;
 use App\Services\Payments\Efi\EfiClient;
+use Database\Seeders\PapeisSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
+use Tests\Feature\Admin\Cenario;
 
 /**
  * A guarda das credenciais do provedor de pagamento.
@@ -207,9 +211,12 @@ it('materializa o certificado com permissao restrita e fora do repositorio', fun
     // processo da maquina e um vazamento esperando acontecer.
     expect(substr(sprintf('%o', fileperms($caminho)), -4))->toBe('0600');
 
-    // Dentro de storage/, que o .gitignore bloqueia — pasta e extensao.
+    // Dentro de storage/, que o .gitignore bloqueia — pasta e extensao. E com
+    // a extensao do arquivo que foi enviado: o SDK decide como ler o
+    // certificado por ela, e um .p12 com nome de .pem falharia com um erro de
+    // TLS que nao explica nada.
     expect($caminho)->toStartWith(storage_path('certificados'))
-        ->and($caminho)->toEndWith('.pem');
+        ->and($caminho)->toEndWith('.p12');
 
     // Nenhum arquivo temporario ficou para tras.
     expect(glob(storage_path('certificados').'/*.tmp'))->toBe([]);
@@ -357,4 +364,267 @@ it('joga fora o token dos dois ambientes quando a credencial muda', function ():
     // usando a credencial antiga por ate uma hora.
     expect(Cache::get(ConfiguracaoEfi::chaveDoTokenDe('homologacao')))->toBeNull()
         ->and(Cache::get(ConfiguracaoEfi::chaveDoTokenDe('producao')))->toBeNull();
+});
+
+it('joga fora o token guardado ao salvar uma credencial pela tela', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    Cache::put(ConfiguracaoEfi::chaveDoTokenDe('homologacao'), 'token-da-credencial-antiga', 3600);
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao', [
+            'client_id' => 'Id_Novo_Da_Aplicacao_4321',
+        ])
+        ->assertRedirect();
+
+    // Sem isso, o sistema seguiria falando com a Efi usando o token emitido
+    // para a credencial antiga por ate uma hora — e o sintoma em producao
+    // (recusa intermitente que se cura sozinha) e incompreensivel.
+    expect(Cache::get(ConfiguracaoEfi::chaveDoTokenDe('homologacao')))->toBeNull();
+});
+
+// ---------------------------------------------------------------------
+// Quem entra e quem nao entra
+// ---------------------------------------------------------------------
+
+it('da a permissao de credenciais so ao administrador', function (): void {
+    Cenario::semearPapeis();
+
+    expect(Cenario::usuarioCom('administrador')->can('pagamentos.credenciais'))->toBeTrue()
+        ->and(Cenario::usuarioCom('organizador')->can('pagamentos.credenciais'))->toBeFalse()
+        ->and(PapeisSeeder::permissoesDoOrganizador())->not->toContain('pagamentos.credenciais');
+});
+
+it('recusa a tela de credenciais para o organizador', function (): void {
+    Cenario::semearPapeis();
+    $organizador = Cenario::usuarioCom('organizador');
+
+    // As quatro portas, e nao so a de leitura: uma delas aberta bastaria.
+    $this->actingAs($organizador)->get('/admin/pagamentos/credenciais')->assertForbidden();
+    $this->actingAs($organizador)->post('/admin/pagamentos/credenciais/homologacao')->assertForbidden();
+    $this->actingAs($organizador)->post('/admin/pagamentos/credenciais/homologacao/ativar')->assertForbidden();
+    $this->actingAs($organizador)->post('/admin/pagamentos/credenciais/homologacao/testar')->assertForbidden();
+});
+
+it('exige estar autenticado para abrir a tela de credenciais', function (): void {
+    $this->get('/admin/pagamentos/credenciais')->assertRedirect('/login');
+});
+
+it('nao devolve nada sigiloso nas props da tela', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste(['ativo' => true]);
+
+    $resposta = $this->actingAs($administrador)->get('/admin/pagamentos/credenciais')->assertOk();
+
+    $resposta->assertInertia(fn (AssertableInertia $pagina) => $pagina
+        ->component('Admin/Pagamentos/Credenciais/Index')
+        ->has('ambientes', 2)
+        ->where('ambientes.0.cadastro.tem_client_id', true)
+        ->where('ambientes.0.cadastro.ativo', true)
+        ->where('origem', 'banco')
+    );
+
+    // A varredura e sobre o HTML inteiro da resposta, que e onde as props do
+    // Inertia viajam. Nenhum dos cinco valores pode estar ali — nem inteiro,
+    // nem em pedaco reconhecivel.
+    $conteudo = $resposta->getContent();
+
+    foreach ([
+        'Client_Id_De_Teste_123456',
+        'Client_Secret_De_Teste_ABCDEF',
+        'chave-pix-de-teste@example.com',
+        'Hmac_De_Teste_0123456789',
+        'conteudo-ficticio-de-teste',
+        'BEGIN CERTIFICATE',
+    ] as $valor) {
+        expect($conteudo)->not->toContain($valor);
+    }
+});
+
+// ---------------------------------------------------------------------
+// Salvar
+// ---------------------------------------------------------------------
+
+it('mantem o valor guardado quando o campo chega vazio', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste();
+
+    // Corrigir a chave Pix nao pode obrigar a redigitar a credencial inteira —
+    // e nao ha como redigitar o que a tela nunca mostrou.
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao', [
+            'client_id' => '',
+            'client_secret' => '',
+            'chave_pix' => 'chave-pix-corrigida@example.com',
+            'webhook_hmac' => '',
+        ])
+        ->assertRedirect();
+
+    $credencial = CredencialPagamento::query()->where('ambiente', 'homologacao')->first();
+
+    expect($credencial->chave_pix)->toBe('chave-pix-corrigida@example.com')
+        // Em branco manteve. Jamais apagou.
+        ->and($credencial->client_id)->toBe('Client_Id_De_Teste_123456')
+        ->and($credencial->client_secret)->toBe('Client_Secret_De_Teste_ABCDEF')
+        ->and($credencial->webhook_hmac)->toBe('Hmac_De_Teste_0123456789')
+        ->and($credencial->certificado)->toBe(conteudoDeCertificadoFalso())
+        ->and($credencial->atualizado_por_id)->toBe($administrador->id);
+});
+
+it('recusa um arquivo que nao abre como certificado', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao', [
+            'certificado' => UploadedFile::fake()->createWithContent('contrato.pem', 'isto aqui nao e um certificado'),
+        ])
+        ->assertSessionHasErrors('certificado');
+
+    expect(CredencialPagamento::query()->count())->toBe(0);
+});
+
+it('recusa um arquivo com extensao que nao e de certificado', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao', [
+            'certificado' => UploadedFile::fake()->create('planilha.xlsx', 10),
+        ])
+        ->assertSessionHasErrors('certificado');
+});
+
+it('guarda o certificado e le a validade dele quando o formato permite', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $chave = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    $pedido = openssl_csr_new(['commonName' => 'certificado-de-teste'], $chave);
+    $certificado = openssl_csr_sign($pedido, null, $chave, 30);
+    openssl_x509_export($certificado, $pem);
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao', [
+            'certificado' => UploadedFile::fake()->createWithContent('efi-producao.pem', $pem),
+        ])
+        ->assertRedirect();
+
+    $credencial = CredencialPagamento::query()->where('ambiente', 'homologacao')->first();
+
+    expect($credencial->certificado)->toBe($pem)
+        ->and($credencial->certificado_nome)->toBe('efi-producao.pem')
+        ->and($credencial->certificado_expira_em)->not->toBeNull()
+        ->and($credencial->certificado_expira_em->isFuture())->toBeTrue();
+});
+
+// ---------------------------------------------------------------------
+// Ativar
+// ---------------------------------------------------------------------
+
+it('recusa ativar producao sem confirmacao explicita', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste(['ambiente' => AmbientePagamento::Producao]);
+
+    // A confirmacao e cobrada no servidor, e nao so na tela: uma confirmacao
+    // que vive so no navegador cai com um clique no lugar errado ou com uma
+    // chamada feita fora da tela.
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/producao/ativar')
+        ->assertRedirect();
+
+    expect(CredencialPagamento::ativaDe())->toBeNull();
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/producao/ativar', ['confirmacao' => true])
+        ->assertRedirect();
+
+    expect(CredencialPagamento::ativaDe()?->ambiente)->toBe(AmbientePagamento::Producao);
+});
+
+it('troca o ambiente ativo sem nunca deixar dois ativos', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao]);
+    credencialDeTeste(['ambiente' => AmbientePagamento::Producao]);
+
+    $this->actingAs($administrador)->post('/admin/pagamentos/credenciais/homologacao/ativar');
+
+    expect(CredencialPagamento::query()->where('ativo', true)->count())->toBe(1);
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/producao/ativar', ['confirmacao' => true]);
+
+    expect(CredencialPagamento::query()->where('ativo', true)->count())->toBe(1)
+        ->and(CredencialPagamento::ativaDe()?->ambiente)->toBe(AmbientePagamento::Producao);
+});
+
+it('recusa ativar um cadastro incompleto', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste(['certificado' => null, 'certificado_nome' => null]);
+
+    // Ativar um cadastro pela metade trocaria "o pagamento nao esta
+    // configurado" por "o pagamento quebra na hora da inscricao".
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao/ativar')
+        ->assertSessionHas('erro');
+
+    expect(CredencialPagamento::ativaDe())->toBeNull();
+});
+
+it('devolve 404 para um ambiente que nao existe', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/qualquer-coisa/ativar')
+        ->assertNotFound();
+});
+
+// ---------------------------------------------------------------------
+// Testar conexao
+// ---------------------------------------------------------------------
+
+it('diz o que falta quando o teste de conexao roda sem cadastro', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $resposta = $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/producao/testar')
+        ->assertSessionHas('teste');
+
+    $teste = $resposta->getSession()->get('teste');
+
+    expect($teste['sucesso'])->toBeFalse()
+        ->and($teste['mensagem'])->toContain('Nao ha credencial cadastrada');
+});
+
+it('nao expoe valor nenhum na resposta do teste de conexao', function (): void {
+    Cenario::semearPapeis();
+    $administrador = Cenario::usuarioCom('administrador');
+
+    credencialDeTeste(['chave_pix' => null]);
+
+    $resposta = $this->actingAs($administrador)
+        ->post('/admin/pagamentos/credenciais/homologacao/testar')
+        ->assertSessionHas('teste');
+
+    $teste = $resposta->getSession()->get('teste');
+
+    expect($teste['sucesso'])->toBeFalse()
+        // Diz o NOME do que falta, na lingua de quem cadastra pela tela.
+        ->and($teste['mensagem'])->toContain('Chave Pix da conta recebedora')
+        ->and($teste['mensagem'])->not->toContain('Client_Id_De_Teste_123456')
+        ->and($teste['mensagem'])->not->toContain('Client_Secret_De_Teste_ABCDEF')
+        ->and($teste['mensagem'])->not->toContain(storage_path('certificados'));
 });

@@ -4,7 +4,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { CalendarDays, LayoutGrid, ScrollText, Users } from 'lucide-vue-next';
+import { CalendarDays, KeyRound, LayoutGrid, ScrollText, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -39,12 +39,20 @@ const itensFixos: NavItem[] = [
  */
 const itensDoPainel = computed<NavItem[]>(() => {
     const permissoes = page.props.auth?.permissoes ?? [];
+    const itens = [...itensFixos];
 
-    if (!permissoes.includes('auditoria.ver')) {
-        return itensFixos;
+    if (permissoes.includes('auditoria.ver')) {
+        itens.push({ title: 'Auditoria', href: '/admin/auditoria', icon: ScrollText });
     }
 
-    return [...itensFixos, { title: 'Auditoria', href: '/admin/auditoria', icon: ScrollText }];
+    // Mesma regra para as credenciais de pagamento, e com mais razao ainda:
+    // e a tela que decide para qual conta o dinheiro do evento vai, e so o
+    // administrador alcanca.
+    if (permissoes.includes('pagamentos.credenciais')) {
+        itens.push({ title: 'Credenciais de pagamento', href: '/admin/pagamentos/credenciais', icon: KeyRound });
+    }
+
+    return itens;
 });
 </script>
 

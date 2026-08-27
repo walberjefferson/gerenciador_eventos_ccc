@@ -116,6 +116,28 @@ class ConfiguracaoEfi
     }
 
     /**
+     * Uma configuracao presa a um cadastro especifico, sem mexer na que o
+     * sistema esta usando.
+     *
+     * Existe para o teste de conexao da tela: quem vai virar a chave para
+     * producao precisa conseguir provar a credencial de producao ANTES de
+     * ativa-la — do contrario o unico jeito de descobrir que ela nao presta
+     * seria com gente tentando se inscrever.
+     *
+     * Devolve outra instancia de proposito: a que esta em uso continua
+     * respondendo pelo cadastro ativo.
+     */
+    public function paraCredencial(CredencialPagamento $credencial): self
+    {
+        $copia = new self;
+
+        $copia->credencial = $credencial;
+        $copia->credencialLida = true;
+
+        return $copia;
+    }
+
+    /**
      * Diz de onde a configuracao em uso esta vindo. A tela mostra isso, e o
      * comando de diagnostico tambem: descobrir tarde que o sistema estava
      * lendo o arquivo de ambiente e uma hora perdida.
