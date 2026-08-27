@@ -50,6 +50,12 @@ const anoAtual = new Date().getFullYear();
             </div>
         </header>
 
+        <!-- A faixa de topo, quando a pagina tem uma. Fica FORA do container
+             de propria vontade: e o unico jeito de o fundo sangrar de borda a
+             borda em tela grande. Quem usa o slot centraliza o conteudo por
+             dentro, com o mesmo max-w-3xl do resto. -->
+        <slot name="hero" />
+
         <main id="conteudo" class="mx-auto w-full max-w-3xl flex-1 px-4 pb-10 pt-6">
             <slot />
         </main>

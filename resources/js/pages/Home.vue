@@ -77,32 +77,41 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
     </Head>
 
     <PublicoLayout>
+        <!-- O hero e a faixa de informacao sangram de borda a borda; o conteudo
+             dentro deles respeita o mesmo max-w-3xl das demais secoes. Sem foto
+             de proposito: imagem de banco numa comunidade soa falsa, e a forca
+             aqui vem do tamanho do nome sobre fundo cheio. No dia em que houver
+             foto de uma edicao anterior, ela entra atras disto. -->
+        <template v-if="destaque" #hero>
+            <div class="bg-informacao text-informacao-foreground">
+                <div class="mx-auto w-full max-w-3xl px-4 pb-8 pt-8 sm:pb-12 sm:pt-12">
+                    <Badge variant="sucesso">Inscrições abertas</Badge>
+
+                    <h1 class="mt-3 text-3xl font-extrabold leading-none sm:text-5xl">{{ destaque.nome }}</h1>
+
+                    <p class="mt-2 text-sm font-medium opacity-90 sm:text-base">{{ destaque.periodo_rotulo }}</p>
+                </div>
+            </div>
+
+            <!-- A faixa de informacao. Mostra o que e fato do evento e nao muda
+                 enquanto a pessoa le. Vaga restante ficou de fora: na porta de
+                 entrada vira pressao sem contexto e desatualiza no segundo
+                 seguinte — quem precisa dela ve na vitrine, por atividade, que
+                 e onde a informacao significa alguma coisa. -->
+            <div class="border-b border-border bg-card">
+                <dl class="mx-auto flex w-full max-w-3xl flex-wrap items-baseline gap-x-2 px-4 py-4">
+                    <dt class="text-xs uppercase tracking-wide text-muted-foreground">Valor</dt>
+                    <dd class="w-full text-2xl font-bold">
+                        {{ formatarValor(destaque.valor_centavos) }}
+                        <span class="text-sm font-normal text-muted-foreground">por pessoa</span>
+                    </dd>
+                </dl>
+            </div>
+        </template>
+
         <div class="space-y-8">
             <!-- Um evento com inscricoes abertas: o convite direto. -->
             <template v-if="destaque">
-                <!-- O hero. Sem foto de proposito: imagem de banco numa
-                     comunidade soa falsa, e a forca aqui vem do tamanho do
-                     nome do evento sobre fundo cheio. O dia em que houver
-                     foto de uma edicao anterior, ela entra atras disto. -->
-                <header class="-mx-4 -mt-6 bg-informacao px-4 pb-7 pt-8 text-informacao-foreground sm:rounded-b-2xl">
-                    <Badge variant="sucesso">Inscrições abertas</Badge>
-
-                    <h1 class="mt-3 text-3xl font-extrabold leading-none sm:text-4xl">{{ destaque.nome }}</h1>
-
-                    <p class="mt-2 text-base font-medium opacity-90">{{ destaque.periodo_rotulo }}</p>
-                </header>
-
-                <!-- A faixa de informacao. Mostra o que e fato do evento e nao
-                     muda enquanto a pessoa le. Vaga restante ficou de fora: na
-                     porta de entrada vira pressao sem contexto, e desatualiza
-                     no segundo seguinte — quem precisa dela ve na vitrine, por
-                     atividade, que e onde a informacao significa alguma coisa. -->
-                <dl class="-mt-4 flex flex-wrap items-baseline gap-x-2 border-b border-border pb-4">
-                    <dt class="sr-only">Valor da inscrição</dt>
-                    <dd class="text-2xl font-bold">{{ formatarValor(destaque.valor_centavos) }}</dd>
-                    <dd class="text-sm text-muted-foreground">por pessoa</dd>
-                </dl>
-
                 <p v-if="destaque.resumo" class="text-base leading-relaxed text-muted-foreground">
                     {{ destaque.resumo }}
                 </p>
