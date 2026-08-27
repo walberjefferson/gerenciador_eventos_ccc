@@ -110,7 +110,7 @@ const prazoEmPalavras = 'Depois de confirmar, você verá o código Pix e o praz
                     <span class="flex size-11 shrink-0 items-center justify-center">
                         <Checkbox
                             id="aceite_termos"
-                            v-model:checked="aceite"
+                            v-model="aceite"
                             class="size-6"
                             :aria-describedby="erros.aceite_termos ? 'erro-aceite_termos' : undefined"
                         />
