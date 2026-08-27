@@ -1,0 +1,25 @@
+{
+    "stack": "shadcn-vue",
+    "framework": "vue",
+    "frameworkVersion": "3.5.13",
+    "componentLibrary": "shadcn-vue",
+    "primitives": "reka-ui",
+    "primitivesVersion": "2.10.4",
+    "styling": "tailwind",
+    "stylingVersion": "4.3.3",
+    "typescript": true,
+    "router": "inertia",
+    "componentsPath": "resources/js/components",
+    "uiComponentsPath": "resources/js/components/ui",
+    "pagesPath": "resources/js/pages",
+    "layoutsPath": "resources/js/layouts",
+    "cssPath": "resources/css/app.css",
+    "e2e": "playwright",
+    "notes": [
+        "Tailwind 4: a configuracao vive no proprio CSS (@theme), nao ha tailwind.config.js.",
+        "Os 23 componentes de resources/js/components/ui sao codigo do repositorio, adaptados a mao. Nao regenerar pelo CLI sem ler docs/ARCHITECTURE.md secao 14.",
+        "A paleta tem tokens semanticos proprios em portugues (acao, sucesso, informacao, atencao) com contraste WCAG calculado e escrito em comentario no app.css.",
+        "Tres cenarios Playwright medem contraste real no navegador: acessibilidade-do-participante, acessibilidade-e-responsividade e home.",
+        "As telas publicas sao mobile-first: o participante se inscreve pelo celular, e os cenarios rodam num Pixel 5."
+    ]
+}

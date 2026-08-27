@@ -341,3 +341,32 @@
         @apply bg-background text-foreground;
     }
 }
+
+/*
+ * Movimento reduzido.
+ *
+ * Quem tem sensibilidade vestibular — enxaqueca, vertigem, transtorno de
+ * movimento — pede ao sistema operacional para reduzir animacao. Ate aqui o
+ * sistema ignorava esse pedido: menu deslizando, dialogo dando zoom e
+ * transicao de estado saiam igual. Para essas pessoas isso nao e enfeite, e
+ * sintoma.
+ *
+ * A duracao vai para 0.01ms, e NAO para "none". A diferenca importa: o
+ * reka-ui desmonta conteudo escutando o evento "animationend". Com
+ * "animation: none" o evento nunca dispara, e o elemento que devia sumir
+ * fica montado para sempre — a correcao de acessibilidade viraria defeito de
+ * funcionamento. Com 0.01ms a animacao termina imediatamente e o evento
+ * continua acontecendo.
+ */
+@layer utilities {
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}

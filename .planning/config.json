@@ -3,5 +3,6 @@
   "model_profile": "balanced",
   "model_overrides": {
     "feat-executor": "opus"
-  }
+  },
+  "audit": false
 }
