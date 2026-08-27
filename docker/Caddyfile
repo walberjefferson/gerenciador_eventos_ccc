@@ -1,0 +1,26 @@
+{
+	# Opcoes globais injetaveis por variavel (mantem o padrao do FrankenPHP).
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp {
+		{$FRANKENPHP_CONFIG}
+	}
+}
+
+# SERVER_NAME=:80 -> o FrankenPHP escuta HTTP simples. Quem termina o TLS e o
+# Traefik, na borda. Por isso esta porta NAO e publicada no host: o unico
+# caminho ate aqui passa pela rede do proxy.
+{$SERVER_NAME:localhost} {
+	root * /app/public
+	encode zstd br gzip
+
+	# Arquivo estatico e servido direto; todo o resto cai no index.php.
+	php_server {
+		try_files {path} index.php
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
