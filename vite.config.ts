@@ -1,8 +1,7 @@
+import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
-import autoprefixer from 'autoprefixer';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
-import tailwindcss from 'tailwindcss';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -14,6 +13,9 @@ export default defineConfig({
         hmr: { host: 'localhost' },
     },
     plugins: [
+        // O Tailwind 4 entra como plugin do Vite: nao ha mais etapa de PostCSS
+        // nem autoprefixer, porque a propria v4 gera os prefixos de que precisa.
+        tailwindcss(),
         laravel({
             input: ['resources/js/app.ts'],
             refresh: true,
@@ -30,11 +32,6 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),
-        },
-    },
-    css: {
-        postcss: {
-            plugins: [tailwindcss, autoprefixer],
         },
     },
 });

@@ -1,12 +1,20 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+@import 'tw-animate-css';
 
-body,
-html {
-    --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-}
+/*
+ * Onde o Tailwind procura as classes usadas. Na v3 isso vivia no `content` do
+ * `tailwind.config.js`; na v4 a configuracao e o proprio CSS. A lista repete a
+ * antiga, na mesma ordem, para que nenhuma classe deixe de ser gerada.
+ */
+@source '../views';
+@source '../js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views';
+
+/*
+ * Modo escuro por classe. Na v3 isso era `darkMode: ['class']`; na v4 e uma
+ * variante declarada aqui, e sem ela o `dark:` simplesmente para de existir.
+ */
+@custom-variant dark (&:is(.dark *));
 
 @layer base {
     :root {
@@ -121,7 +129,7 @@ html {
         --chart-5: 340 75% 55%;
         --sidebar-background: 0 0% 7%;
         --sidebar-foreground: 0 0% 95.9%;
-        --sidebar-primary: 360, 100%, 100%;
+        --sidebar-primary: 0 0% 100%;
         --sidebar-primary-foreground: 0 0% 100%;
         --sidebar-accent: 0 0% 15.9%;
         --sidebar-accent-foreground: 240 4.8% 95.9%;
@@ -152,6 +160,73 @@ html {
         --cor-atencao-contraste: 0 0% 0%;
         --cor-atencao-texto: 49.1 95.7% 53.9%;
     }
+}
+
+/*
+ * O que na v3 vivia em `theme.extend` do `tailwind.config.js`. O `inline`
+ * manda o Tailwind resolver a variavel na hora de gerar a classe, que e o que
+ * permite `bg-primary/90` continuar funcionando.
+ */
+@theme inline {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
+    --color-popover: hsl(var(--popover));
+    --color-popover-foreground: hsl(var(--popover-foreground));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+    --color-destructive: hsl(var(--destructive));
+    --color-destructive-foreground: hsl(var(--destructive-foreground));
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
+
+    --color-chart-1: hsl(var(--chart-1));
+    --color-chart-2: hsl(var(--chart-2));
+    --color-chart-3: hsl(var(--chart-3));
+    --color-chart-4: hsl(var(--chart-4));
+    --color-chart-5: hsl(var(--chart-5));
+
+    --color-acao: hsl(var(--cor-acao));
+    --color-acao-foreground: hsl(var(--cor-acao-contraste));
+    --color-acao-texto: hsl(var(--cor-acao-texto));
+
+    --color-sucesso: hsl(var(--cor-sucesso));
+    --color-sucesso-foreground: hsl(var(--cor-sucesso-contraste));
+    --color-sucesso-texto: hsl(var(--cor-sucesso-texto));
+
+    --color-informacao: hsl(var(--cor-informacao));
+    --color-informacao-foreground: hsl(var(--cor-informacao-contraste));
+    --color-informacao-texto: hsl(var(--cor-informacao-texto));
+
+    --color-atencao: hsl(var(--cor-atencao));
+    --color-atencao-forte: hsl(var(--cor-atencao-forte));
+    --color-atencao-foreground: hsl(var(--cor-atencao-contraste));
+    --color-atencao-texto: hsl(var(--cor-atencao-texto));
+
+    --color-sidebar: hsl(var(--sidebar-background));
+    --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+    --color-sidebar-primary: hsl(var(--sidebar-primary));
+    --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+    --color-sidebar-accent: hsl(var(--sidebar-accent));
+    --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+    --color-sidebar-border: hsl(var(--sidebar-border));
+    --color-sidebar-ring: hsl(var(--sidebar-ring));
 }
 
 @layer base {
