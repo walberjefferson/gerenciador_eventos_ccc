@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.6 · **Data:** 2026-08-27 (a seção 14 ganhou a §14.3: o projeto passou a **Tailwind 4** e a vestir o **tema do shadcn studio** — não há mais `tailwind.config.js`, a configuração é o próprio `resources/css/app.css`, e o botão principal deixou de ser vermelho. A §14.2 continua valendo: os componentes seguem em `radix-vue`. Versão 1.5: seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório — e as duas armadilhas do `components.json` que só mordem quem for acrescentar um componente novo. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
+> **Versão:** 1.7 · **Data:** 2026-08-27 (a **seção 14 foi reescrita**: as duas armadilhas do `components.json` deixaram de existir. O projeto migrou de `radix-vue` para **`reka-ui` 2** (§14.2) e o alias do gerador foi corrigido para minúsculo (§14.1) — o gerador oficial do shadcn voltou a servir, e `radix-vue` saiu do `package.json`. Versão 1.6: a seção 14 ganhou a §14.3: o projeto passou a **Tailwind 4** e a vestir o **tema do shadcn studio** — não há mais `tailwind.config.js`, a configuração é o próprio `resources/css/app.css`, e o botão principal deixou de ser vermelho. Versão 1.5: seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -822,7 +822,7 @@ Em desenvolvimento nada muda: o e-mail continua parando no Mailpit.
 
 ---
 
-## 14. Interface: componentes e as duas armadilhas do `components.json`
+## 14. Interface: os componentes e o `components.json`
 
 As telas são **Vue 3 + Inertia + TypeScript**, com **Tailwind 4** e um conjunto de
 componentes de interface (botão, etiqueta, aviso, caixa, campo, menu...) em
@@ -837,53 +837,64 @@ bibliotecas sobre as quais esses componentes são construídos:
 
 | Pacote | Para que serve |
 |---|---|
-| `radix-vue` | as primitivas sem estilo: comportamento de menu, diálogo, seleção |
+| `reka-ui` | as primitivas sem estilo: comportamento de menu, diálogo, seleção |
 | `tw-animate-css` | as animações que o `tailwindcss-animate` fazia na versão 3 |
 | `class-variance-authority` | as variantes de um componente (`variant`, `size`) |
 | `tailwind-merge` + `clsx` | o utilitário `cn()`, que resolve conflito entre classes |
 | `lucide-vue-next` | os ícones |
 
 O arquivo `components.json` na raiz guarda a configuração desse gerador. **Ele
-tem duas inconsistências conhecidas**, e as duas só aparecem no dia em que
-alguém tentar acrescentar um componente novo — anos depois, provavelmente sem
-ninguém por perto que se lembre disto.
+teve, durante boa parte da vida do projeto, duas inconsistências que só apareceriam
+no dia em que alguém tentasse acrescentar um componente novo.** As duas foram
+fechadas na Etapa 22, e ficam registradas abaixo porque a lição continua valendo.
 
-### 14.1 O alias aponta para `Components`, com maiúscula; o diretório é minúsculo
+### 14.1 O alias apontava para `Components`, com maiúscula — resolvido
 
-`components.json` declara `resources/js/Components`. O diretório de verdade,
+`components.json` declarava `resources/js/Components`. O diretório de verdade,
 como o git o registra, é `resources/js/components`.
 
-No macOS e no Windows isso passa despercebido, porque o sistema de arquivos não
+No macOS e no Windows isso passava despercebido, porque o sistema de arquivos não
 distingue maiúscula de minúscula. **No Linux distingue** — e é Linux que roda
 dentro da imagem Docker e no servidor. O gerador criaria um segundo diretório,
 `Components/`, ao lado do que já existe, e o componente novo simplesmente não
 seria encontrado pelos imports.
 
+**Está corrigido:** o alias e a chave `ui` apontam para `resources/js/components`
+minúsculo. Na mesma passada, a chave `tailwind.config` — que apontava para um
+`tailwind.config.js` que **não existe mais** desde a Etapa 21 (§14.3) — passou a
+ser vazia, que é o que a ferramenta espera de um projeto em Tailwind 4.
+
 Nada disso afeta o que já está pronto: os imports usam o alias `@/*` do
-`tsconfig.json`, que aponta para `resources/js/*` e resolve corretamente.
+`tsconfig.json`, que aponta para `resources/js/*` e sempre resolveu corretamente.
 
-**Antes de gerar qualquer componente novo, corrija o `components.json` para
-minúsculo.**
+### 14.2 Os componentes eram da geração `radix-vue` — resolvido na Etapa 22
 
-### 14.2 Os componentes são da geração `radix-vue`, não `reka-ui`
+Durante um tempo os 23 componentes importavam de **`radix-vue`**, enquanto a
+ferramenta shadcn já gerava componentes que importam de **`reka-ui`** — é o mesmo
+projeto de primitivas, renomeado na versão 2. Quem rodasse o gerador recebia um
+componente que **não conversava** com os antigos, e o projeto passaria a carregar
+duas bibliotecas de primitivas ao mesmo tempo.
 
-Os 23 componentes existentes importam de **`radix-vue`**. A versão atual da
-ferramenta shadcn gera componentes que importam de **`reka-ui`** — é o mesmo
-projeto de primitivas, renomeado na versão 2.
+**A Etapa 22 migrou o projeto inteiro para `reka-ui` 2**, e a armadilha deixou de
+existir: o gerador oficial voltou a servir. `radix-vue` **saiu do `package.json`** —
+não há duas bibliotecas de primitivas no bundle, e não pode voltar a haver.
 
-Quem rodar o gerador hoje recebe um componente da geração nova, que **não
-conversa** com os 23 antigos: o projeto passaria a carregar duas bibliotecas de
-primitivas ao mesmo tempo, com dois conjuntos de comportamento para a mesma
-coisa.
+Quatro coisas mudam entre as duas versões, e **só a primeira dá erro de
+compilação**. Vale conhecê-las, porque é esse o formato de armadilha que uma troca
+de biblioteca de primitivas produz:
 
-Há dois caminhos honestos, e nenhum deles é "rodar o gerador e ver no que dá":
+| # | O que mudou | Como se manifesta |
+|---|---|---|
+| 1 | o nome do pacote no `import` | erro de compilação — o `vue-tsc` acusa |
+| 2 | as variáveis CSS `--radix-*` viraram `--reka-*` (e `[data-radix-*]` virou `[data-reka-*]`) | **silêncio**: o elemento perde a medida e fica do tamanho errado, sem erro nenhum |
+| 3 | `v-model:checked` virou `v-model`, e a prop `checked` virou `:model-value` | **silêncio**: a caixa de marcar deixa de responder. No projeto, isso atingia **o aceite dos termos** — a última etapa antes de enviar a inscrição |
+| 4 | Accordion, Collapsible, Tabs e NavigationMenu passaram a montar o conteúdo mesmo inativo (`forceMount`), controlando a visibilidade pelo atributo `hidden` | **silêncio**: conteúdo escondido aos olhos, mas visível ao leitor de tela — pior do que quebrado |
 
-1. **Para um componente pontual:** copiar o código do site da ferramenta e
-   trocar o import de `reka-ui` para `radix-vue`. Funciona porque a interface
-   das primitivas mudou pouco entre as duas versões.
-2. **Para muitos componentes:** migrar o projeto inteiro de `radix-vue` para
-   `reka-ui` como tarefa própria, com a suíte de ponta a ponta como rede de
-   proteção. Não é trabalho de acompanhamento de uma tela nova.
+**Os 23 componentes foram adaptados à mão, não regerados** (**DA-44**). Vários
+carregam ajuste próprio do projeto — comentários em português e correções de
+acessibilidade — que o gerador apagaria. Quem for acrescentar um componente novo
+pode rodar o gerador para **esse** componente; o que não se faz é passar o gerador
+por cima dos que já existem.
 
 ### 14.3 O Tailwind é o 4, e a configuração é o próprio CSS
 
