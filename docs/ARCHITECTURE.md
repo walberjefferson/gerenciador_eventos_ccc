@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.3 · **Data:** 2026-08-27 (seção 8 ampliada na Fase 8b: a configuração da Efí passou a ser cadastrada pela tela, cifrada no banco, com o arquivo de ambiente como reserva)
+> **Versão:** 1.4 · **Data:** 2026-08-27 (seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -425,6 +425,8 @@ flowchart LR
 
 Nada nesta seção é código, e nada disso pode ser garantido por teste. São as condições que precisam estar certas no ambiente antes de o sistema cobrar de verdade. **Enquanto elas não estiverem, `PAYMENT_GATEWAY` deve continuar em `fake`.**
 
+> **Para executar:** o passo a passo desta seção, na ordem real e já dentro do stack de produção, está nas seções **7 e 8 de `docs/DEPLOY.md`** — inclusive os **cinco escopos** que a aplicação da Efí precisa ter marcados (`cob.write`, `cob.read`, `pix.read`, `webhook.write`, `webhook.read`). A falta de `cob.write` já custou uma sessão inteira de diagnóstico neste projeto: a autenticação funciona, o token é emitido, o "Testar conexão" passa — e a emissão da cobrança falha com um erro genérico de autorização.
+
 #### 8.3.1 O certificado da aplicação (mTLS)
 
 A Efí não aceita apenas usuário e senha: **as duas pontas se identificam por certificado**. O painel da Efí entrega um certificado por ambiente; ele é convertido para o formato que o cliente HTTP lê.
@@ -534,11 +536,19 @@ Sem o Sail (PHP no próprio computador):
 php artisan queue:work redis --queue=emails
 ```
 
-Em produção, o trabalhador precisa ser um serviço supervisionado (`supervisord`,
-`systemd` ou equivalente), que sobe junto com o servidor e volta sozinho se
-cair. O agendador (`php artisan schedule:work` ou a entrada de `cron`) é outro
-processo e continua sendo necessário: é ele que dispara a expiração, a
-reconciliação e o lembrete de prazo.
+**Em produção, o trabalhador é um container próprio, e isso deixou de ser tarefa
+de alguém lembrar.** O stack de `docker/compose.portainer.yaml` sobe três
+processos da mesma imagem — `app`, `worker` e `scheduler` —, e o `worker` roda
+exatamente `queue:work redis --queue=emails`, com `restart: unless-stopped`: se
+o processo cair, o Docker o levanta de novo. O agendador é o terceiro container,
+rodando `schedule:work`; é ele que dispara a expiração, a reconciliação e o
+lembrete de prazo, e **ele nunca pode ter duas réplicas**, porque duas rodadas do
+mesmo agendamento são dois lembretes para a mesma pessoa.
+
+O desenho está na **§13 deste documento**, e o roteiro para executá-lo — publicar
+a imagem, criar o stack e conferir que os e-mails saíram de verdade — está em
+**`docs/DEPLOY.md`**. Fora desse arranjo, o trabalhador continua precisando ser um
+serviço supervisionado (`supervisord`, `systemd` ou equivalente).
 
 **Quando um e-mail não é entregue:** o trabalhador tenta 3 vezes, esperando
 1 minuto, 5 minutos e 15 minutos entre as tentativas — servidor de e-mail fora
@@ -670,16 +680,19 @@ porteiro. E o campo `dados` guarda **o nome do campo que mudou, nunca o conteúd
 
 ### 11.4 O que precisa estar certo no servidor
 
-Três coisas não são código e não têm como ser garantidas por teste — precisam estar certas
-no ambiente onde o sistema roda:
+Estas coisas não são código e não têm como ser garantidas por teste — precisam estar certas
+no ambiente onde o sistema roda. **O stack da §13 resolve as três primeiras por desenho**;
+elas continuam listadas aqui porque quem publicar fora dele precisa resolvê-las à mão.
 
 - **`APP_DEBUG=false` em produção.** Com `true`, qualquer erro devolve à pessoa a pilha de
   chamadas, o caminho dos arquivos no servidor e as variáveis de ambiente da requisição —
   inclusive segredos. O `.env.example` traz `true` porque é arquivo de desenvolvimento;
   em produção esse valor tem que mudar, junto com `APP_ENV=production`.
-- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura — e porque a Efí não chama endereço sem certificado válido (§8.3.2).
-- **O trabalhador da fila de pé** (§9.1), sem o qual nenhum e-mail sai.
-- **O certificado da Efí no lugar certo, com permissão restrita, e o endereço do aviso registrado** (§8.3). Sem o certificado, nenhuma cobrança nasce; sem o endereço registrado, nenhuma se confirma sozinha — e nada no sistema avisa que faltou.
+  No `docker/compose.portainer.yaml` os dois vão **fixos**, e não como variável do stack:
+  ninguém liga depuração em produção por engano de digitação.
+- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura — e porque a Efí não chama endereço sem certificado válido (§8.3.2). Atrás de um proxy reverso isso exige mais um cuidado, tratado na §13.2: sem confiar nos cabeçalhos do proxy, o framework julga que toda requisição é `http` e **as URLs assinadas do participante param de validar**.
+- **O trabalhador da fila de pé** (§9.1), sem o qual nenhum e-mail sai. No stack ele é o container `worker`, com reinício automático.
+- **O certificado da Efí no lugar certo, com permissão restrita, e o endereço do aviso registrado** (§8.3). Sem o certificado, nenhuma cobrança nasce; sem o endereço registrado, nenhuma se confirma sozinha — e nada no sistema avisa que faltou. **Nem o certificado nem o endereço são criados pela implantação**: são passos manuais, descritos na ordem certa em `docs/DEPLOY.md`.
 
 ---
 
@@ -696,3 +709,113 @@ Ferramenta: **Pest 4**. Banco de teste: PostgreSQL real, o mesmo motor de produ�
 | Fronteira com a Efí | Formato do identificador, conversão de centavos, nova tentativa no identificador repetido, tradução de erro, assinatura no endereço, aviso com dois pagamentos e o identificador da transferência guardado — tudo **sem credencial, sem certificado e sem rede** |
 
 O mapeamento entre os testes exigidos no briefing e os arquivos criados está em `BUSINESS_RULES.md`.
+
+---
+
+## 13. Implantação
+
+> **O passo a passo está em `docs/DEPLOY.md`.** Esta seção explica o desenho e o
+> porquê de cada decisão; o roteiro para executar — publicar a imagem, criar o
+> stack, criar o primeiro administrador, cadastrar a credencial da Efí e
+> registrar o aviso — está lá, escrito para quem não acompanhou a construção.
+
+### 13.1 Uma imagem, três processos
+
+O sistema é publicado como **uma imagem Docker** (`Dockerfile`, três estágios:
+assets do Vite → `vendor` sem dependências de desenvolvimento → FrankenPHP com
+PHP 8.4), publicada no GHCR por GitHub Actions a cada push na `main`
+(decisão **DA-31**). O Portainer sobe o `docker/compose.portainer.yaml` atrás de
+um Traefik que já existe no servidor (**DA-33**).
+
+Dessa única imagem saem **três containers** (**DA-32**), distinguidos pela
+variável `CONTAINER_ROLE` e pelo comando:
+
+| Container | Comando | Por que existe separado |
+|---|---|---|
+| `app` | `frankenphp run` | Atende as pessoas. É o único que o Traefik alcança |
+| `worker` | `queue:work redis --queue=emails` | Entrega os e-mails (§9.1). Enfileirar é barato; entregar demora, e nenhuma inscrição pode esperar por um servidor de e-mail lento |
+| `scheduler` | `schedule:work` | Expira inscrição vencida, lembra do prazo e reconcilia pagamento (§9). **Uma réplica, sempre** |
+
+Mais `pgsql` (PostgreSQL 18) e `redis` (fila e cache), ambos dentro do stack, em
+rede interna, **sem publicar porta no host** (**DA-30**). O único caminho de fora
+para dentro passa pelo Traefik e para no `app`.
+
+Separar em três containers, em vez de um só com supervisor, tem uma consequência
+prática que compensa a aparente complexidade: **cada processo cai e reinicia
+sozinho, sem derrubar os outros**, e o log de cada um é o log de uma coisa só.
+
+### 13.2 O que muda quando existe um proxy na frente
+
+O Traefik termina o TLS e conversa com o container em **HTTP simples**, pela rede
+interna. Sem configuração, o framework acredita nisso e passa a tratar toda
+requisição como `http`. O estrago aparece longe da causa, e é grave:
+
+1. **As URLs assinadas param de validar.** É assim que o participante acessa a
+   inscrição, vê a linha do tempo e pede a segunda via do Pix. O link é gerado
+   com `https` — quem gera é o trabalhador da fila, a partir de `APP_URL` — e
+   conferido numa requisição que o framework lê como `http`. A assinatura cobre a
+   URL inteira, esquema incluído: não bate, e **a pessoa recebe 403 no link que
+   acabou de chegar por e-mail**.
+2. **O `Strict-Transport-Security` não é emitido**, porque `CabecalhosDeSeguranca`
+   só o manda em resposta segura (§11.2).
+3. Todo `url()` e `route()` gerado numa requisição sai com esquema errado.
+
+Por isso `bootstrap/app.php` configura `trustProxies` com os quatro cabeçalhos
+`X-Forwarded-*`. Confiar em `'*'` é seguro **aqui** por um motivo concreto: nada
+além do Traefik alcança o container, porque a porta 80 não é publicada no host. E
+o IP do Traefik não é fixo — muda a cada recriação do container dele —, então uma
+lista de IP daria falso negativo justamente em dia de manutenção, que é o pior
+momento possível para o site quebrar.
+
+Isso é provado por teste (`tests/Feature/Producao/AtrasDeProxyTest.php`), e não
+por confiança: uma URL assinada gerada em linha de comando é conferida numa
+requisição com `X-Forwarded-Proto: https`, e o HSTS é exigido na resposta.
+
+### 13.3 O que o container faz sozinho ao subir
+
+`docker/entrypoint.sh` é o único lugar onde o papel do container vira
+comportamento. Em qualquer papel ele espera o **banco** e o **Redis** ficarem
+disponíveis — o Redis não é enfeite: fila e cache moram nele, e subir antes dele
+faria a primeira inscrição responder erro 500 por um motivo que não lembra em
+nada a causa — e roda `storage:link`, `package:discover` e `php artisan optimize`.
+
+**Só no papel `web`** ele aplica `migrate --force` e, em seguida,
+`db:seed --class=PapeisSeeder --force`.
+
+As duas restrições têm motivo:
+
+- **Migrations em um papel só**, porque os três containers sobem ao mesmo tempo e
+  três processos migrando o mesmo banco é corrida garantida.
+- **O seeder de papéis roda a cada boot**, e isso é intencional. Ele é idempotente
+  por desenho (**D-50**), e é ele que grava no banco as permissões que nasceram no
+  código. Sem esse passo, uma tela nova **não aparece para ninguém**: o item some
+  do menu e o acesso direto responde 403, sem erro nenhum no log. Não é hipótese —
+  aconteceu na fase 8b, em desenvolvimento, com a permissão `pagamentos.credenciais`.
+
+### 13.4 O aviso da Efí atrás do Traefik
+
+A rota do aviso responde em **dois caminhos** — `/webhooks/pagamentos` e
+`/webhooks/pagamentos/pix` (§8.3.3). No stack, um **router próprio do Traefik**
+cobre os dois de uma vez, com `PathPrefix`, e tem **prioridade explícita maior**
+que o router do site: sem isso, a regra genérica de `Host` — que casa com tudo no
+domínio — poderia capturar o aviso antes.
+
+Sobre esse router, e **só sobre ele**, há um middleware de **lista de IP**
+(`ipallowlist`) que deixa passar apenas o endereço de onde a Efí notifica. A
+inscrição pública continua aberta a qualquer pessoa, de qualquer lugar.
+
+**O mTLS de verdade ficou fora** (decisão **DA-28**). A Efí recomenda exigir o
+certificado do cliente na borda; aqui a defesa é dupla e diferente: o **HMAC** que
+a aplicação confere em todo aviso (§7) mais a **lista de IP**. É um desvio
+consciente da recomendação da Efí, registrado como tal para que ninguém o
+descubra por acaso.
+
+### 13.5 E-mail em produção
+
+Em produção o e-mail sai pela **Resend**, por API HTTPS (decisão **DA-29**), e não
+por SMTP. O motivo é bem concreto: as portas 25 e 587 costumam vir bloqueadas em
+servidor de nuvem, e a falha seria **silenciosa** — o trabalho ficaria na fila e
+ninguém receberia nada, que é exatamente o modo de falhar que este sistema mais
+tenta evitar.
+
+Em desenvolvimento nada muda: o e-mail continua parando no Mailpit.
