@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.1 · **Data:** 2026-08-21 (seção 11 ampliada na Fase 9)
+> **Versão:** 1.2 · **Data:** 2026-08-27 (seção 8 ampliada na Fase 8a: o provedor real e o que ele exige do servidor)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -310,16 +310,19 @@ sequenceDiagram
     participant CP as ConfirmarPagamento (Action)
 
     G->>WC: POST /webhooks/pagamentos (payload + assinatura)
+    WC->>WC: webhookRequest() - o provedor diz onde mora a assinatura
     WC->>WC: verifyWebhookSignature()
     alt assinatura inválida
         WC->>DB: grava aviso com assinatura_valida = false
         WC-->>G: 200 (não revelamos detalhe do erro)
     else assinatura válida
-        WC->>DB: grava em webhooks_pagamento (unique protege repetição)
+        WC->>WC: parseWebhook() traduz e desdobra o aviso em N eventos
+        loop um por evento do aviso
+            WC->>DB: grava em webhooks_pagamento (unique protege repetição)
+            WC->>Q: enfileira ProcessarWebhookPagamento
+        end
         WC-->>G: 200 recebido
-        WC->>Q: enfileira ProcessarWebhookPagamento
-        Q->>JB: executa em segundo plano
-        JB->>JB: parseWebhook() traduz para formato neutro
+        Q->>JB: executa em segundo plano (um evento por vez)
         JB->>CP: confirma o pagamento
         CP->>DB: pagamento -> pago
         CP->>DB: inscricao -> confirmada
@@ -330,9 +333,15 @@ sequenceDiagram
     end
 ```
 
+**Um aviso pode trazer vários pagamentos.** A Efí notifica com uma **lista**: um único POST pode carregar dois, três, dez pagamentos. Por isso o controller **desdobra** o aviso em um registro e um trabalho por pagamento, cada um guardando só o seu pedaço do conteúdo. Tratar o aviso como um evento só perderia os demais **em silêncio** — ninguém reclamaria, e as pessoas ficariam pagas e sem vaga. O trabalho em segundo plano continua processando **um** evento por vez, com a idempotência de três camadas intacta.
+
+**Quando a falha é nossa, respondemos erro de propósito.** Assinatura inválida recebe 200 (ver abaixo). Mas banco fora do ar, ou qualquer erro inesperado do nosso lado, **propaga** e vira 5xx. A diferença importa: a Efí reentrega o aviso até nove vezes ao longo de cerca de cinco horas quando não recebe uma resposta de sucesso. Responder 200 numa falha nossa jogaria fora, de graça, a única chance de receber o aviso de novo.
+
 **Por que respondemos 200 mesmo com assinatura inválida.** Responder 401 informa a quem está tentando forjar avisos que ele acertou o endereço mas errou a assinatura. Guardamos o aviso marcado como inválido, não produzimos nenhum efeito, e respondemos de forma neutra.
 
 **Por que `parseWebhook` e não `handleWebhook`.** O rascunho sugeria `handleWebhook`, o que colocaria o provedor no comando de alterar nossas inscrições. `parseWebhook` apenas **traduz** o payload do provedor em um resultado neutro; quem decide o que fazer é a Action da aplicação. A regra fica de um lado só da fronteira.
+
+**Por que o controller não sabe onde fica a assinatura.** Até a Fase 8a ele sabia, e citava o provedor simulado pelo nome para descobrir o cabeçalho. A Efí manda a assinatura **no endereço**, não em cabeçalho — e o acoplamento apareceu. Hoje quem recorta a requisição é o próprio provedor, por `webhookRequest()`. O controller recebe, entrega e não sabe onde a assinatura viajava.
 
 ---
 
@@ -342,8 +351,8 @@ sequenceDiagram
 flowchart LR
     DOM[Regras de inscrição] -->|conhece apenas| CT[interface PaymentGateway]
     CT -.implementado por.-> FK[FakePaymentGateway]
-    CT -.futuramente.-> EF[EfiPaymentGateway]
-    CT -.futuramente.-> PM[PagarMePaymentGateway]
+    CT -.implementado por.-> EF[EfiPaymentGateway]
+    CT -.futuramente.-> PM[outro provedor]
     CFG[config/payments.php ← PAYMENT_GATEWAY] -->|escolhe em tempo de execução| CT
 ```
 
@@ -354,8 +363,10 @@ interface PaymentGateway
     public function getPayment(string $externalId): PaymentStatusResult;
     public function cancelPayment(string $externalId): void;
     public function refundPayment(string $externalId, ?int $amountCents = null): RefundResult;
+    public function webhookRequest(Request $request): WebhookRequestData;
     public function verifyWebhookSignature(WebhookRequestData $request): bool;
-    public function parseWebhook(WebhookRequestData $request): WebhookResult;
+    /** @return list<WebhookResult> */
+    public function parseWebhook(WebhookRequestData $request): array;
 }
 ```
 
@@ -366,11 +377,13 @@ Regras que sustentam essa fronteira:
 - **A escolha vem de configuração**, resolvida no contêiner de serviços do Laravel:
 
 ```php
-$this->app->singleton(PaymentGateway::class, fn () => match (config('payments.default')) {
-    // 'efi' => new EfiPaymentGateway(...),   // fase 8
-    default => new FakePaymentGateway(...),
+$this->app->singleton(PaymentGateway::class, fn () => match ($escolhido) {
+    'fake' => new FakePaymentGateway(...),
+    'efi'  => new EfiPaymentGateway(...),
 });
 ```
+
+Um valor desconhecido em `PAYMENT_GATEWAY` **não** cai no simulado por descuido: o provedor reclama. Cobrar de mentira achando que se está cobrando de verdade seria o pior desfecho possível — todo mundo com inscrição confirmada e nenhum centavo na conta.
 
 - **Nenhuma taxa comercial no código.** Taxas mudam; ficam apenas documentadas em `PAYMENTS.md`, com a data da consulta.
 
@@ -382,6 +395,78 @@ O `FakePaymentGateway` gera um código Pix fictício e permite simular pagamento
 2. a configuração `payments.fake.simulation_enabled` está ligada.
 
 Fora disso, respondem "não encontrado" (404). Existe teste automatizado que prova esse bloqueio.
+
+---
+
+### 8.2 A Efí — o provedor real (fase 8a)
+
+`EfiPaymentGateway` cumpre o mesmo contrato do simulado. Ele vive em `app/Services/Payments/Efi/` junto com três companheiros, e **nada fora dessa pasta** sabe o nome do fornecedor — exceto o braço `'efi'` no `PaymentServiceProvider` e o comando de diagnóstico.
+
+```mermaid
+flowchart LR
+    GW[EfiPaymentGateway] -->|le configuracao| CFG[ConfiguracaoEfi]
+    GW -->|fala com a Efi| CLI[EfiClient]
+    GW -->|traduz situacao| TR[TraducaoDeStatus]
+    CLI -->|unico ponto que usa| SDK[SDK oficial da Efi]
+    CFG -->|hoje| ENV[variaveis de ambiente]
+    CFG -.->|fase 8b| BD[(banco, cifrado)]
+```
+
+**Duas fronteiras dentro da fronteira**, e cada uma existe por um motivo concreto:
+
+- **`ConfiguracaoEfi` é o único lugar que lê configuração da Efí.** Credencial, certificado, chave Pix, segredo do aviso e ambiente — tudo passa por ela. Se o gateway, o cliente ou o comando lessem configuração por conta própria, trocar a fonte (do ambiente para o banco, na fase 8b) exigiria reescrever os quatro. Existe teste automatizado que percorre `app/` inteiro e falha se um segundo arquivo aparecer lendo esse bloco de configuração.
+- **`EfiClient` é o único lugar que instancia o SDK.** Isso vale por si (se o SDK sair um dia, muda um arquivo), mas o motivo imediato é a suíte: o SDK usa cliente HTTP próprio, que as ferramentas de teste do Laravel **não** interceptam. Sem esse embrulho, provar a emissão de cobrança exigiria credencial, certificado e rede — a suíte deixaria de rodar no computador de quem desenvolve.
+
+**O que o gateway não faz:** ele não toca em `Inscricao` nem em `Pagamento`. Ele traduz — de centavos para texto decimal na ida, do vocabulário da Efí para o do domínio na volta. Quem decide o efeito continua sendo a Action da aplicação.
+
+---
+
+### 8.3 O que a Efí exige do servidor (roteiro de implantação)
+
+Nada nesta seção é código, e nada disso pode ser garantido por teste. São as condições que precisam estar certas no ambiente antes de o sistema cobrar de verdade. **Enquanto elas não estiverem, `PAYMENT_GATEWAY` deve continuar em `fake`.**
+
+#### 8.3.1 O certificado da aplicação (mTLS)
+
+A Efí não aceita apenas usuário e senha: **as duas pontas se identificam por certificado**. O painel da Efí entrega um certificado por ambiente; ele é convertido para o formato que o cliente HTTP lê e o arquivo resultante fica no servidor, apontado por `EFI_CERT_PATH`.
+
+Regras que não admitem exceção:
+
+- **O arquivo nunca entra no repositório.** O `.gitignore` cobre a pasta de certificados, mas isso é a segunda linha de defesa, não a primeira.
+- **Permissão restrita**: legível apenas pelo usuário que roda a aplicação. Quem lê o arquivo pode cobrar em nome do evento.
+- **Um certificado por ambiente.** Homologação e produção têm certificados e credenciais diferentes. Misturá-los é emitir cobrança de teste contra dinheiro de verdade — e o sistema não tem como perceber sozinho.
+- **Vencimento tem data.** O certificado expira. No dia em que expirar, toda cobrança nova para de funcionar de uma vez. Anote a data e crie um lembrete com folga de semanas.
+
+Se o arquivo estiver ausente ou ilegível, o provedor **recusa operar** com erro claro, em vez de tentar e falhar no meio de uma inscrição. Falhar cedo é a única forma segura de falhar aqui.
+
+#### 8.3.2 O endereço que recebe o aviso (webhook)
+
+A Efí chama nosso servidor quando o Pix cai. Para essa chamada acontecer:
+
+- **HTTPS válido e público.** Não serve certificado autoassinado nem endereço interno: a Efí precisa alcançar o servidor pela internet e confiar no certificado dele.
+- **A cadeia de certificados da Efí instalada no servidor web.** Quando a Efí nos chama, ela também se identifica por certificado. O servidor web precisa ter a cadeia da Efí instalada para reconhecê-lo. Sem ela, ou o aviso é recusado, ou — pior — é aceito sem verificação nenhuma.
+- **A verificação do certificado do cliente configurada como opcional no servidor web**, e não obrigatória, com o resultado repassado à aplicação. Obrigatória, o servidor web derruba a conexão antes de a aplicação ver o pedido; e é a aplicação quem sabe responder com a delicadeza que a decisão D-18 exige.
+
+> **Por que "opcional" e não "obrigatória".** Parece o contrário do seguro, e não é. A aplicação **já** confere a assinatura do aviso e recusa o que não bate. Deixar o servidor web cortar a conexão apenas troca uma recusa educada por uma porta batida — e, no caminho, tira da aplicação a chance de registrar a tentativa. Segurança que apaga o rastro da tentativa é meia segurança.
+
+#### 8.3.3 Registrar o aviso na Efí
+
+O endereço precisa ser cadastrado uma vez, no painel ou pela API da Efí, **terminando em `?ignorar=`**. Esse detalhe existe porque a Efí acrescenta `/pix` ao fim do endereço registrado quando vai notificar; o `?ignorar=` faz o sufixo cair na parte descartável do endereço.
+
+Como o comportamento é documentado das duas formas, **a aplicação aceita as duas**: a rota do aviso responde tanto no caminho configurado quanto no mesmo caminho com `/pix` no fim. Custa uma linha; descobrir o engano custaria pagamentos perdidos em silêncio.
+
+Junto com o endereço vai o parâmetro de assinatura (`?hmac=`), cujo valor é o mesmo de `EFI_WEBHOOK_HMAC`. **Sem esse valor configurado, todo aviso é recusado** — de novo, a falha para o lado seguro.
+
+Registrar o endereço é **tarefa de implantação**, como manter o trabalhador da fila de pé (§9.1). Não acontece sozinho quando o código sobe, e nada no sistema avisa que faltou: as cobranças serão criadas normalmente e nenhuma será confirmada. O sinal de que faltou é a reconciliação (§9) confirmando **todos** os pagamentos cinco minutos depois — ela é a rede de segurança, não o caminho normal.
+
+#### 8.3.4 A ordem de ligar
+
+1. Certificado no servidor, com permissão restrita, fora do repositório.
+2. Credenciais do ambiente **de homologação** no ambiente da aplicação.
+3. `php artisan efi:diagnostico` — confere certificado, token, cobrança e código Pix, um passo por vez, dizendo qual falhou.
+4. Endereço do aviso registrado na Efí de homologação.
+5. Uma inscrição inteira à mão em homologação, do formulário ao e-mail de confirmação.
+6. Só então repetir de 1 a 5 com as credenciais de produção — e `PAYMENT_GATEWAY=efi`.
+
 
 ---
 
@@ -564,8 +649,9 @@ no ambiente onde o sistema roda:
   chamadas, o caminho dos arquivos no servidor e as variáveis de ambiente da requisição —
   inclusive segredos. O `.env.example` traz `true` porque é arquivo de desenvolvimento;
   em produção esse valor tem que mudar, junto com `APP_ENV=production`.
-- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura.
+- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura — e porque a Efí não chama endereço sem certificado válido (§8.3.2).
 - **O trabalhador da fila de pé** (§9.1), sem o qual nenhum e-mail sai.
+- **O certificado da Efí no lugar certo, com permissão restrita, e o endereço do aviso registrado** (§8.3). Sem o certificado, nenhuma cobrança nasce; sem o endereço registrado, nenhuma se confirma sozinha — e nada no sistema avisa que faltou.
 
 ---
 
@@ -579,5 +665,6 @@ Ferramenta: **Pest 4**. Banco de teste: PostgreSQL real, o mesmo motor de produ�
 | Inscrição | As 13 regras de negócio, cada uma com o seu teste |
 | Concorrência | Um teste determinístico e um com processos paralelos disputando a última vaga |
 | Pagamento | Criação da cobrança, confirmação, aviso repetido, expiração, reconciliação e bloqueio do provedor simulado |
+| Fronteira com a Efí | Formato do identificador, conversão de centavos, nova tentativa no identificador repetido, tradução de erro, assinatura no endereço, aviso com dois pagamentos e o identificador da transferência guardado — tudo **sem credencial, sem certificado e sem rede** |
 
 O mapeamento entre os testes exigidos no briefing e os arquivos criados está em `BUSINESS_RULES.md`.
