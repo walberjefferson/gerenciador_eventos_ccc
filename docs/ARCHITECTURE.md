@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.5 · **Data:** 2026-08-27 (seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório — e as duas armadilhas do `components.json` que só mordem quem for acrescentar um componente novo. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
+> **Versão:** 1.6 · **Data:** 2026-08-27 (a seção 14 ganhou a §14.3: o projeto passou a **Tailwind 4** e a vestir o **tema do shadcn studio** — não há mais `tailwind.config.js`, a configuração é o próprio `resources/css/app.css`, e o botão principal deixou de ser vermelho. A §14.2 continua valendo: os componentes seguem em `radix-vue`. Versão 1.5: seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório — e as duas armadilhas do `components.json` que só mordem quem for acrescentar um componente novo. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -824,7 +824,7 @@ Em desenvolvimento nada muda: o e-mail continua parando no Mailpit.
 
 ## 14. Interface: componentes e as duas armadilhas do `components.json`
 
-As telas são **Vue 3 + Inertia + TypeScript**, com **Tailwind** e um conjunto de
+As telas são **Vue 3 + Inertia + TypeScript**, com **Tailwind 4** e um conjunto de
 componentes de interface (botão, etiqueta, aviso, caixa, campo, menu...) em
 `resources/js/components/ui/`. São 23 componentes, e todos eles são **código
 deste repositório**, versionados no git como qualquer outro arquivo.
@@ -838,6 +838,7 @@ bibliotecas sobre as quais esses componentes são construídos:
 | Pacote | Para que serve |
 |---|---|
 | `radix-vue` | as primitivas sem estilo: comportamento de menu, diálogo, seleção |
+| `tw-animate-css` | as animações que o `tailwindcss-animate` fazia na versão 3 |
 | `class-variance-authority` | as variantes de um componente (`variant`, `size`) |
 | `tailwind-merge` + `clsx` | o utilitário `cn()`, que resolve conflito entre classes |
 | `lucide-vue-next` | os ícones |
@@ -883,3 +884,52 @@ Há dois caminhos honestos, e nenhum deles é "rodar o gerador e ver no que dá"
 2. **Para muitos componentes:** migrar o projeto inteiro de `radix-vue` para
    `reka-ui` como tarefa própria, com a suíte de ponta a ponta como rede de
    proteção. Não é trabalho de acompanhamento de uma tela nova.
+
+### 14.3 O Tailwind é o 4, e a configuração é o próprio CSS
+
+Quem procurar `tailwind.config.js` na raiz não vai achar, e não é esquecimento:
+**o arquivo foi removido de propósito**. A versão 4 do Tailwind virou o que a
+documentação chama de *CSS-first* — o que antes era um arquivo de JavaScript
+com `theme.extend`, `content` e `plugins` agora mora em
+`resources/css/app.css`, em diretivas do próprio CSS:
+
+| Antes (v3, no `tailwind.config.js`) | Agora (v4, no `app.css`) |
+|---|---|
+| `@tailwind base/components/utilities` | `@import 'tailwindcss'` |
+| `content: [...]` | `@source '../views'`, `@source '../js'` |
+| `darkMode: ['class']` | `@custom-variant dark (&:is(.dark *))` |
+| `theme.extend.colors` | `@theme inline { --color-*: var(--token) }` |
+| `plugins: [tailwindcss-animate]` | `@import 'tw-animate-css'` |
+
+O build também mudou de lugar: **não há mais PostCSS nem autoprefixer**. O
+`vite.config.ts` carrega o plugin `@tailwindcss/vite`, e os prefixos de
+navegador a própria versão 4 resolve.
+
+**As cores são o tema do shadcn studio, e o tema é azul.** Isso tem uma
+consequência visível que não é defeito: o botão "Fazer inscrição" **deixou de
+ser vermelho**. A paleta antiga vinha da logo da CCC; a nova vem do tema
+escolhido pelo dono do produto (decisões **DA-39** e **DA-40** no
+`docs/PROGRESS.md`).
+
+**O que o studio não trazia, o projeto derivou.** O tema tem `primary`,
+`destructive`, `chart-*` e `sidebar-*`, mas não tem "sucesso" nem "atenção" — e
+o projeto usa quatro cores semânticas (`acao`, `sucesso`, `informacao`,
+`atencao`) espalhadas por dezenas de telas. Elas foram **derivadas do esquema
+azul mantendo o significado**, não apagadas (**DA-41**).
+
+**Cada cor que carrega texto tem a razão de contraste escrita ao lado dela**, no
+modo claro e no escuro, e nenhuma fica abaixo de 4.5:1 (**DA-42**). Três tons
+que o studio traz reprovariam e foram ajustados — o cinza de texto secundário,
+e os textos que vão por cima do azul e do vermelho no modo escuro. O motivo de
+cada ajuste está no comentário, ao lado do valor.
+
+**Uma armadilha para quem for mexer nas cores:** os valores estão escritos em
+**hexadecimal, não em `oklch()`**, embora o tema do studio venha em `oklch`. As
+cores são exatamente as mesmas. O motivo é que o cenário
+`tests/e2e/home.spec.ts` mede contraste lendo a cor calculada do elemento e a
+interpretando como `rgb()` — e o navegador **não converte `oklch()`**, devolve
+`oklch(...)` como está. Escrito em `oklch`, o cenário passaria a medir os três
+números do oklch como se fossem canais de cor e chegaria a um valor sem
+sentido. **Se um dia alguém trocar as cores por `oklch`, é esse cenário que
+avisa.**
+
