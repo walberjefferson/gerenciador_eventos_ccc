@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\EventoPublicoController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
 use App\Http\Controllers\PagamentoController;
@@ -23,9 +24,9 @@ use App\Http\Controllers\SegundaViaPagamentoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+// A porta da rua: qual e o evento, quando e e como se inscrever. O nome
+// "home" da rota e usado pelas telas de autenticacao do starter kit.
+Route::get('/', HomeController::class)->name('home');
 
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
