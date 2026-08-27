@@ -1,7 +1,7 @@
 # Pagamentos
 
-> **Versão:** 2.0 · **Data do documento:** 2026-08-27
-> Descreve como a plataforma cobra, como ela se mantém independente de fornecedor, e como a **Efí** — o provedor escolhido — foi encaixada atrás do mesmo contrato sem que nenhuma regra de inscrição percebesse a troca.
+> **Versão:** 2.1 · **Data do documento:** 2026-08-27
+> Descreve como a plataforma cobra, como ela se mantém independente de fornecedor, como a **Efí** — o provedor escolhido — foi encaixada atrás do mesmo contrato sem que nenhuma regra de inscrição percebesse a troca, e **como configurá-la pela tela do painel** (seção 10).
 
 ---
 
@@ -325,17 +325,48 @@ Ele confere, contra a homologação de verdade, cada passo em ordem: certificado
 
 ---
 
-## 10. O que fica para a fase 8b e para a implantação
+## 10. Configurar a Efí pela tela (fase 8b)
 
-**Fase 8b — credenciais pela interface.** Hoje as credenciais e o caminho do certificado vêm do ambiente, o que significa que trocá-las exige acesso ao servidor. A fase 8b troca a fonte para o banco, cifrada, com tela de cadastro. **Muda o corpo de `ConfiguracaoEfi` e mais nada** — foi para isso que ela existe.
+A fase 8b tirou a credencial do arquivo de ambiente e a colocou numa tela do painel. **Ela mudou o corpo de `ConfiguracaoEfi` e mais nada do lado do provedor** — foi exatamente para isso que essa classe existia.
 
-**Tarefas de implantação (não são código):**
+**Quem entra:** só quem tem a permissão `pagamentos.credenciais`, que pertence **apenas ao papel `administrador`**. Quem organiza o evento não vê o item no menu e recebe 403 se digitar o endereço.
 
-1. Converter o certificado do painel da Efí para o formato que o cliente HTTP usa e colocá-lo **fora do repositório**, no caminho apontado por `EFI_CERT_PATH`.
-2. Cadastrar as credenciais do ambiente correto — homologação e produção têm pares diferentes, e misturá-los é mandar cobrança de teste para produção.
-3. Registrar o endereço do aviso automático no painel da Efí, terminando em `?ignorar=`.
-4. Instalar a cadeia de certificados da Efí no servidor web — o roteiro está em `ARCHITECTURE.md`.
-5. Homologar à mão: `php artisan efi:diagnostico`, depois uma inscrição inteira em homologação.
+**Onde fica:** menu lateral do painel → **Credenciais de pagamento** (`/admin/pagamentos/credenciais`).
+
+### 10.1 O passo a passo
+
+1. **Escolha o bloco de homologação.** A tela tem dois blocos independentes, homologação e produção, e nada passa de um para o outro.
+2. **Cole a identificação e a chave secreta da aplicação**, as duas do painel da Efí, do **mesmo ambiente** do bloco. Misturar credencial de homologação com a de produção é mandar cobrança de teste para dinheiro de verdade, e não há como o sistema perceber sozinho.
+3. **Informe a chave Pix da conta que recebe** o dinheiro do evento.
+4. **Clique em "Gerar valor"** no campo do aviso automático. Não invente esse valor à mão: ele é conferido a cada aviso que a Efí manda, e um valor curto ou previsível deixaria alguém de fora confirmar inscrição sem pagar.
+5. **Envie o certificado** (`.p12`, `.pfx` ou `.pem`) baixado do painel da Efí. O sistema confere que o arquivo abre de verdade e, quando o formato permite, lê a data de validade e passa a mostrá-la.
+6. **Copie o endereço do aviso** que a tela monta pronto — ele já traz o `?hmac=` com o valor gerado e o `?ignorar=` no fim — e registre-o no painel da Efí.
+7. **Salve.**
+8. **Clique em "Testar conexão".** Ele percorre os mesmos passos do `php artisan efi:diagnostico` — configuração completa, certificado que abre e não venceu, token aceito pela Efí — e diz, em português, qual passo falhou. **Ele não emite cobrança**: a tela roda em produção, e uma cobrança de teste ali seria dinheiro de verdade.
+9. **Clique em "Usar este ambiente".**
+10. Repita tudo no bloco de produção quando a homologação estiver provada. **A virada para produção pede que você digite `PRODUCAO`** — a partir dali toda cobrança é real.
+
+### 10.2 Três coisas que surpreendem, e não deveriam
+
+- **Nada do que você salvou reaparece na tela.** Os campos voltam vazios de propósito, indicando apenas que existe um valor guardado. Não é falha: é a única forma de a tela não virar um lugar de onde se lê a credencial da conta bancária.
+- **Por isso, campo em branco significa "mantém", nunca "apaga".** Para corrigir só a chave Pix, preencha só a chave Pix — não há como redigitar o que a tela nunca mostrou.
+- **O endereço do aviso só aparece completo depois que você gera ou digita o valor.** Ele carrega o segredo, e o segredo não volta do servidor. Se você não o anotou, gere um novo, salve, e registre o endereço novo na Efí.
+
+### 10.3 O que a tela guarda, e como
+
+Os cinco campos sigilosos — identificação, chave secreta, chave Pix, valor do aviso e **o conteúdo do certificado** — vão **cifrados** para o banco, pelo mesmo mecanismo que já protege o CPF de quem se inscreve. O certificado é escrito em disco, com permissão restrita e fora do repositório, apenas no instante em que o SDK precisa dele; esse arquivo é cache descartável, e o sistema o reescreve quando ele some.
+
+Cada alteração e cada troca de ambiente entram em `logs_auditoria` dizendo **quais campos** mudaram — **nunca os valores**, nem antes nem depois.
+
+Enquanto não houver nenhum ambiente ativo cadastrado, o sistema continua lendo o arquivo de ambiente do servidor (decisão **DA-26**), e a própria tela avisa quando é esse o caso.
+
+### 10.4 O que continua sendo tarefa de implantação (não é código)
+
+1. Instalar a cadeia de certificados da Efí no servidor web e deixar a verificação do certificado do cliente como **opcional** — o roteiro está na seção 8.3 de `ARCHITECTURE.md`.
+2. HTTPS válido e público, sem o qual a Efí não chama o servidor.
+3. Registrar o endereço do aviso no painel da Efí, terminando em `?ignorar=`.
+4. Homologar à mão: uma inscrição inteira em homologação, do formulário ao e-mail de confirmação.
+5. Manter o **trabalhador da fila** de pé (`php artisan queue:work redis --queue=emails`), senão o comprovante não sai.
 6. Confirmar a taxa efetiva com o comercial e fechar a **P-06** aqui neste documento.
 
 Nenhum arquivo de domínio deve ser alterado em nenhuma dessas etapas. Se for necessário alterar, o contrato estava errado — e isso é sinal para revisar o desenho, não para abrir exceção.

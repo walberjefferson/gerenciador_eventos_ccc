@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.7 · **Data:** 2026-08-27 · **Revisado ao final da Fase 8a**
+> **Versão:** 1.8 · **Data:** 2026-08-27 · **Revisado ao final da Fase 8b — a última fase de código do plano**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-27:** **todas as fases planejadas estão concluídas e verificadas, exceto a Fase 8b.** As fases 0 a 4 (núcleo transacional), a **5a** e a **5b** (todo o caminho do participante), a **6a** e a **6b** (todo o lado administrativo), a **7** (os cinco e-mails, o lembrete de prazo e o registro que impede a mensagem repetida) a **8a** (o provedor de pagamento real, a Efí, atrás do mesmo contrato) e a **9** (auditoria append-only, medição de desempenho com 10.000 inscrições, limites de requisição, cabeçalhos de segurança com CSP e teste de carga com 50 processos) estão de pé: **488 testes Pest passando (3455 asserções)**, **32 cenários Playwright** passando num navegador que imita um celular — **os mesmos 32, sem nenhuma edição na Fase 8a**, que é a prova de que a troca de provedor é invisível para quem se inscreve —, `pint` e `eslint` limpos e `vue-tsc --noEmit` com **zero erros**. A **Fase 8b — credenciais da Efí pela interface** é a única de código que falta. ⚠️ **A Efí não foi ligada contra dinheiro de verdade**: não existe ambiente publicado, e o que ela exige do servidor (certificado, cadeia de certificados no servidor web, HTTPS válido e o registro do endereço do aviso) é **tarefa de implantação**, com roteiro na seção 8.3 de `docs/ARCHITECTURE.md`. ⚠️ **A revisão de LGPD NÃO foi feita** — retenção, prazo de descarte e anonimização não existem, e dependem da **P-04** e da **P-03**. ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
+> **Estado real em 2026-08-27: todo o escopo planejado está entregue.** Não há fase de código pendente. As fases 0 a 4 (núcleo transacional), a **5a** e a **5b** (todo o caminho do participante), a **6a** e a **6b** (todo o lado administrativo), a **7** (os cinco e-mails, o lembrete de prazo e o registro que impede a mensagem repetida), a **8a** (o provedor de pagamento real, a Efí, atrás do mesmo contrato), a **8b** (credenciais e certificado da Efí cadastrados pela tela, cifrados no banco) e a **9** (auditoria append-only, medição de desempenho com 10.000 inscrições, limites de requisição, cabeçalhos de segurança com CSP e teste de carga com 50 processos) estão de pé: **522 testes Pest passando (3.661 asserções)**, **36 cenários Playwright** passando num navegador que imita um celular — **os 32 anteriores sem nenhuma edição**, mais 4 novos da tela de credenciais —, `pint` e `eslint` limpos, `vue-tsc --noEmit` com **zero erros** e `composer audit` sem aviso. ⚠️ **A Efí não foi ligada contra dinheiro de verdade**: não existe ambiente publicado, e o que falta **não é código** — cadastrar as credenciais reais pela tela nova, publicar em HTTPS com a cadeia de certificados da Efí no servidor web (o mTLS do aviso automático) e registrar o endereço do aviso no painel da Efí, com roteiro na seção 8.3 de `docs/ARCHITECTURE.md` e passo a passo na seção 10 de `docs/PAYMENTS.md`. ⚠️ **A revisão de LGPD NÃO foi feita** — retenção, prazo de descarte e anonimização não existem, e dependem da **P-04** e da **P-03**. ⚠️ **Estorno não existe** e depende da **P-02**; a taxa efetiva da Efí não foi confirmada com o comercial (**P-06**). ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
 
 ---
 
@@ -23,7 +23,8 @@
 | 6 | Administração (6a + 6b) | ✅ | Painel com números e cadastros — concluída nas duas metades |
 | 7 | Comunicação | ✅ | Cinco e-mails na fila, lembrete de prazo e nenhuma mensagem repetida |
 | 8a | Provedor real (Efí) | ✅ | Cobrança Pix de verdade, aviso automático em lote e confirmação — **sem uma linha alterada em Action, Model ou Enum de domínio**. Fecha a P-01 |
-| 8b | Credenciais pela interface | ❌ **única fase pendente** | Credenciais e certificado da Efí vindos do banco, cifrados, com tela de cadastro — em vez do arquivo de ambiente |
+| 8b | Credenciais pela interface | ✅ | Credenciais e certificado da Efí cadastrados **pela tela**, cifrados no banco, dois ambientes independentes e nenhum segredo voltando para o navegador — com **um único arquivo do provedor alterado** (decisão **DA-24** cobrada e paga) |
+| 8 | Pagamento real (8a + 8b) | ✅ | Cobrança Pix de verdade e configurável pelo painel — concluída nas duas metades |
 | 9 | Endurecimento | ✅ | Auditoria append-only, desempenho medido com 10.000 inscrições, limites e cabeçalhos com CSP, teste de carga. **A LGPD ficou de fora** (decisão D-76): depende da P-04 e da P-03 |
 
 ---
@@ -270,13 +271,20 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 8b — Credenciais da Efí pela interface ❌ **a única fase pendente**
+## Fase 8b — Credenciais da Efí pela interface ✅ concluída
 
-- Trocar a fonte da configuração do arquivo de ambiente para o **banco, cifrada** — dentro de `ConfiguracaoEfi`, e só ali.
-- Tela de cadastro das credenciais e envio do certificado, restrita a `administrador`, sem nunca exibir de volta o conteúdo do certificado.
-- Manter o arquivo de ambiente como reserva, para que um cadastro incompleto não derrube a cobrança.
+- ✅ Fonte da configuração trocada do arquivo de ambiente para o **banco, cifrada** — dentro de `ConfiguracaoEfi`, **e só ali**. Isso foi verificado, não suposto: `git diff --stat` sobre `app/Services/Payments/Efi/` na fase inteira mostra **um único arquivo alterado**. `EfiPaymentGateway`, `EfiClient` e `TraducaoDeStatus` não mudaram uma linha, e a suíte da 8a continuou verde **sem edição**. É a decisão **DA-24** cobrada e paga.
+- ✅ Tabela `credenciais_pagamento` com os **cinco campos sigilosos cifrados em repouso** (decisão **DA-25**), pelo mesmo mecanismo que já protege o CPF (**D-08**) — inclusive o **conteúdo** do certificado, e não o caminho dele.
+- ✅ **Um ambiente ativo por provedor garantido pelo PostgreSQL**, por índice único parcial (`WHERE ativo = true`), e não por verificação em PHP: tentar ativar o segundo devolve `SQLSTATE 23505` (mesma lição da **D-66**).
+- ✅ Tela restrita à permissão própria `pagamentos.credenciais`, **exclusiva do administrador** (**D-55**) — quem organiza o evento **recebe 403** e não vê o item no menu.
+- ✅ **Nenhum segredo volta para o navegador**, nem mascarado; por consequência, **campo em branco mantém** o valor guardado e nunca apaga. O certificado é materializado em `storage/certificados` com permissão `0600`, só no uso, e é cache descartável.
+- ✅ Toda alteração e toda troca de ambiente em `logs_auditoria` (`AcaoAuditada::AlterouCredencialPagamento`), com **quais campos** mudaram e **nunca os valores** — com teste dedicado provando o vazamento zero.
+- ✅ Arquivo de ambiente mantido como **reserva** (decisão **DA-26**), usado só quando não há ambiente ativo cadastrado — e **sem completar** o que falta num cadastro pela metade.
+- ✅ **34 testes Pest novos** e **4 cenários Playwright novos**; os **32 anteriores continuaram verdes sem edição**.
+- ❌ **Rotação automática de credencial e alerta de vencimento de certificado ficaram fora do escopo.** A tela mostra a validade quando o formato permite lê-la, e nada mais.
+- ❌ **Nenhum outro provedor além da Efí.** A coluna `gateway` existe para o dia em que houver outro, mas a tela fala de Efí.
 
-**Nenhum arquivo de domínio deve mudar, e nem o gateway, nem o cliente, nem o comando de diagnóstico.** Se algum deles precisar mudar, a decisão DA-24 não foi respeitada na Fase 8a.
+**Nenhum arquivo de domínio mudou, e nem o gateway, nem o cliente, nem o comando de diagnóstico.** Era a condição que a decisão DA-24 impunha à Fase 8a, e ela se sustentou.
 
 ---
 
@@ -312,7 +320,7 @@ flowchart LR
 
 As fases 5, 6, 7 e 8 dependem apenas da fase 4 e podem ser feitas em paralelo por pessoas diferentes. Foi para isso que o domínio foi isolado das telas e do provedor de pagamento.
 
-**O plano original punha a Fase 9 depois da Fase 8, e a ordem real foi outra** — a Fase 9 foi concluída antes, com a Fase 8 ainda parada à espera de decisão comercial. **A Fase 8a mostrou que isso não deixou dívida:** o que a Fase 9 endureceu foi a aplicação (auditoria, desempenho, limites, cabeçalhos e concorrência sob carga), e nada disso precisou ser revisto quando o provedor real entrou — o limite de requisições do aviso automático, a CSP e a auditoria continuaram valendo sem uma linha alterada. O vocabulário de status também não precisou mudar: `SituacaoPagamento::deStatusExterno()` já era neutro o bastante para o da Efí. **A Fase 8 também foi partida em duas**, 8a (o provedor) e 8b (as credenciais pela tela), porque cadastrar credencial pela interface é trabalho de tela e de cifra, não de integração financeira — e misturar os dois faria a fase inteira depender de a tela ficar pronta.
+**O plano original punha a Fase 9 depois da Fase 8, e a ordem real foi outra** — a Fase 9 foi concluída antes, com a Fase 8 ainda parada à espera de decisão comercial. **A Fase 8a mostrou que isso não deixou dívida:** o que a Fase 9 endureceu foi a aplicação (auditoria, desempenho, limites, cabeçalhos e concorrência sob carga), e nada disso precisou ser revisto quando o provedor real entrou — o limite de requisições do aviso automático, a CSP e a auditoria continuaram valendo sem uma linha alterada. O vocabulário de status também não precisou mudar: `SituacaoPagamento::deStatusExterno()` já era neutro o bastante para o da Efí. **A Fase 8 também foi partida em duas**, 8a (o provedor) e 8b (as credenciais pela tela), porque cadastrar credencial pela interface é trabalho de tela e de cifra, não de integração financeira — e misturar os dois faria a fase inteira depender de a tela ficar pronta. **A partição se justificou duas vezes:** a 8a entregou capacidade de cobrar sem esperar a tela, e a 8b provou que a aposta da 8a estava certa — trocar a fonte da configuração custou **um arquivo**, exatamente como a DA-24 previa. É o tipo de retorno que não aparece na fase em que a decisão é tomada, e sim na seguinte.
 
 ---
 

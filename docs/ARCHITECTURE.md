@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.2 · **Data:** 2026-08-27 (seção 8 ampliada na Fase 8a: o provedor real e o que ele exige do servidor)
+> **Versão:** 1.3 · **Data:** 2026-08-27 (seção 8 ampliada na Fase 8b: a configuração da Efí passou a ser cadastrada pela tela, cifrada no banco, com o arquivo de ambiente como reserva)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -408,13 +408,13 @@ flowchart LR
     GW -->|fala com a Efi| CLI[EfiClient]
     GW -->|traduz situacao| TR[TraducaoDeStatus]
     CLI -->|unico ponto que usa| SDK[SDK oficial da Efi]
-    CFG -->|hoje| ENV[variaveis de ambiente]
-    CFG -.->|fase 8b| BD[(banco, cifrado)]
+    CFG -->|primeiro| BD[(cadastro da tela, cifrado no banco)]
+    CFG -->|so se o cadastro estiver vazio| ENV[variaveis de ambiente]
 ```
 
 **Duas fronteiras dentro da fronteira**, e cada uma existe por um motivo concreto:
 
-- **`ConfiguracaoEfi` é o único lugar que lê configuração da Efí.** Credencial, certificado, chave Pix, segredo do aviso e ambiente — tudo passa por ela. Se o gateway, o cliente ou o comando lessem configuração por conta própria, trocar a fonte (do ambiente para o banco, na fase 8b) exigiria reescrever os quatro. Existe teste automatizado que percorre `app/` inteiro e falha se um segundo arquivo aparecer lendo esse bloco de configuração.
+- **`ConfiguracaoEfi` é o único lugar que lê configuração da Efí.** Credencial, certificado, chave Pix, segredo do aviso e ambiente — tudo passa por ela. Se o gateway, o cliente ou o comando lessem configuração por conta própria, trocar a fonte exigiria reescrever os quatro. Existe teste automatizado que percorre `app/` inteiro e falha se um segundo arquivo aparecer lendo esse bloco de configuração. **A fase 8b cobrou essa aposta**: a fonte mudou do arquivo de ambiente para o banco e **um único arquivo do provedor foi alterado** — este. `EfiPaymentGateway`, `EfiClient` e `TraducaoDeStatus` não mudaram uma linha.
 - **`EfiClient` é o único lugar que instancia o SDK.** Isso vale por si (se o SDK sair um dia, muda um arquivo), mas o motivo imediato é a suíte: o SDK usa cliente HTTP próprio, que as ferramentas de teste do Laravel **não** interceptam. Sem esse embrulho, provar a emissão de cobrança exigiria credencial, certificado e rede — a suíte deixaria de rodar no computador de quem desenvolve.
 
 **O que o gateway não faz:** ele não toca em `Inscricao` nem em `Pagamento`. Ele traduz — de centavos para texto decimal na ida, do vocabulário da Efí para o do domínio na volta. Quem decide o efeito continua sendo a Action da aplicação.
@@ -427,7 +427,9 @@ Nada nesta seção é código, e nada disso pode ser garantido por teste. São a
 
 #### 8.3.1 O certificado da aplicação (mTLS)
 
-A Efí não aceita apenas usuário e senha: **as duas pontas se identificam por certificado**. O painel da Efí entrega um certificado por ambiente; ele é convertido para o formato que o cliente HTTP lê e o arquivo resultante fica no servidor, apontado por `EFI_CERT_PATH`.
+A Efí não aceita apenas usuário e senha: **as duas pontas se identificam por certificado**. O painel da Efí entrega um certificado por ambiente; ele é convertido para o formato que o cliente HTTP lê.
+
+Desde a fase 8b, **o caminho normal é enviar esse arquivo pela tela** (§8.4): o conteúdo vai cifrado para o banco e o sistema o escreve em disco, com permissão restrita, só na hora de usar. Colocar o arquivo no servidor à mão e apontar `EFI_CERT_PATH` continua funcionando, e é a reserva para quem ainda não cadastrou nada.
 
 Regras que não admitem exceção:
 
@@ -460,13 +462,39 @@ Registrar o endereço é **tarefa de implantação**, como manter o trabalhador 
 
 #### 8.3.4 A ordem de ligar
 
-1. Certificado no servidor, com permissão restrita, fora do repositório.
-2. Credenciais do ambiente **de homologação** no ambiente da aplicação.
-3. `php artisan efi:diagnostico` — confere certificado, token, cobrança e código Pix, um passo por vez, dizendo qual falhou.
-4. Endereço do aviso registrado na Efí de homologação.
-5. Uma inscrição inteira à mão em homologação, do formulário ao e-mail de confirmação.
-6. Só então repetir de 1 a 5 com as credenciais de produção — e `PAYMENT_GATEWAY=efi`.
+1. Credenciais e certificado do ambiente **de homologação** cadastrados na tela **Credenciais de pagamento** (§8.4) — ou, na falta dela, no ambiente da aplicação.
+2. **Testar conexão** na própria tela, que percorre os mesmos passos do `php artisan efi:diagnostico` — certificado que abre e não venceu, e token aceito pela Efí — dizendo qual falhou. O comando de terminal continua existindo e vai um passo além: emite uma cobrança de teste.
+3. Endereço do aviso registrado na Efí de homologação, copiado pronto da própria tela, já com o `?hmac=` e o `?ignorar=`.
+4. **Usar este ambiente** em homologação, e uma inscrição inteira à mão, do formulário ao e-mail de confirmação.
+5. Só então repetir de 1 a 4 com as credenciais de produção — e a troca para produção, que a tela só aceita depois de a palavra de confirmação ser digitada.
 
+---
+
+### 8.4 Onde a configuração da Efí mora (fase 8b)
+
+Até a fase 8a, a credencial da Efí vivia no arquivo de ambiente do servidor. Isso obriga quem administra o evento a pedir ajuda técnica para trocar uma chave, e um arquivo de ambiente não entra no backup do banco: um redeploy ou um contêiner recriado leva a configuração junto.
+
+Desde a fase 8b existe a tela **Credenciais de pagamento** (`/admin/pagamentos/credenciais`), e a regra de precedência é uma só:
+
+> **O cadastro da tela vence. O arquivo de ambiente é a reserva** — usado apenas quando não há nenhum ambiente ativo cadastrado (decisão **DA-26**). Sem essa reserva, a suíte de testes e a máquina de quem desenvolve precisariam de um banco semeado com segredo para rodar qualquer coisa.
+
+**A precedência não se mistura.** Quando há cadastro ativo, ele responde por tudo — credencial, certificado, chave Pix e segredo do aviso. O arquivo de ambiente **não completa o que falta no cadastro**: um cadastro pela metade falha dizendo o que falta, em vez de cobrar com meia credencial da tela e meia do servidor.
+
+**Dois ambientes, um ativo** (decisão **DA-27**). Homologação e produção são dois cadastros independentes, e um indicador diz qual o sistema está usando. Quem garante que só existe um ativo é o **PostgreSQL**, por índice único parcial (`WHERE ativo = true`) — não uma verificação em PHP, que duas requisições simultâneas furam.
+
+**O que protege a tela**, ponto a ponto:
+
+| Risco | O que o sistema faz |
+|---|---|
+| Alguém com acesso ao banco lê a credencial | Os cinco campos sigilosos vão **cifrados** para o banco, pelo mesmo mecanismo que já protege o CPF (**D-08**). Na linha crua não há nada legível |
+| A tela devolve o segredo para o navegador | **Nenhum valor guardado volta** — nem mascarado. A tela recebe apenas "existe um valor guardado". Por isso **campo em branco mantém o que está lá**, e nunca apaga |
+| Quem não deveria abre a tela | Permissão própria, `pagamentos.credenciais`, **exclusiva do administrador**. O organizador recebe 403 e não vê o item no menu |
+| A troca some sem deixar rastro | Toda alteração e toda troca de ambiente viram registro em `logs_auditoria` (**D-77/D-78**), com **quais campos** mudaram — jamais os valores |
+| Alguém liga produção sem querer | A virada exige **digitar uma palavra de confirmação**, e a exigência é cobrada no servidor, não só na tela |
+| O certificado vaza pelo repositório | Ele nunca é gravado em pasta versionada: o conteúdo mora cifrado no banco (**DA-25**) e é materializado em `storage/certificados`, com permissão `0600`, apenas na hora do uso. O `.gitignore` cobre a pasta e as extensões `.p12`, `.pem` e `.pfx` |
+| A credencial troca e o sistema segue usando a antiga | Salvar **joga fora o token guardado** dos dois ambientes. Sem isso, a credencial antiga continuaria valendo por até uma hora |
+
+O arquivo materializado do certificado é **cache, não fonte da verdade**: pode ser apagado a qualquer momento, e o sistema o reescreve na chamada seguinte.
 
 ---
 
