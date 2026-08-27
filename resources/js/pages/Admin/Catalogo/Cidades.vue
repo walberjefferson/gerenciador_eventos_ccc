@@ -117,7 +117,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         required
                         :aria-describedby="formulario.errors.nome ? 'erro-cidade-nome' : undefined"
                         :aria-invalid="formulario.errors.nome ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <p
                         v-if="formulario.errors.nome"
@@ -135,7 +135,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         id="cidade-uf"
                         v-model="formulario.uf"
                         :aria-describedby="formulario.errors.uf ? 'erro-cidade-uf' : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option v-for="uf in props.ufs" :key="uf" :value="uf">{{ uf }}</option>
                     </select>
@@ -153,14 +153,14 @@ function excluir(cidade: CidadeDoCatalogo): void {
                     <button
                         type="submit"
                         :disabled="formulario.processing"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         {{ emEdicao === null ? 'Cadastrar' : 'Salvar' }}
                     </button>
                     <button
                         v-if="emEdicao !== null"
                         type="button"
-                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @click="cancelarEdicao"
                     >
                         Cancelar
@@ -201,7 +201,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                             <div class="flex flex-wrap items-center gap-2">
                                 <button
                                     type="button"
-                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                     @click="editar(cidade)"
                                 >
                                     Editar
@@ -212,14 +212,14 @@ function excluir(cidade: CidadeDoCatalogo): void {
                                     <button
                                         type="button"
                                         :disabled="excluindo"
-                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                         @click="excluir(cidade)"
                                     >
                                         Sim, excluir
                                     </button>
                                     <button
                                         type="button"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                         @click="confirmandoExclusao = null"
                                     >
                                         Não
@@ -228,7 +228,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                                 <button
                                     v-else
                                     type="button"
-                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                     @click="confirmandoExclusao = cidade.id"
                                 >
                                     Excluir

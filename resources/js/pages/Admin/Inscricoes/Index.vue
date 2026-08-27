@@ -66,7 +66,7 @@ const enderecoDaExportacao = computed(() => {
                 v-if="props.pode_exportar"
                 :href="enderecoDaExportacao"
                 data-testid="exportar-csv"
-                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Exportar para planilha (CSV)
             </a>
@@ -79,7 +79,7 @@ const enderecoDaExportacao = computed(() => {
                 v-if="props.inscricoes.links.anterior"
                 :href="props.inscricoes.links.anterior"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Página anterior
             </Link>
@@ -92,7 +92,7 @@ const enderecoDaExportacao = computed(() => {
                 v-if="props.inscricoes.links.proxima"
                 :href="props.inscricoes.links.proxima"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Próxima página
             </Link>

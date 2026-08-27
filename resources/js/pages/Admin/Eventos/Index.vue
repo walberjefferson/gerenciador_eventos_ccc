@@ -71,7 +71,7 @@ function excluir(evento: EventoDaLista): void {
         <div>
             <Link
                 :href="route('admin.eventos.create')"
-                class="inline-flex h-10 items-center rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="inline-flex h-10 items-center rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Novo evento
             </Link>
@@ -112,13 +112,13 @@ function excluir(evento: EventoDaLista): void {
                                 <div class="flex flex-wrap items-center gap-2">
                                     <Link
                                         :href="route('admin.eventos.edit', { evento: evento.id })"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         Editar
                                     </Link>
                                     <Link
                                         :href="route('admin.eventos.estrutura', { evento: evento.id })"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         Programação
                                     </Link>
@@ -131,14 +131,14 @@ function excluir(evento: EventoDaLista): void {
                                         <button
                                             type="button"
                                             :disabled="excluindo"
-                                            class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                            class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                             @click="excluir(evento)"
                                         >
                                             Sim, excluir
                                         </button>
                                         <button
                                             type="button"
-                                            class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                             @click="confirmandoExclusao = null"
                                         >
                                             Não
@@ -147,7 +147,7 @@ function excluir(evento: EventoDaLista): void {
                                     <button
                                         v-else
                                         type="button"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                         @click="confirmandoExclusao = evento.id"
                                     >
                                         Excluir

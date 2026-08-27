@@ -96,7 +96,7 @@ const dinheiro = computed(() => props.numeros?.dinheiro ?? null);
                 <select
                     id="seletor-de-evento"
                     v-model.number="eventoSelecionado"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     @change="trocarEvento"
                 >
                     <option v-for="item in props.eventos" :key="item.id" :value="item.id">{{ item.nome }} — {{ item.situacao_rotulo }}</option>

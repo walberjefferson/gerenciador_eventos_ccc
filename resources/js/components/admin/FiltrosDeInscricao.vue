@@ -54,7 +54,7 @@ function limpar(): void {
                     v-model="campos.busca"
                     type="search"
                     aria-describedby="ajuda-filtro-busca"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <p id="ajuda-filtro-busca" class="text-sm text-muted-foreground">Nome, e-mail ou código da inscrição. O CPF não é buscável.</p>
             </div>
@@ -64,7 +64,7 @@ function limpar(): void {
                 <select
                     id="filtro-evento"
                     v-model="campos.evento_id"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <option :value="null">Todos</option>
                     <option v-for="evento in props.opcoes.eventos" :key="evento.id" :value="String(evento.id)">{{ evento.nome }}</option>
@@ -76,7 +76,7 @@ function limpar(): void {
                 <select
                     id="filtro-situacao"
                     v-model="campos.situacao"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <option :value="null">Todas</option>
                     <option v-for="situacao in props.opcoes.situacoes" :key="situacao.valor" :value="situacao.valor">
@@ -90,7 +90,7 @@ function limpar(): void {
                 <select
                     id="filtro-cidade"
                     v-model="campos.cidade_id"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <option :value="null">Todas</option>
                     <option v-for="cidade in props.opcoes.cidades" :key="cidade.id" :value="String(cidade.id)">{{ cidade.nome }}</option>
@@ -102,7 +102,7 @@ function limpar(): void {
                 <select
                     id="filtro-grupo"
                     v-model="campos.grupo_participante_id"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <option :value="null">Todos</option>
                     <option v-for="grupo in props.opcoes.grupos" :key="grupo.id" :value="String(grupo.id)">{{ grupo.nome }}</option>
@@ -116,7 +116,7 @@ function limpar(): void {
                     v-model="campos.atividade_id"
                     :disabled="props.opcoes.atividades.length === 0"
                     aria-describedby="ajuda-filtro-atividade"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                 >
                     <option :value="null">Todas</option>
                     <option v-for="atividade in props.opcoes.atividades" :key="atividade.id" :value="String(atividade.id)">
@@ -131,7 +131,7 @@ function limpar(): void {
                 <select
                     id="filtro-pagamento"
                     v-model="campos.situacao_pagamento"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <option :value="null">Todas</option>
                     <option v-for="situacao in props.opcoes.situacoes_pagamento" :key="situacao.valor" :value="situacao.valor">
@@ -146,7 +146,7 @@ function limpar(): void {
                     id="filtro-de"
                     v-model="campos.criada_de"
                     type="date"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 />
             </div>
 
@@ -156,7 +156,7 @@ function limpar(): void {
                     id="filtro-ate"
                     v-model="campos.criada_ate"
                     type="date"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 />
             </div>
         </div>
@@ -164,13 +164,13 @@ function limpar(): void {
         <div class="flex flex-wrap gap-2">
             <button
                 type="submit"
-                class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Filtrar
             </button>
             <button
                 type="button"
-                class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 @click="limpar"
             >
                 Limpar filtros

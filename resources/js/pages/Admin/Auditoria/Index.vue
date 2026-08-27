@@ -117,7 +117,7 @@ function formatarValor(valor: unknown): string {
                         v-model="campos.de"
                         type="date"
                         data-testid="auditoria-filtro-de"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 </div>
 
@@ -128,7 +128,7 @@ function formatarValor(valor: unknown): string {
                         v-model="campos.ate"
                         type="date"
                         data-testid="auditoria-filtro-ate"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 </div>
 
@@ -139,7 +139,7 @@ function formatarValor(valor: unknown): string {
                         v-model="campos.usuario_id"
                         data-testid="auditoria-filtro-usuario"
                         aria-describedby="ajuda-auditoria-usuario"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option :value="null">Todos</option>
                         <option v-for="usuario in props.opcoes.usuarios" :key="usuario.id" :value="String(usuario.id)">
@@ -157,7 +157,7 @@ function formatarValor(valor: unknown): string {
                         id="auditoria-acao"
                         v-model="campos.acao"
                         data-testid="auditoria-filtro-acao"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option :value="null">Tudo</option>
                         <option v-for="acao in props.opcoes.acoes" :key="acao.valor" :value="acao.valor">{{ acao.rotulo }}</option>
@@ -168,13 +168,13 @@ function formatarValor(valor: unknown): string {
             <div class="flex flex-wrap gap-2">
                 <button
                     type="submit"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     Filtrar
                 </button>
                 <button
                     type="button"
-                    class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     @click="limpar"
                 >
                     Limpar filtros
@@ -219,7 +219,7 @@ function formatarValor(valor: unknown): string {
                 v-if="props.registros.links.anterior"
                 :href="props.registros.links.anterior"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Página anterior
             </Link>
@@ -230,7 +230,7 @@ function formatarValor(valor: unknown): string {
                 v-if="props.registros.links.proxima"
                 :href="props.registros.links.proxima"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Próxima página
             </Link>

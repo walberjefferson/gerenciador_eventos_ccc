@@ -67,7 +67,7 @@ function momento(iso: string | null): string {
                         -->
                         <Link
                             :href="route('admin.inscricoes.show', { inscricao: inscricao.id })"
-                            class="relative rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="relative rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <span class="sr-only">Abrir a ficha de {{ inscricao.nome_completo }}</span>
                             <span aria-hidden="true">Abrir</span>

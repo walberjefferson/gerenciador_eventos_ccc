@@ -265,7 +265,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
         <div>
             <Link
                 :href="route('admin.eventos.index')"
-                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Voltar para a lista de eventos
             </Link>
@@ -285,7 +285,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         required
                         maxlength="120"
                         :aria-invalid="formularioDia.errors.nome ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <p v-if="formularioDia.errors.nome" role="alert" class="text-sm text-destructive">{{ formularioDia.errors.nome }}</p>
                 </div>
@@ -298,7 +298,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         type="date"
                         required
                         :aria-invalid="erroDaDataDoDia ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <p v-if="erroDaDataDoDia" role="alert" class="text-sm text-destructive">{{ erroDaDataDoDia }}</p>
                 </div>
@@ -312,7 +312,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         min="1"
                         required
                         :aria-invalid="formularioDia.errors.posicao ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <p v-if="formularioDia.errors.posicao" role="alert" class="text-sm text-destructive">
                         {{ formularioDia.errors.posicao }}
@@ -328,14 +328,14 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <button
                         type="submit"
                         :disabled="formularioDia.processing"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         {{ diaEmEdicao === null ? 'Acrescentar' : 'Salvar' }}
                     </button>
                     <button
                         v-if="diaEmEdicao !== null"
                         type="button"
-                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @click="cancelarDia"
                     >
                         Cancelar
@@ -368,7 +368,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             <div class="flex flex-wrap gap-2">
                                 <button
                                     type="button"
-                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                     @click="editarDia(dia)"
                                 >
                                     Editar
@@ -376,7 +376,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 <button
                                     type="button"
                                     :disabled="excluindo"
-                                    class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                    class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                     @click="excluirDia(dia)"
                                 >
                                     Excluir
@@ -402,7 +402,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <select
                             id="grupo-dia"
                             v-model.number="formularioGrupo.dia_evento_id"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <option :value="0" disabled>Escolha o dia</option>
                             <option v-for="dia in props.dias" :key="dia.id" :value="dia.id">{{ dia.nome }}</option>
@@ -420,7 +420,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="text"
                             required
                             maxlength="120"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioGrupo.errors.nome" role="alert" class="text-sm text-destructive">
                             {{ formularioGrupo.errors.nome }}
@@ -435,7 +435,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="number"
                             min="1"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                     </div>
                 </div>
@@ -455,7 +455,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             min="0"
                             required
                             :aria-invalid="formularioGrupo.errors.min_selecoes ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioGrupo.errors.min_selecoes" role="alert" class="text-sm text-destructive">
                             {{ formularioGrupo.errors.min_selecoes }}
@@ -471,7 +471,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             min="0"
                             aria-describedby="ajuda-grupo-max"
                             :aria-invalid="formularioGrupo.errors.max_selecoes ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p id="ajuda-grupo-max" class="text-sm text-muted-foreground">Em branco, não há limite.</p>
                         <p v-if="formularioGrupo.errors.max_selecoes" role="alert" class="text-sm text-destructive">
@@ -489,14 +489,14 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <button
                         type="submit"
                         :disabled="formularioGrupo.processing"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         {{ grupoEmEdicao === null ? 'Acrescentar' : 'Salvar' }}
                     </button>
                     <button
                         v-if="grupoEmEdicao !== null"
                         type="button"
-                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @click="cancelarGrupo"
                     >
                         Cancelar
@@ -532,7 +532,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 <div class="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                         @click="editarGrupo(grupo)"
                                     >
                                         Editar
@@ -540,7 +540,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                     <button
                                         type="button"
                                         :disabled="excluindo"
-                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                         @click="excluirGrupo(grupo)"
                                     >
                                         Excluir
@@ -566,7 +566,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <select
                             id="atividade-grupo"
                             v-model.number="formularioAtividade.grupo_atividade_id"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <option :value="0" disabled>Escolha o grupo</option>
                             <option v-for="grupo in grupos" :key="grupo.id" :value="grupo.id">{{ grupo.nome }}</option>
@@ -584,7 +584,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="text"
                             required
                             maxlength="120"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioAtividade.errors.nome" role="alert" class="text-sm text-destructive">
                             {{ formularioAtividade.errors.nome }}
@@ -599,7 +599,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="number"
                             min="1"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                     </div>
                 </div>
@@ -612,7 +612,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             v-model="formularioAtividade.comeca_em"
                             type="datetime-local"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioAtividade.errors.comeca_em" role="alert" class="text-sm text-destructive">
                             {{ formularioAtividade.errors.comeca_em }}
@@ -627,7 +627,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="datetime-local"
                             required
                             :aria-invalid="formularioAtividade.errors.termina_em ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioAtividade.errors.termina_em" role="alert" class="text-sm text-destructive">
                             {{ formularioAtividade.errors.termina_em }}
@@ -643,7 +643,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             min="0"
                             aria-describedby="ajuda-atividade-capacidade"
                             :aria-invalid="formularioAtividade.errors.capacidade ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p id="ajuda-atividade-capacidade" class="text-sm text-muted-foreground">Em branco, não há limite.</p>
                         <p v-if="formularioAtividade.errors.capacidade" role="alert" class="text-sm text-destructive">
@@ -666,7 +666,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             type="number"
                             min="0"
                             max="120"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                     </div>
 
@@ -679,7 +679,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             min="0"
                             max="120"
                             :aria-invalid="formularioAtividade.errors.idade_maxima ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularioAtividade.errors.idade_maxima" role="alert" class="text-sm text-destructive">
                             {{ formularioAtividade.errors.idade_maxima }}
@@ -691,14 +691,14 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <button
                         type="submit"
                         :disabled="formularioAtividade.processing"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         {{ atividadeEmEdicao === null ? 'Acrescentar' : 'Salvar' }}
                     </button>
                     <button
                         v-if="atividadeEmEdicao !== null"
                         type="button"
-                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @click="cancelarAtividade"
                     >
                         Cancelar
@@ -740,7 +740,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 <div class="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        class="rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                                         @click="editarAtividade(atividade)"
                                     >
                                         Editar
@@ -752,7 +752,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                         v-else
                                         type="button"
                                         :disabled="excluindo"
-                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                        class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                         @click="excluirAtividade(atividade)"
                                     >
                                         Excluir
@@ -781,7 +781,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         id="conflito-a"
                         v-model.number="formularioConflito.atividade_a_id"
                         :aria-invalid="formularioConflito.errors.atividade_a_id ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option :value="0" disabled>Escolha</option>
                         <option v-for="atividade in props.atividades" :key="`a-${atividade.id}`" :value="atividade.id">
@@ -799,7 +799,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         id="conflito-b"
                         v-model.number="formularioConflito.atividade_b_id"
                         :aria-invalid="formularioConflito.errors.atividade_b_id ? true : undefined"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option :value="0" disabled>Escolha</option>
                         <option v-for="atividade in props.atividades" :key="`b-${atividade.id}`" :value="atividade.id">
@@ -818,7 +818,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         v-model="formularioConflito.motivo"
                         type="text"
                         maxlength="255"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 </div>
 
@@ -826,7 +826,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <button
                         type="submit"
                         :disabled="formularioConflito.processing"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         Cadastrar
                     </button>
@@ -854,7 +854,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             <button
                                 type="button"
                                 :disabled="excluindo"
-                                class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                                class="rounded-md border border-destructive px-3 py-1 text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                                 @click="excluirConflito(conflito)"
                             >
                                 Remover

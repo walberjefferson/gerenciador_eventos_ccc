@@ -99,7 +99,7 @@ function devolverOFoco(evento: Event): void {
                         required
                         :aria-describedby="descritoPor"
                         :aria-invalid="props.erro ? true : undefined"
-                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @input="emit('update:texto', ($event.target as HTMLTextAreaElement).value)"
                     ></textarea>
                     <p :id="`${idDoCampo}-ajuda`" class="text-sm text-muted-foreground">
@@ -111,7 +111,7 @@ function devolverOFoco(evento: Event): void {
                 <DialogFooter>
                     <button
                         type="button"
-                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         @click="emit('update:aberto', false)"
                     >
                         Voltar
@@ -119,7 +119,7 @@ function devolverOFoco(evento: Event): void {
                     <button
                         type="submit"
                         :disabled="props.processando"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                     >
                         {{ props.textoDoBotao }}
                     </button>

@@ -80,7 +80,7 @@ function gravar(): void {
                             required
                             :aria-describedby="formulario.errors.nome ? 'erro-evento-nome' : undefined"
                             :aria-invalid="formulario.errors.nome ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.nome" id="erro-evento-nome" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.nome }}
@@ -96,7 +96,7 @@ function gravar(): void {
                             maxlength="160"
                             aria-describedby="ajuda-evento-slug"
                             :aria-invalid="formulario.errors.slug ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p id="ajuda-evento-slug" class="text-sm text-muted-foreground">
                             Em branco, é gerado a partir do nome. Exemplo: copa-ccc-2026.
@@ -111,7 +111,7 @@ function gravar(): void {
                         id="evento-descricao"
                         v-model="formulario.descricao"
                         rows="3"
-                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     ></textarea>
                 </div>
 
@@ -120,7 +120,7 @@ function gravar(): void {
                     <select
                         id="evento-situacao"
                         v-model="formulario.situacao"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option v-for="situacao in props.situacoes" :key="situacao.valor" :value="situacao.valor">
                             {{ situacao.rotulo }}
@@ -141,7 +141,7 @@ function gravar(): void {
                             v-model="formulario.data_inicio"
                             type="date"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.data_inicio" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.data_inicio }}
@@ -157,7 +157,7 @@ function gravar(): void {
                             required
                             :aria-describedby="formulario.errors.data_fim ? 'erro-evento-data-fim' : undefined"
                             :aria-invalid="formulario.errors.data_fim ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.data_fim" id="erro-evento-data-fim" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.data_fim }}
@@ -171,7 +171,7 @@ function gravar(): void {
                             v-model="formulario.inscricoes_abrem_em"
                             type="datetime-local"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.inscricoes_abrem_em" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.inscricoes_abrem_em }}
@@ -187,7 +187,7 @@ function gravar(): void {
                             required
                             :aria-describedby="formulario.errors.inscricoes_fecham_em ? 'erro-evento-fecham' : undefined"
                             :aria-invalid="formulario.errors.inscricoes_fecham_em ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.inscricoes_fecham_em" id="erro-evento-fecham" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.inscricoes_fecham_em }}
@@ -209,7 +209,7 @@ function gravar(): void {
                             min="0"
                             aria-describedby="ajuda-evento-capacidade"
                             :aria-invalid="formulario.errors.capacidade ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p id="ajuda-evento-capacidade" class="text-sm text-muted-foreground">Em branco, o evento não tem limite de vagas.</p>
                         <p v-if="formulario.errors.capacidade" role="alert" class="text-sm text-destructive">
@@ -227,7 +227,7 @@ function gravar(): void {
                             required
                             aria-describedby="ajuda-evento-valor"
                             :aria-invalid="formulario.errors.valor_centavos ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p id="ajuda-evento-valor" class="text-sm text-muted-foreground">
                             R$ 120,00 se escreve 12000. Use zero para evento gratuito.
@@ -245,7 +245,7 @@ function gravar(): void {
                             type="number"
                             min="5"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.prazo_pagamento_minutos" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.prazo_pagamento_minutos }}
@@ -266,7 +266,7 @@ function gravar(): void {
                         required
                         aria-describedby="ajuda-evento-regulamento"
                         :aria-invalid="formulario.errors.regulamento ? true : undefined"
-                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     ></textarea>
                     <p id="ajuda-evento-regulamento" class="text-sm text-muted-foreground">É o texto que a pessoa aceita ao se inscrever.</p>
                     <p v-if="formulario.errors.regulamento" role="alert" class="text-sm text-destructive">
@@ -283,7 +283,7 @@ function gravar(): void {
                             type="text"
                             maxlength="40"
                             required
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.versao_termos" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.versao_termos }}
@@ -299,7 +299,7 @@ function gravar(): void {
                             maxlength="160"
                             required
                             :aria-invalid="formulario.errors.contato_email ? true : undefined"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formulario.errors.contato_email" role="alert" class="text-sm text-destructive">
                             {{ formulario.errors.contato_email }}
@@ -313,7 +313,7 @@ function gravar(): void {
                             v-model="formulario.contato_telefone"
                             type="text"
                             maxlength="40"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                     </div>
                 </div>
@@ -323,7 +323,7 @@ function gravar(): void {
                 <button
                     type="submit"
                     :disabled="formulario.processing"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                 >
                     {{ editando ? 'Salvar' : 'Cadastrar' }}
                 </button>
@@ -331,14 +331,14 @@ function gravar(): void {
                 <Link
                     v-if="props.evento"
                     :href="route('admin.eventos.estrutura', { evento: props.evento.id })"
-                    class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     Programação
                 </Link>
 
                 <Link
                     :href="route('admin.eventos.index')"
-                    class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     Voltar para a lista
                 </Link>

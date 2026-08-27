@@ -245,7 +245,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             autocomplete="off"
                             :data-testid="`credenciais-client-id-${ambiente.valor}`"
                             :placeholder="ambiente.cadastro?.tem_client_id ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Cole aqui o Client Id do painel da Efí'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularios[ambiente.valor].errors.client_id" class="text-sm text-destructive">
                             {{ formularios[ambiente.valor].errors.client_id }}
@@ -261,7 +261,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             autocomplete="new-password"
                             :data-testid="`credenciais-client-secret-${ambiente.valor}`"
                             :placeholder="ambiente.cadastro?.tem_client_secret ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Cole aqui o Client Secret do painel da Efí'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularios[ambiente.valor].errors.client_secret" class="text-sm text-destructive">
                             {{ formularios[ambiente.valor].errors.client_secret }}
@@ -277,7 +277,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             autocomplete="off"
                             :data-testid="`credenciais-chave-pix-${ambiente.valor}`"
                             :placeholder="ambiente.cadastro?.tem_chave_pix ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'A chave Pix da conta do evento'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         />
                         <p v-if="formularios[ambiente.valor].errors.chave_pix" class="text-sm text-destructive">
                             {{ formularios[ambiente.valor].errors.chave_pix }}
@@ -294,7 +294,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                                 autocomplete="off"
                                 :data-testid="`credenciais-webhook-hmac-${ambiente.valor}`"
                                 :placeholder="ambiente.cadastro?.tem_webhook_hmac ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Use o botão ao lado'"
-                                class="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                             />
                             <button
                                 type="button"
@@ -431,7 +431,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                 type="text"
                 autocomplete="off"
                 data-testid="credenciais-palavra-confirmacao"
-                class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             />
 
             <div class="flex gap-2">

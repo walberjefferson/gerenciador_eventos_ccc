@@ -333,7 +333,7 @@ async function voltar(): Promise<void> {
             <!-- Anuncio da troca de etapa para quem usa leitor de tela. -->
             <p aria-live="polite" role="status" class="sr-only">{{ anuncio }}</p>
 
-            <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-none">{{ titulos[passo] }}</h2>
+            <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-hidden">{{ titulos[passo] }}</h2>
 
             <PassoDadosPessoais
                 v-show="passo === 'dados'"

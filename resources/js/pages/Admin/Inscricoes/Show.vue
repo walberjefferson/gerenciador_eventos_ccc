@@ -88,7 +88,7 @@ function confirmarPagamento(): void {
         <div>
             <Link
                 :href="route('admin.inscricoes.index')"
-                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Voltar para a lista
             </Link>
@@ -209,7 +209,7 @@ function confirmarPagamento(): void {
                     v-if="podeCancelarAgora"
                     type="button"
                     data-testid="abrir-cancelamento"
-                    class="h-10 rounded-md border border-destructive px-4 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md border border-destructive px-4 text-sm text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     @click="cancelamentoAberto = true"
                 >
                     Cancelar inscrição
@@ -219,7 +219,7 @@ function confirmarPagamento(): void {
                     v-if="podeConfirmarAgora"
                     type="button"
                     data-testid="abrir-confirmacao-manual"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     @click="confirmacaoAberta = true"
                 >
                     Confirmar pagamento recebido
@@ -262,7 +262,7 @@ function confirmarPagamento(): void {
                     <select
                         id="metodo-manual"
                         v-model="formularioConfirmacao.metodo"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option v-for="metodo in props.metodos_manuais" :key="metodo.valor" :value="metodo.valor">{{ metodo.rotulo }}</option>
                     </select>
