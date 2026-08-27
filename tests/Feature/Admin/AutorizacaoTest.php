@@ -9,11 +9,11 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\Feature\Admin\Cenario;
 
-it('cria os dois papeis e as nove permissoes', function (): void {
+it('cria os dois papeis e as dez permissoes', function (): void {
     Cenario::semearPapeis();
 
     expect(Role::count())->toBe(2)
-        ->and(Permission::count())->toBe(9)
+        ->and(Permission::count())->toBe(10)
         ->and(Role::pluck('name')->sort()->values()->all())->toBe(['administrador', 'organizador']);
 });
 
@@ -22,11 +22,11 @@ it('roda duas vezes sem duplicar papel nem permissao', function (): void {
     Cenario::semearPapeis();
 
     expect(Role::count())->toBe(2)
-        ->and(Permission::count())->toBe(9);
+        ->and(Permission::count())->toBe(10);
 
     $administrador = Role::findByName('administrador');
 
-    expect($administrador->permissions()->count())->toBe(9);
+    expect($administrador->permissions()->count())->toBe(10);
 });
 
 it('da todas as permissoes ao administrador', function (): void {
