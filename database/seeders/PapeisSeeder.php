@@ -42,6 +42,7 @@ class PapeisSeeder extends Seeder
         'pagamentos.confirmar-manual' => 'Declarar na mao que um pagamento entrou',
         'usuarios.gerenciar' => 'Criar e ajustar contas administrativas',
         'auditoria.ver' => 'Ler o historico de quem fez o que (Fase 9)',
+        'pagamentos.credenciais' => 'Cadastrar a credencial e o certificado do provedor de pagamento (Fase 8b)',
     ];
 
     /**
@@ -52,12 +53,18 @@ class PapeisSeeder extends Seeder
      * menos gente puder, melhor. "usuarios.gerenciar" e "auditoria.ver" tratam
      * de quem entra e do historico, e tambem ficam so com o administrador.
      *
+     * "pagamentos.credenciais" e a mais restrita de todas: ela abre a tela que
+     * guarda a credencial da instituicao financeira e decide para qual conta o
+     * dinheiro do evento vai. Quem organiza o evento no dia a dia nao precisa
+     * dela nem uma vez.
+     *
      * @var array<int, string>
      */
     public const FORA_DO_ORGANIZADOR = [
         'pagamentos.confirmar-manual',
         'usuarios.gerenciar',
         'auditoria.ver',
+        'pagamentos.credenciais',
     ];
 
     public function run(): void

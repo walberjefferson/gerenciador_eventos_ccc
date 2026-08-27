@@ -188,8 +188,15 @@ class CredencialPagamento extends Model
 
         @chmod($pasta, 0700);
 
+        // A extensao acompanha o arquivo que foi enviado. O SDK decide como
+        // ler o certificado pela extensao do caminho: entregar um .p12 com
+        // nome de .pem faria a leitura falhar com um erro de TLS que nao
+        // explica nada.
+        $extensao = mb_strtolower(pathinfo((string) $this->certificado_nome, PATHINFO_EXTENSION));
+        $extensao = in_array($extensao, ['pem', 'p12', 'pfx'], true) ? $extensao : 'pem';
+
         $caminho = $pasta.'/'.$this->gateway.'-'.$this->ambiente->value
-            .'-'.substr(hash('sha256', $conteudo), 0, 16).'.pem';
+            .'-'.substr(hash('sha256', $conteudo), 0, 16).'.'.$extensao;
 
         if (is_file($caminho) && @file_get_contents($caminho) === $conteudo) {
             @chmod($caminho, 0600);
@@ -207,6 +214,57 @@ class CredencialPagamento extends Model
         @chmod($caminho, 0600);
 
         return $caminho;
+    }
+
+    /**
+     * Abre o conteudo enviado e diz se e mesmo um certificado — e ate quando
+     * ele vale.
+     *
+     * Aceita os dois formatos que o painel da Efi entrega: o .p12 que se baixa
+     * de la e o .pem convertido a partir dele. O .p12 da Efi nasce sem senha,
+     * que e o que permite abri-lo aqui sem pedir nada a quem envia.
+     *
+     * **Abrir e requisito; ler a validade nao e.** Um arquivo que nem abre
+     * quase certamente e o arquivo errado, e recusa-lo agora custa um clique;
+     * aceita-lo custaria uma cobranca que nao sai na primeira inscricao real.
+     * Ja a validade e conveniencia da tela: se este OpenSSL nao souber
+     * extrai-la, a coluna fica nula e ninguem e barrado por isso.
+     *
+     * @return array{valido: bool, expira_em: Carbon|null}
+     */
+    public static function lerCertificado(string $conteudo): array
+    {
+        if (trim($conteudo) === '') {
+            return ['valido' => false, 'expira_em' => null];
+        }
+
+        $x509 = @openssl_x509_parse($conteudo);
+
+        if (! is_array($x509)) {
+            $partes = [];
+
+            // O .p12 e binario: openssl_x509_parse nao o entende. Aqui ele e
+            // aberto com senha vazia — como o painel da Efi o entrega — so
+            // para alcancar o certificado que esta dentro.
+            if (@openssl_pkcs12_read($conteudo, $partes, '') && isset($partes['cert'])) {
+                $x509 = @openssl_x509_parse((string) $partes['cert']);
+            }
+
+            // A chave privada lida acima nao fica em variavel nenhuma alem
+            // desta, e ela morre no fim do metodo.
+            unset($partes);
+        }
+
+        if (! is_array($x509)) {
+            return ['valido' => false, 'expira_em' => null];
+        }
+
+        $vencimento = $x509['validTo_time_t'] ?? null;
+
+        return [
+            'valido' => true,
+            'expira_em' => is_int($vencimento) ? Carbon::createFromTimestamp($vencimento) : null,
+        ];
     }
 
     /**

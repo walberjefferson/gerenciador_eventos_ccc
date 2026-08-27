@@ -28,6 +28,16 @@ enum AcaoAuditada: string
     case PromoveuUsuario = 'promoveu-usuario';
     case CriouUsuarioAdministrativo = 'criou-usuario-administrativo';
 
+    /**
+     * Mexer na credencial do provedor de pagamento — ou trocar qual ambiente
+     * esta valendo.
+     *
+     * Tem verbo proprio, e nao "alterou", porque nao e cadastro: quem faz isso
+     * muda para qual conta bancaria o dinheiro do evento vai. Quem le a
+     * auditoria precisa achar esses casos sem saber qual entidade filtrar.
+     */
+    case AlterouCredencialPagamento = 'alterou-credencial-pagamento';
+
     public function rotulo(): string
     {
         return match ($this) {
@@ -38,6 +48,7 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual => 'Confirmou pagamento na mao',
             self::PromoveuUsuario => 'Mudou o papel de um usuario',
             self::CriouUsuarioAdministrativo => 'Criou conta administrativa',
+            self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
         };
     }
 
@@ -54,6 +65,7 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual,
             self::PromoveuUsuario,
             self::CriouUsuarioAdministrativo,
+            self::AlterouCredencialPagamento,
         ];
     }
 }
