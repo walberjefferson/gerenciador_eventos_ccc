@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.4 · **Data:** 2026-08-27 (seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
+> **Versão:** 1.5 · **Data:** 2026-08-27 (seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório — e as duas armadilhas do `components.json` que só mordem quem for acrescentar um componente novo. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -819,3 +819,67 @@ ninguém receberia nada, que é exatamente o modo de falhar que este sistema mai
 tenta evitar.
 
 Em desenvolvimento nada muda: o e-mail continua parando no Mailpit.
+
+---
+
+## 14. Interface: componentes e as duas armadilhas do `components.json`
+
+As telas são **Vue 3 + Inertia + TypeScript**, com **Tailwind** e um conjunto de
+componentes de interface (botão, etiqueta, aviso, caixa, campo, menu...) em
+`resources/js/components/ui/`. São 23 componentes, e todos eles são **código
+deste repositório**, versionados no git como qualquer outro arquivo.
+
+Isso costuma surpreender quem procura o pacote no `package.json` e não acha:
+**não existe pacote `shadcn` para instalar.** A ferramenta shadcn é um gerador —
+ela **copia o código-fonte** do componente para dentro do projeto, e a partir daí
+o componente é seu, para editar à vontade. O que aparece no `package.json` são as
+bibliotecas sobre as quais esses componentes são construídos:
+
+| Pacote | Para que serve |
+|---|---|
+| `radix-vue` | as primitivas sem estilo: comportamento de menu, diálogo, seleção |
+| `class-variance-authority` | as variantes de um componente (`variant`, `size`) |
+| `tailwind-merge` + `clsx` | o utilitário `cn()`, que resolve conflito entre classes |
+| `lucide-vue-next` | os ícones |
+
+O arquivo `components.json` na raiz guarda a configuração desse gerador. **Ele
+tem duas inconsistências conhecidas**, e as duas só aparecem no dia em que
+alguém tentar acrescentar um componente novo — anos depois, provavelmente sem
+ninguém por perto que se lembre disto.
+
+### 14.1 O alias aponta para `Components`, com maiúscula; o diretório é minúsculo
+
+`components.json` declara `resources/js/Components`. O diretório de verdade,
+como o git o registra, é `resources/js/components`.
+
+No macOS e no Windows isso passa despercebido, porque o sistema de arquivos não
+distingue maiúscula de minúscula. **No Linux distingue** — e é Linux que roda
+dentro da imagem Docker e no servidor. O gerador criaria um segundo diretório,
+`Components/`, ao lado do que já existe, e o componente novo simplesmente não
+seria encontrado pelos imports.
+
+Nada disso afeta o que já está pronto: os imports usam o alias `@/*` do
+`tsconfig.json`, que aponta para `resources/js/*` e resolve corretamente.
+
+**Antes de gerar qualquer componente novo, corrija o `components.json` para
+minúsculo.**
+
+### 14.2 Os componentes são da geração `radix-vue`, não `reka-ui`
+
+Os 23 componentes existentes importam de **`radix-vue`**. A versão atual da
+ferramenta shadcn gera componentes que importam de **`reka-ui`** — é o mesmo
+projeto de primitivas, renomeado na versão 2.
+
+Quem rodar o gerador hoje recebe um componente da geração nova, que **não
+conversa** com os 23 antigos: o projeto passaria a carregar duas bibliotecas de
+primitivas ao mesmo tempo, com dois conjuntos de comportamento para a mesma
+coisa.
+
+Há dois caminhos honestos, e nenhum deles é "rodar o gerador e ver no que dá":
+
+1. **Para um componente pontual:** copiar o código do site da ferramenta e
+   trocar o import de `reka-ui` para `radix-vue`. Funciona porque a interface
+   das primitivas mudou pouco entre as duas versões.
+2. **Para muitos componentes:** migrar o projeto inteiro de `radix-vue` para
+   `reka-ui` como tarefa própria, com a suíte de ponta a ponta como rede de
+   proteção. Não é trabalho de acompanhamento de uma tela nova.
