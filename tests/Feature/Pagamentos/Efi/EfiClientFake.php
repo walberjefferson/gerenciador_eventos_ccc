@@ -52,7 +52,7 @@ class EfiClientFake extends EfiClient
         // memoria. Mas herda de EfiClient de proposito, para que uma mudanca
         // de assinatura no cliente de verdade quebre a suite em vez de passar
         // despercebida.
-        parent::__construct($configuracao ?? new ConfiguracaoEfi, cache());
+        parent::__construct($configuracao ?? new ConfiguracaoEfi, cache()->store());
     }
 
     /**
