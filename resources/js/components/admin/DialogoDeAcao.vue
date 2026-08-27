@@ -50,7 +50,7 @@ const descritoPor = computed(() => {
  * O botão que abriu o diálogo, guardado para devolver o foco a ele no fim.
  *
  * O diálogo é controlado por uma propriedade, e não por um `DialogTrigger`,
- * então o `radix-vue` não tem como saber de onde a pessoa veio. Sem isto, quem
+ * então o `reka-ui` não tem como saber de onde a pessoa veio. Sem isto, quem
  * navega por teclado fecha o diálogo e cai no começo da página, perdendo o
  * lugar onde estava.
  */

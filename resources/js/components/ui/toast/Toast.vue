@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
-import { ToastRoot, type ToastRootEmits, type ToastRootProps, useForwardPropsEmits } from 'radix-vue';
+import { ToastRoot, type ToastRootEmits, type ToastRootProps, useForwardPropsEmits } from 'reka-ui';
 import { computed, type HTMLAttributes } from 'vue';
 
 const props = withDefaults(defineProps<ToastRootProps & { class?: HTMLAttributes['class'] }>(), {

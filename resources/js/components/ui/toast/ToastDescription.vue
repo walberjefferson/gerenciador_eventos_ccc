@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
-import { ToastDescription } from 'radix-vue';
+import { ToastDescription } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
 
 const props = defineProps<{

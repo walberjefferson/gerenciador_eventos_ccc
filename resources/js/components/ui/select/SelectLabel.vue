@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
-import { SelectLabel } from 'radix-vue';
+import { SelectLabel } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
 
 const props = defineProps<{

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-vue-next';
-import { ToastClose } from 'radix-vue';
+import { ToastClose } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
 
 const props = defineProps<{
