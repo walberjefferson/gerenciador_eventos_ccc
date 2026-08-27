@@ -1,0 +1,236 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\AmbientePagamento;
+use App\Models\CredencialPagamento;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * A guarda das credenciais do provedor de pagamento.
+ *
+ * Este arquivo prova as coisas que, se falharem, custam a conta bancaria do
+ * evento — e por isso quase todas as provas sao contra o banco de verdade, e
+ * nao contra o comportamento do PHP. Restricao que so existe em codigo nao
+ * sobrevive a duas requisicoes ao mesmo tempo nem a um script de migracao de
+ * dados; restricao que existe no PostgreSQL sobrevive as duas coisas.
+ */
+
+/** Um conteudo qualquer no formato de certificado, so para exercitar a guarda. */
+function conteudoDeCertificadoFalso(): string
+{
+    return "-----BEGIN CERTIFICATE-----\nconteudo-ficticio-de-teste\n-----END CERTIFICATE-----\n";
+}
+
+/**
+ * @param  array<string, mixed>  $atributos
+ */
+function credencialDeTeste(array $atributos = []): CredencialPagamento
+{
+    return CredencialPagamento::query()->create(array_merge([
+        'gateway' => CredencialPagamento::GATEWAY_EFI,
+        'ambiente' => AmbientePagamento::Homologacao,
+        'client_id' => 'Client_Id_De_Teste_123456',
+        'client_secret' => 'Client_Secret_De_Teste_ABCDEF',
+        'chave_pix' => 'chave-pix-de-teste@example.com',
+        'webhook_hmac' => 'Hmac_De_Teste_0123456789',
+        'certificado' => conteudoDeCertificadoFalso(),
+        'certificado_nome' => 'certificado-de-teste.p12',
+        'ativo' => false,
+    ], $atributos));
+}
+
+// ---------------------------------------------------------------------
+// Guarda em repouso
+// ---------------------------------------------------------------------
+
+it('nao deixa nada legivel na linha crua do banco', function (): void {
+    $credencial = credencialDeTeste();
+
+    $linha = DB::table('credenciais_pagamento')->where('id', $credencial->id)->first();
+
+    expect($linha)->not->toBeNull();
+
+    $bruto = json_encode((array) $linha, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    // Nenhum dos cinco valores originais aparece em lugar nenhum da linha.
+    foreach ([
+        'Client_Id_De_Teste_123456',
+        'Client_Secret_De_Teste_ABCDEF',
+        'chave-pix-de-teste@example.com',
+        'Hmac_De_Teste_0123456789',
+        'conteudo-ficticio-de-teste',
+        'BEGIN CERTIFICATE',
+    ] as $valor) {
+        expect($bruto)->not->toContain($valor);
+    }
+
+    // E o que esta guardado tem a cara do mecanismo de cifragem do Laravel —
+    // o mesmo que ja protege o CPF do participante (D-08).
+    foreach (CredencialPagamento::CAMPOS_SIGILOSOS as $campo) {
+        $guardado = (string) $linha->{$campo};
+
+        expect($guardado)->not->toBe('');
+
+        $decodificado = json_decode((string) base64_decode($guardado, true), true);
+
+        expect($decodificado)->toBeArray()
+            ->and($decodificado)->toHaveKeys(['iv', 'value', 'mac']);
+    }
+
+    // Lido de volta pela aplicacao, o valor volta inteiro.
+    expect($credencial->fresh()->client_id)->toBe('Client_Id_De_Teste_123456');
+});
+
+it('deixa os campos sigilosos fora de qualquer serializacao do model', function (): void {
+    $json = credencialDeTeste()->toJson();
+
+    // Nenhuma das cinco chaves sai na serializacao. A busca e pela chave com
+    // aspas e dois-pontos de proposito: "certificado_nome" contem a palavra
+    // "certificado" e e informacao legitima da tela.
+    foreach (CredencialPagamento::CAMPOS_SIGILOSOS as $campo) {
+        expect($json)->not->toContain('"'.$campo.'":');
+    }
+
+    foreach ([
+        'Client_Id_De_Teste_123456',
+        'Client_Secret_De_Teste_ABCDEF',
+        'chave-pix-de-teste@example.com',
+        'Hmac_De_Teste_0123456789',
+        'conteudo-ficticio-de-teste',
+    ] as $valor) {
+        expect($json)->not->toContain($valor);
+    }
+});
+
+it('nao devolve nenhum valor sigiloso no retrato que vai para a tela', function (): void {
+    $tela = credencialDeTeste(['ativo' => true])->paraTela();
+
+    $bruto = json_encode($tela, JSON_UNESCAPED_UNICODE);
+
+    foreach ([
+        'Client_Id_De_Teste_123456',
+        'Client_Secret_De_Teste_ABCDEF',
+        'chave-pix-de-teste@example.com',
+        'Hmac_De_Teste_0123456789',
+        'conteudo-ficticio-de-teste',
+    ] as $valor) {
+        expect($bruto)->not->toContain($valor);
+    }
+
+    // O que a tela recebe e a existencia do valor, nunca o valor.
+    expect($tela['tem_client_id'])->toBeTrue()
+        ->and($tela['tem_client_secret'])->toBeTrue()
+        ->and($tela['tem_certificado'])->toBeTrue()
+        ->and($tela['completa'])->toBeTrue()
+        ->and($tela['certificado_nome'])->toBe('certificado-de-teste.p12');
+});
+
+// ---------------------------------------------------------------------
+// O que o banco impede
+// ---------------------------------------------------------------------
+
+it('deixa o banco recusar um segundo ambiente ativo do mesmo provedor', function (): void {
+    credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao, 'ativo' => true]);
+
+    // Sem passar por Action nenhuma: a insercao vai direto ao banco, que e
+    // exatamente o caminho que uma verificacao em PHP nao cobriria.
+    //
+    // A tentativa acontece uma vez so, e nao duas: no PostgreSQL um comando
+    // com erro envenena a transacao inteira, entao a segunda tentativa
+    // devolveria "transacao abortada" em vez do erro que interessa.
+    $erro = null;
+
+    try {
+        credencialDeTeste(['ambiente' => AmbientePagamento::Producao, 'ativo' => true]);
+    } catch (QueryException $capturado) {
+        $erro = $capturado;
+    }
+
+    expect($erro)->toBeInstanceOf(QueryException::class)
+        // A recusa vem do indice parcial do banco, e nao de codigo nosso.
+        ->and($erro?->getMessage())->toContain('credenciais_pagamento_um_ativo_por_gateway');
+});
+
+it('deixa o banco recusar dois cadastros do mesmo ambiente', function (): void {
+    credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao]);
+
+    expect(fn () => credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao]))
+        ->toThrow(QueryException::class);
+});
+
+it('deixa o banco recusar um ambiente que nao existe', function (): void {
+    expect(fn () => DB::table('credenciais_pagamento')->insert([
+        'gateway' => 'efi',
+        'ambiente' => 'produção',
+        'ativo' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]))->toThrow(QueryException::class);
+
+    expect(fn () => DB::table('credenciais_pagamento')->insert([
+        'gateway' => 'efi',
+        'ambiente' => 'PRODUCAO',
+        'ativo' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]))->toThrow(QueryException::class);
+});
+
+it('permite dois ambientes cadastrados desde que so um esteja ativo', function (): void {
+    credencialDeTeste(['ambiente' => AmbientePagamento::Homologacao, 'ativo' => true]);
+    credencialDeTeste(['ambiente' => AmbientePagamento::Producao, 'ativo' => false]);
+
+    expect(CredencialPagamento::query()->count())->toBe(2)
+        ->and(CredencialPagamento::ativaDe()?->ambiente)->toBe(AmbientePagamento::Homologacao);
+});
+
+// ---------------------------------------------------------------------
+// O certificado em disco
+// ---------------------------------------------------------------------
+
+it('materializa o certificado com permissao restrita e fora do repositorio', function (): void {
+    $credencial = credencialDeTeste();
+
+    $caminho = $credencial->materializarCertificado();
+
+    expect($caminho)->not->toBe('')
+        ->and(is_file($caminho))->toBeTrue()
+        ->and(file_get_contents($caminho))->toBe(conteudoDeCertificadoFalso());
+
+    // 0600: so o dono le. Chave privada de conta bancaria legivel por outro
+    // processo da maquina e um vazamento esperando acontecer.
+    expect(substr(sprintf('%o', fileperms($caminho)), -4))->toBe('0600');
+
+    // Dentro de storage/, que o .gitignore bloqueia — pasta e extensao.
+    expect($caminho)->toStartWith(storage_path('certificados'))
+        ->and($caminho)->toEndWith('.pem');
+
+    // Nenhum arquivo temporario ficou para tras.
+    expect(glob(storage_path('certificados').'/*.tmp'))->toBe([]);
+
+    @unlink($caminho);
+});
+
+it('reescreve o certificado quando ele some do disco, porque o arquivo e cache', function (): void {
+    $credencial = credencialDeTeste();
+
+    $caminho = $credencial->materializarCertificado();
+    @unlink($caminho);
+
+    expect(is_file($caminho))->toBeFalse();
+
+    // A fonte da verdade e o banco (DA-25): apagar o arquivo nao perde nada.
+    expect($credencial->materializarCertificado())->toBe($caminho)
+        ->and(file_get_contents($caminho))->toBe(conteudoDeCertificadoFalso());
+
+    @unlink($caminho);
+});
+
+it('nao materializa arquivo nenhum quando nao ha certificado guardado', function (): void {
+    $credencial = credencialDeTeste(['certificado' => null, 'certificado_nome' => null]);
+
+    expect($credencial->materializarCertificado())->toBe('')
+        ->and($credencial->estaCompleta())->toBeFalse();
+});
