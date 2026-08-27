@@ -52,10 +52,23 @@ class PaymentServiceProvider extends ServiceProvider
         // continua recebendo 200 e sendo ignorado. O limite so existe para o
         // caso de enxurrada — e, mesmo estourado, nao revela nada sobre a
         // assinatura, porque a recusa vem antes de o aviso ser lido.
-        Route::post(
-            (string) config('payments.webhook.path', 'webhooks/pagamentos'),
-            PaymentWebhookController::class
-        )->middleware('throttle:webhooks-pagamento')->name('webhooks.pagamentos');
+        $caminho = (string) config('payments.webhook.path', 'webhooks/pagamentos');
+
+        Route::post($caminho, PaymentWebhookController::class)
+            ->middleware('throttle:webhooks-pagamento')
+            ->name('webhooks.pagamentos');
+
+        // Cinto e suspensorio. Ha provedor que acrescenta um sufixo ao
+        // endereco registrado na hora de notificar de verdade — a notificacao
+        // de teste vai no endereco puro e a de verdade vai com "/pix" no fim.
+        // Existe um contorno documentado (terminar a URL registrada com um
+        // parametro vazio), mas ele depende de quem faz a implantacao acertar
+        // um detalhe que ninguem lembra. Aceitar os dois caminhos custa uma
+        // linha; descobrir o erro custa avisos de pagamento perdidos, com
+        // dinheiro ja na conta e inscricao aguardando pagamento na tela.
+        Route::post($caminho.'/pix', PaymentWebhookController::class)
+            ->middleware('throttle:webhooks-pagamento')
+            ->name('webhooks.pagamentos.pix');
 
         // As rotas de simulacao so nascem em local/testing e com a chave ligada.
         // Ainda assim, cada uma passa por um middleware que confere as duas
