@@ -39,25 +39,37 @@
  * Os fundos de referencia: no claro, branco #FFFFFF; no escuro, #09090B
  * (`--background`) e #18181B (`--card`), que e o mais claro dos dois e
  * portanto o caso dificil para texto claro.
+ *
+ * POR QUE HEXADECIMAL, E NAO `oklch()`
+ * O tema do studio vem escrito em `oklch()`. Aqui ele esta escrito em sRGB,
+ * com exatamente as mesmas cores. O motivo e concreto: o cenario que mede
+ * contraste no navegador (tests/e2e/home.spec.ts) le a cor calculada do
+ * elemento e a interpreta como `rgb()`. O Chromium NAO converte `oklch()` na
+ * hora de calcular — ele devolve `oklch(...)` como esta —, e o cenario passaria
+ * a medir os tres numeros do oklch como se fossem canais de cor, chegando a
+ * um valor sem sentido. Em hexadecimal a cor calculada volta a ser `rgb()` e a
+ * medicao volta a valer. Nenhum tom mudou: os valores abaixo sao a conversao
+ * exata dos do studio para sRGB, que e onde eles seriam exibidos de qualquer
+ * forma.
  */
 
 @layer base {
     :root {
         /* --- Tokens do studio, portados como vieram --- */
-        --background: oklch(1 0 0); /* #FFFFFF */
-        --foreground: oklch(0.141 0.005 285.823); /* #09090B - 19.90:1 sobre branco */
-        --card: oklch(1 0 0);
-        --card-foreground: oklch(0.141 0.005 285.823); /* 19.90:1 sobre o card */
-        --popover: oklch(1 0 0);
-        --popover-foreground: oklch(0.141 0.005 285.823); /* 19.90:1 */
+        --background: #FFFFFF; /* #FFFFFF */
+        --foreground: #09090B; /* #09090B - 19.90:1 sobre branco */
+        --card: #FFFFFF;
+        --card-foreground: #09090B; /* 19.90:1 sobre o card */
+        --popover: #FFFFFF;
+        --popover-foreground: #09090B; /* 19.90:1 */
 
         /* Azul do studio #155DFC. Texto `primary-foreground` (#EFF6FF) por cima: 4.82:1. */
-        --primary: oklch(0.546 0.245 262.881);
-        --primary-foreground: oklch(0.97 0.014 254.604);
+        --primary: #155DFC;
+        --primary-foreground: #EFF6FF;
 
-        --secondary: oklch(0.967 0.001 286.375); /* #F4F4F5 */
-        --secondary-foreground: oklch(0.21 0.006 285.885); /* #18181B - 16.12:1 sobre o secondary */
-        --muted: oklch(0.967 0.001 286.375); /* #F4F4F5 */
+        --secondary: #F4F4F5; /* #F4F4F5 */
+        --secondary-foreground: #18181B; /* #18181B - 16.12:1 sobre o secondary */
+        --muted: #F4F4F5; /* #F4F4F5 */
         /*
          * Ajuste de acessibilidade (DA-42). O cinza do studio (#71717B) rende
          * 4.83:1 sobre branco, mas apenas 4.39:1 sobre o proprio `--muted`
@@ -65,9 +77,9 @@
          * o projeto usa. Escurecido para #6B6B75, passa a 4.79:1 sobre o
          * muted e 5.27:1 sobre branco.
          */
-        --muted-foreground: oklch(0.53 0.016 285.938);
-        --accent: oklch(0.967 0.001 286.375);
-        --accent-foreground: oklch(0.21 0.006 285.885); /* 16.12:1 sobre o accent */
+        --muted-foreground: #6B6B75;
+        --accent: #F4F4F5;
+        --accent-foreground: #18181B; /* 16.12:1 sobre o accent */
 
         /*
          * Vermelho de erro do studio (#E7000B). Texto branco por cima: 4.77:1,
@@ -75,19 +87,19 @@
          * pequeno sem precisar de ajuste — que e onde o participante le
          * "Este CPF nao parece valido".
          */
-        --destructive: oklch(0.577 0.245 27.325);
-        --destructive-foreground: oklch(1 0 0);
+        --destructive: #E7000B;
+        --destructive-foreground: #FFFFFF;
 
-        --border: oklch(0.92 0.004 286.32);
-        --input: oklch(0.92 0.004 286.32);
-        --ring: oklch(0.546 0.245 262.881); /* o anel de foco passa a ser o azul do tema */
+        --border: #E4E4E7;
+        --input: #E4E4E7;
+        --ring: #155DFC; /* o anel de foco passa a ser o azul do tema */
 
         /* Graficos do studio. Nenhuma tela usa hoje; ficam para o proximo grafico nascer certo. */
-        --chart-1: oklch(0.546 0.245 262.881);
-        --chart-2: oklch(0.707 0.165 254.624);
-        --chart-3: oklch(0.809 0.105 251.813);
-        --chart-4: oklch(0.882 0.059 254.128);
-        --chart-5: oklch(0.932 0.032 255.585);
+        --chart-1: #155DFC;
+        --chart-2: #51A2FF;
+        --chart-3: #8EC5FF;
+        --chart-4: #BEDBFF;
+        --chart-5: #DBEAFE;
 
         --radius: 0.625rem;
 
@@ -104,43 +116,43 @@
 
         /* Acao principal - o azul do tema #155DFC. Branco por cima: 5.25:1.
          * Como texto sobre branco: 5.25:1. */
-        --cor-acao: oklch(0.546 0.245 262.881);
-        --cor-acao-contraste: oklch(1 0 0);
-        --cor-acao-texto: oklch(0.546 0.245 262.881);
+        --cor-acao: #155DFC;
+        --cor-acao-contraste: #FFFFFF;
+        --cor-acao-texto: #155DFC;
 
         /* Sucesso e disponibilidade - verde #007A55, vizinho frio do azul.
          * Branco por cima: 5.36:1 (preto daria 3.71:1 e reprova, por isso o
          * texto desta superficie e branco, ao contrario do tema antigo).
          * Como texto sobre branco: 5.36:1. */
-        --cor-sucesso: oklch(0.508 0.118 165.612);
-        --cor-sucesso-contraste: oklch(1 0 0);
-        --cor-sucesso-texto: oklch(0.508 0.118 165.612);
+        --cor-sucesso: #007A55;
+        --cor-sucesso-contraste: #FFFFFF;
+        --cor-sucesso-texto: #007A55;
 
         /* Informacao e navegacao - azul-céu #0069A8, distinguivel do azul de
          * acao sem sair da familia. Branco por cima: 5.86:1.
          * Como texto sobre branco: 5.86:1. */
-        --cor-informacao: oklch(0.5 0.134 242.749);
-        --cor-informacao-contraste: oklch(1 0 0);
-        --cor-informacao-texto: oklch(0.5 0.134 242.749);
+        --cor-informacao: #0069A8;
+        --cor-informacao-contraste: #FFFFFF;
+        --cor-informacao-texto: #0069A8;
 
         /* Atencao e contagem de tempo - ambar #FE9A00. Preto por cima: 9.32:1.
          * Como texto o ambar puro reprova (2.13:1 sobre branco), por isso o
          * papel de texto usa o ambar escuro #973C00, que rende 7.09:1. */
-        --cor-atencao: oklch(0.769 0.188 70.08);
+        --cor-atencao: #FE9A00;
         /* Ambar claro #FFB900, para o realce mais forte. Preto por cima: 11.55:1. */
-        --cor-atencao-forte: oklch(0.828 0.189 84.429);
-        --cor-atencao-contraste: oklch(0.141 0.005 285.823);
-        --cor-atencao-texto: oklch(0.473 0.137 46.201);
+        --cor-atencao-forte: #FFB900;
+        --cor-atencao-contraste: #09090B;
+        --cor-atencao-texto: #973C00;
 
         /* --- Barra lateral, tokens do studio --- */
-        --sidebar-background: oklch(0.985 0 0); /* #FAFAFA */
-        --sidebar-foreground: oklch(0.141 0.005 285.823); /* 18.62:1 sobre a barra */
-        --sidebar-primary: oklch(0.546 0.245 262.881);
-        --sidebar-primary-foreground: oklch(0.97 0.014 254.604); /* 4.82:1 */
-        --sidebar-accent: oklch(0.967 0.001 286.375);
-        --sidebar-accent-foreground: oklch(0.21 0.006 285.885); /* 16.12:1 */
-        --sidebar-border: oklch(0.92 0.004 286.32);
-        --sidebar-ring: oklch(0.546 0.245 262.881);
+        --sidebar-background: #FAFAFA; /* #FAFAFA */
+        --sidebar-foreground: #09090B; /* 18.62:1 sobre a barra */
+        --sidebar-primary: #155DFC;
+        --sidebar-primary-foreground: #EFF6FF; /* 4.82:1 */
+        --sidebar-accent: #F4F4F5;
+        --sidebar-accent-foreground: #18181B; /* 16.12:1 */
+        --sidebar-border: #E4E4E7;
+        --sidebar-ring: #155DFC;
 
         /* --- Sombras do studio --- */
         --sombra-2xs: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
@@ -158,12 +170,12 @@
          * #18181B (o card); as razoes abaixo trazem os dois quando o valor
          * serve de texto, porque o card e o caso dificil.
          */
-        --background: oklch(0.141 0.005 285.823); /* #09090B */
-        --foreground: oklch(0.985 0 0); /* #FAFAFA - 19.06:1 sobre a pagina */
-        --card: oklch(0.21 0.006 285.885); /* #18181B */
-        --card-foreground: oklch(0.985 0 0); /* 16.97:1 sobre o card */
-        --popover: oklch(0.21 0.006 285.885);
-        --popover-foreground: oklch(0.985 0 0); /* 16.97:1 */
+        --background: #09090B; /* #09090B */
+        --foreground: #FAFAFA; /* #FAFAFA - 19.06:1 sobre a pagina */
+        --card: #18181B; /* #18181B */
+        --card-foreground: #FAFAFA; /* 16.97:1 sobre o card */
+        --popover: #18181B;
+        --popover-foreground: #FAFAFA; /* 16.97:1 */
 
         /*
          * Azul claro do studio #2B7FFF. Ajuste de acessibilidade (DA-42): o
@@ -172,68 +184,75 @@
          * em qualquer tamanho de texto. Trocado pelo quase-preto #09090B, que
          * rende 5.29:1. Branco por cima daria 3.76:1 e tambem reprovaria.
          */
-        --primary: oklch(0.623 0.214 259.815);
-        --primary-foreground: oklch(0.141 0.005 285.823);
+        --primary: #2B7FFF;
+        --primary-foreground: #09090B;
 
-        --secondary: oklch(0.274 0.006 286.033); /* #27272A */
-        --secondary-foreground: oklch(0.985 0 0); /* 14.11:1 sobre o secondary */
-        --muted: oklch(0.274 0.006 286.033);
-        --muted-foreground: oklch(0.705 0.015 286.067); /* #9F9FA9 - 7.59:1 na pagina, 5.68:1 sobre o muted */
-        --accent: oklch(0.274 0.006 286.033);
-        --accent-foreground: oklch(0.985 0 0); /* 14.11:1 */
+        --secondary: #27272A; /* #27272A */
+        --secondary-foreground: #FAFAFA; /* 14.11:1 sobre o secondary */
+        --muted: #27272A;
+        --muted-foreground: #9F9FA9; /* #9F9FA9 - 7.59:1 na pagina, 5.68:1 sobre o muted */
+        --accent: #27272A;
+        --accent-foreground: #FAFAFA; /* 14.11:1 */
 
         /*
          * Vermelho de erro no escuro (#FF6467). Ajuste de acessibilidade
          * (DA-42): branco por cima rende 2.89:1 e reprova; o quase-preto
          * #09090B rende 6.89:1. O mesmo tom como texto na pagina: 6.89:1.
          */
-        --destructive: oklch(0.704 0.191 22.216);
-        --destructive-foreground: oklch(0.141 0.005 285.823);
+        --destructive: #FF6467;
+        --destructive-foreground: #09090B;
 
-        --border: oklch(1 0 0 / 10%);
-        --input: oklch(1 0 0 / 15%);
-        --ring: oklch(0.623 0.214 259.815);
+        /*
+         * O studio traz estes dois translucidos (branco a 10% e a 15%). Aqui
+         * eles sao o equivalente opaco sobre o fundo, porque o projeto usa
+         * `bg-border` como superficie de verdade (o fio da linha do tempo, o
+         * separador) e porque uma cor translucida confunde a busca de fundo
+         * feita pelo cenario que mede contraste.
+         */
+        --border: #27272A;
+        --input: #2E2E33;
+        --ring: #2B7FFF;
 
-        --chart-1: oklch(0.546 0.245 262.881);
-        --chart-2: oklch(0.488 0.243 264.376);
-        --chart-3: oklch(0.424 0.199 265.638);
-        --chart-4: oklch(0.379 0.146 265.522);
-        --chart-5: oklch(0.282 0.091 267.935);
+        --chart-1: #155DFC;
+        --chart-2: #1447E6;
+        --chart-3: #193CB8;
+        --chart-4: #1C398E;
+        --chart-5: #162456;
 
         /* Acao - azul #2B7FFF. Preto por cima: 5.29:1 (branco daria 3.76:1 e
          * reprova). Como texto: 5.29:1 na pagina e 4.71:1 sobre o card. */
-        --cor-acao: oklch(0.623 0.214 259.815);
-        --cor-acao-contraste: oklch(0.141 0.005 285.823);
-        --cor-acao-texto: oklch(0.623 0.214 259.815);
+        --cor-acao: #2B7FFF;
+        --cor-acao-contraste: #09090B;
+        --cor-acao-texto: #2B7FFF;
 
         /* Sucesso - verde #00BC7D. Preto por cima: 8.04:1.
          * Como texto: 8.04:1 na pagina e 7.16:1 sobre o card. */
-        --cor-sucesso: oklch(0.696 0.17 162.48);
-        --cor-sucesso-contraste: oklch(0.141 0.005 285.823);
-        --cor-sucesso-texto: oklch(0.696 0.17 162.48);
+        --cor-sucesso: #00BC7D;
+        --cor-sucesso-contraste: #09090B;
+        --cor-sucesso-texto: #00BC7D;
 
         /* Informacao - azul-céu #00BCFF. Preto por cima: 9.13:1.
          * Como texto: 9.13:1 na pagina e 8.13:1 sobre o card. */
-        --cor-informacao: oklch(0.746 0.16 232.661);
-        --cor-informacao-contraste: oklch(0.141 0.005 285.823);
-        --cor-informacao-texto: oklch(0.746 0.16 232.661);
+        --cor-informacao: #00BCFF;
+        --cor-informacao-contraste: #09090B;
+        --cor-informacao-texto: #00BCFF;
 
         /* Atencao - ambar #FFB900. Preto por cima: 11.55:1. No escuro o ambar
          * pode servir de texto: 11.55:1 na pagina e 10.29:1 sobre o card. */
-        --cor-atencao: oklch(0.828 0.189 84.429);
+        --cor-atencao: #FFB900;
         /* Ambar #FFD230, o realce mais forte. Preto por cima: 13.75:1. */
-        --cor-atencao-forte: oklch(0.879 0.169 91.605);
-        --cor-atencao-contraste: oklch(0.141 0.005 285.823);
-        --cor-atencao-texto: oklch(0.828 0.189 84.429);
+        --cor-atencao-forte: #FFD230;
+        --cor-atencao-contraste: #09090B;
+        --cor-atencao-texto: #FFB900;
 
-        --sidebar-background: oklch(0.21 0.006 285.885); /* #18181B */
-        --sidebar-foreground: oklch(0.985 0 0); /* 16.97:1 sobre a barra */
-        --sidebar-primary: oklch(0.546 0.245 262.881);
-        --sidebar-primary-foreground: oklch(0.97 0.014 254.604); /* 4.82:1 */
-        --sidebar-accent: oklch(0.274 0.006 286.033);
-        --sidebar-accent-foreground: oklch(0.985 0 0); /* 14.11:1 */
-        --sidebar-border: oklch(1 0 0 / 10%);
-        --sidebar-ring: oklch(0.552 0.016 285.938);
+        --sidebar-background: #18181B; /* #18181B */
+        --sidebar-foreground: #FAFAFA; /* 16.97:1 sobre a barra */
+        --sidebar-primary: #155DFC;
+        --sidebar-primary-foreground: #EFF6FF; /* 4.82:1 */
+        --sidebar-accent: #27272A;
+        --sidebar-accent-foreground: #FAFAFA; /* 14.11:1 */
+        --sidebar-border: #27272A;
+        --sidebar-ring: #71717B;
     }
 }
 
