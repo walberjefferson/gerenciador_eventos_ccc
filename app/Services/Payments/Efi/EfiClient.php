@@ -280,13 +280,26 @@ class EfiClient
             ? trim($erro->errorDescription)
             : trim($erro->getMessage());
 
-        return match ($codigo) {
-            401, 403 => 'A Efi recusou as credenciais ou o certificado desta aplicacao.',
+        // 401 e 403 dizem coisas diferentes e pedem conserto diferente. Junta-los
+        // faz um erro de escopo se disfarcar de credencial invalida — e quem le
+        // vai conferir client id e certificado, que estao certos, em vez de
+        // marcar a caixa que falta no painel da Efi.
+        $base = match ($codigo) {
+            401 => 'A Efi recusou as credenciais ou o certificado desta aplicacao.',
+            403 => 'A Efi reconheceu a aplicacao, mas negou esta operacao. '
+                .'Quase sempre e escopo que ficou desmarcado no painel da Efi '
+                .'(cob.write, cob.read, pix.read, webhook.write) ou chave Pix '
+                .'que nao pertence a esta conta.',
             429 => 'A Efi recebeu pedidos demais deste sistema. Tente novamente em instantes.',
-            default => $descricao !== ''
-                ? 'A Efi recusou a operacao: '.$descricao
-                : 'A Efi recusou a operacao e nao explicou o motivo.',
+            default => 'A Efi recusou a operacao.',
         };
+
+        // A explicacao da propria Efi vai junto sempre que existe: e ela que
+        // separa "faltou escopo" de "chave errada". Sai limpa de segredo pelo
+        // semSegredo() de quem chama.
+        return $descricao !== ''
+            ? $base.' Resposta da Efi: '.$descricao
+            : $base;
     }
 
     /**
