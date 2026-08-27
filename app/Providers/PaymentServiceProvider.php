@@ -6,7 +6,11 @@ namespace App\Providers;
 
 use App\Contracts\Payments\PaymentGateway;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
+use App\Services\Payments\Efi\ConfiguracaoEfi;
+use App\Services\Payments\Efi\EfiClient;
+use App\Services\Payments\Efi\EfiPaymentGateway;
 use App\Services\Payments\Fake\FakePaymentGateway;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +28,18 @@ class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // O ponto unico de leitura da configuracao da Efi e o cliente que
+        // isola o SDK dela sao registrados sempre, mesmo com o provedor
+        // simulado ativo: eles nao falam com ninguem enquanto nao sao usados,
+        // e ter o cliente no container e o que permite a suite automatizada
+        // troca-lo por um duplo sem tocar no gateway.
+        $this->app->singleton(ConfiguracaoEfi::class);
+
+        $this->app->singleton(EfiClient::class, fn ($app): EfiClient => new EfiClient(
+            $app->make(ConfiguracaoEfi::class),
+            $app->make(CacheFactory::class)->store(),
+        ));
+
         $this->app->singleton(PaymentGateway::class, function ($app): PaymentGateway {
             $escolhido = (string) config('payments.default');
 
@@ -31,6 +47,10 @@ class PaymentServiceProvider extends ServiceProvider
                 'fake' => new FakePaymentGateway(
                     (array) config('payments.fake', []),
                     $app->make(FilesystemFactory::class)->disk('local'),
+                ),
+                'efi' => new EfiPaymentGateway(
+                    $app->make(EfiClient::class),
+                    $app->make(ConfiguracaoEfi::class),
                 ),
                 default => throw new InvalidArgumentException(
                     "Provedor de pagamento nao suportado: {$escolhido}."
