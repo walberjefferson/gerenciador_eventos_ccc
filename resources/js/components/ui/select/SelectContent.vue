@@ -42,7 +42,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
         >
             <SelectViewport
                 :class="
-                    cn('p-1', position === 'popper' && 'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]')
+                    cn('p-1', position === 'popper' && 'h-[var(--reka-select-trigger-height)] w-full min-w-[var(--reka-select-trigger-width)]')
                 "
             >
                 <slot />

@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const formulario = defineModel<FormularioInscricao>({ required: true });
 
-/** O Select do radix trabalha com texto; os identificadores sao numeros. */
+/** O Select do reka trabalha com texto; os identificadores sao numeros. */
 const cidadeSelecionada = computed<string>({
     get: () => (formulario.value.cidade_id === null ? '' : String(formulario.value.cidade_id)),
     set: (valor: string) => {
