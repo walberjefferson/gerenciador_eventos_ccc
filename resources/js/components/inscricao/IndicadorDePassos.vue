@@ -33,7 +33,7 @@ const tituloAtual = computed<string>(() => passos[posicao.value - 1]?.titulo ?? 
     <nav aria-label="Etapas da inscrição" class="space-y-3">
         <Progress :model-value="percentual" :aria-label="`Etapa ${posicao} de ${passos.length}: ${tituloAtual}`" />
 
-        <ol class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <ol class="flex flex-wrap gap-x-3 gap-y-1 text-xs sm:gap-x-4 sm:text-sm">
             <li
                 v-for="(passo, indice) in passos"
                 :key="passo.chave"

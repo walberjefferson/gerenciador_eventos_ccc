@@ -67,9 +67,9 @@ async function copiar(): Promise<void> {
             ref="campo"
             :value="codigo"
             readonly
-            rows="3"
+            rows="5"
             data-testid="codigo-copia-e-cola"
-            class="w-full resize-none break-all rounded-md border border-input bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            class="w-full resize-none break-all rounded-md border border-input bg-muted px-3 py-2 font-mono text-xs leading-5 text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             @focus="campo?.select()"
         />
 

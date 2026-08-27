@@ -50,7 +50,7 @@ const anoAtual = new Date().getFullYear();
             </div>
         </header>
 
-        <main id="conteudo" class="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+        <main id="conteudo" class="mx-auto w-full max-w-3xl flex-1 px-4 pb-10 pt-6">
             <slot />
         </main>
 
