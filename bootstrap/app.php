@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 
@@ -19,6 +20,33 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // O Traefik termina o TLS e conversa com este conteiner em HTTP simples,
+        // pela rede interna do stack. Sem confiar nos cabecalhos que ele envia,
+        // o framework julga que TODA requisicao e http — e o estrago aparece
+        // longe daqui:
+        //
+        // 1. As URLs assinadas param de validar. O link da inscricao sai por
+        //    e-mail com "https" (quem gera e o trabalhador da fila, que usa
+        //    APP_URL), e chega numa requisicao que o framework le como "http".
+        //    A assinatura confere a URL inteira, esquema incluido: nao bate, e
+        //    o participante recebe 403 no link que acabou de receber.
+        // 2. O Strict-Transport-Security nao sai, porque CabecalhosDeSeguranca
+        //    so o emite em resposta segura.
+        // 3. Todo url() e route() sai com esquema errado.
+        //
+        // Confiar em "*" e seguro AQUI porque nada alem do Traefik alcanca este
+        // conteiner: a porta 80 nao e publicada no host (docker/compose.portainer.yaml).
+        // O IP do Traefik tambem nao e fixo — ele muda a cada recriacao do
+        // conteiner dele —, entao uma lista de IP daria falso negativo em dia
+        // de manutencao, que e o pior momento para o site quebrar.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
         // Global, e nao so no grupo "web": o aviso do provedor de pagamento
         // roda fora do grupo web, e cabecalho de seguranca que depende de a
         // rota estar no grupo certo e cabecalho que um dia vai faltar.
