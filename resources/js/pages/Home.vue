@@ -100,6 +100,25 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                         <Link :href="`/eventos/${destaque.slug}#titulo-programacao`" data-testid="link-programacao">Ver a programação</Link>
                     </Button>
                 </section>
+
+                <!-- Mais de um evento aberto (DA-38): o de inicio mais proximo
+                     ficou em destaque; os demais vem aqui, de forma enxuta,
+                     cada um levando a sua propria vitrine. -->
+                <section v-if="outros_abertos.length > 0" aria-labelledby="titulo-outros-eventos" class="space-y-3">
+                    <h2 id="titulo-outros-eventos" class="text-xl font-semibold">Outros eventos com inscrições abertas</h2>
+
+                    <ul class="space-y-2" data-testid="lista-outros-eventos">
+                        <li v-for="evento in outros_abertos" :key="evento.slug">
+                            <Link
+                                :href="`/eventos/${evento.slug}`"
+                                class="flex min-h-11 flex-col justify-center rounded-lg border border-border bg-card px-4 py-3"
+                            >
+                                <span class="font-medium">{{ evento.nome }}</span>
+                                <span class="text-sm text-muted-foreground">{{ evento.periodo_rotulo }}</span>
+                            </Link>
+                        </li>
+                    </ul>
+                </section>
             </template>
 
             <!-- Nenhum evento aberto: o aviso, sem botao nenhum de inscricao. -->
@@ -112,6 +131,26 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                     <AlertTitle>{{ aviso_sem_inscricoes ?? 'No momento não há inscrições abertas.' }}</AlertTitle>
                     <AlertDescription> Assim que um novo evento abrir inscrições, ele aparece aqui. </AlertDescription>
                 </Alert>
+
+                <!-- Quem chegou cedo demais precisa saber quando voltar
+                     (DA-35). O evento ja esta publicado, mas a janela de
+                     inscricao ainda nao comecou: aqui ele so se apresenta, e
+                     nunca ganha botao de inscricao. -->
+                <section v-if="proximo" aria-labelledby="titulo-proximo-evento" class="space-y-3" data-testid="proximo-evento">
+                    <h2 id="titulo-proximo-evento" class="text-xl font-semibold">Próximo evento</h2>
+
+                    <div class="space-y-2 rounded-lg border border-border bg-card px-4 py-4">
+                        <p class="text-lg font-semibold leading-tight">{{ proximo.nome }}</p>
+
+                        <p class="text-base">{{ proximo.periodo_rotulo }}</p>
+
+                        <p v-if="proximo.abre_em_rotulo" class="text-sm font-medium" data-testid="abertura-do-proximo">
+                            {{ proximo.abre_em_rotulo }}
+                        </p>
+
+                        <p v-if="proximo.resumo" class="text-sm leading-relaxed text-muted-foreground">{{ proximo.resumo }}</p>
+                    </div>
+                </section>
             </template>
 
             <!-- Quem ja se inscreveu e perdeu o link volta por aqui (DA-36). -->
