@@ -25,6 +25,14 @@ APP_KEY=base64:jrue6aHKf3Us100SrVzR2/9iCWnhk8oGgqxJd32KgQM=
 APP_DEBUG=true
 APP_TIMEZONE=America/Sao_Paulo
 APP_URL=http://localhost:8888
+# O idioma da aplicacao. Faltava aqui, e a consequencia nao era cosmetica: o
+# Laravel caia no padrao "en" do config/app.php, e toda pagina saia com
+# <html lang="en">. Leitor de tela le portugues com fonetica inglesa quando o
+# documento se declara em ingles — o texto vira quase incompreensivel para
+# quem depende dele.
+APP_LOCALE=pt_BR
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=pt_BR
 
 LOG_CHANNEL=stack
 LOG_LEVEL=debug
