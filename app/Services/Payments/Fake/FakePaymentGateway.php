@@ -12,6 +12,7 @@ use App\DTOs\Payments\RefundResult;
 use App\DTOs\Payments\WebhookRequestData;
 use App\DTOs\Payments\WebhookResult;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -134,6 +135,15 @@ class FakePaymentGateway implements PaymentGateway
         );
     }
 
+    /**
+     * A assinatura do provedor simulado viaja em cabecalho — e e ele quem
+     * sabe disso, nao o controller que recebe o aviso.
+     */
+    public function webhookRequest(Request $request): WebhookRequestData
+    {
+        return WebhookRequestData::fromRequest($request, self::SIGNATURE_HEADER);
+    }
+
     public function verifyWebhookSignature(WebhookRequestData $request): bool
     {
         $secret = (string) ($this->config['webhook_secret'] ?? '');
@@ -147,11 +157,18 @@ class FakePaymentGateway implements PaymentGateway
         return hash_equals($this->sign($request->rawBody), $request->signature);
     }
 
-    public function parseWebhook(WebhookRequestData $request): WebhookResult
+    /**
+     * O provedor simulado avisa um pagamento por vez. A lista tem sempre um
+     * item — o que muda e a forma, para caber no contrato de quem manda
+     * varios de uma vez.
+     *
+     * @return list<WebhookResult>
+     */
+    public function parseWebhook(WebhookRequestData $request): array
     {
         $payload = $request->payload;
 
-        return new WebhookResult(
+        return [new WebhookResult(
             eventId: isset($payload['id']) ? (string) $payload['id'] : null,
             eventType: isset($payload['type']) ? (string) $payload['type'] : null,
             externalId: isset($payload['data']['payment_id']) ? (string) $payload['data']['payment_id'] : null,
@@ -159,7 +176,7 @@ class FakePaymentGateway implements PaymentGateway
             amountCents: isset($payload['data']['amount_cents']) ? (int) $payload['data']['amount_cents'] : null,
             occurredAt: isset($payload['occurred_at']) ? Carbon::parse((string) $payload['occurred_at']) : null,
             raw: $payload,
-        );
+        )];
     }
 
     // ------------------------------------------------------------------

@@ -38,6 +38,25 @@ final readonly class WebhookRequestData
     }
 
     /**
+     * Some providers do not send a signature header at all: they hand back a
+     * value that WE registered inside the webhook URL itself, and it arrives
+     * as a query string parameter on every notification. The raw body is still
+     * kept byte for byte — it is what any other provider signs.
+     */
+    public static function fromRequestQuery(Request $request, string $signatureParameter): self
+    {
+        $rawBody = $request->getContent();
+        $decoded = json_decode($rawBody, true);
+        $signature = $request->query($signatureParameter);
+
+        return new self(
+            rawBody: $rawBody,
+            payload: is_array($decoded) ? $decoded : [],
+            signature: is_string($signature) ? $signature : null,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public static function fromPayload(array $payload, ?string $signature = null): self

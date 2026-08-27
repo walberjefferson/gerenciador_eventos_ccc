@@ -10,6 +10,7 @@ use App\DTOs\Payments\PaymentStatusResult;
 use App\DTOs\Payments\RefundResult;
 use App\DTOs\Payments\WebhookRequestData;
 use App\DTOs\Payments\WebhookResult;
+use Illuminate\Http\Request;
 
 /**
  * Fronteira com o provedor de pagamento.
@@ -36,7 +37,25 @@ interface PaymentGateway
 
     public function refundPayment(string $externalId, ?int $amountCents = null): RefundResult;
 
+    /**
+     * Reads an inbound HTTP request into the boundary DTO.
+     *
+     * It lives in the contract because only the provider knows where ITS
+     * signature travels: a header for one, a query string parameter for
+     * another. The controller must not have to guess.
+     */
+    public function webhookRequest(Request $request): WebhookRequestData;
+
     public function verifyWebhookSignature(WebhookRequestData $request): bool;
 
-    public function parseWebhook(WebhookRequestData $request): WebhookResult;
+    /**
+     * Translates one inbound notification into a LIST of events.
+     *
+     * A list, and not a single event, because a real provider may report
+     * several payments in one POST — the Pix notification is an array. Return
+     * only the first and the rest of the money is lost without a trace.
+     *
+     * @return list<WebhookResult>
+     */
+    public function parseWebhook(WebhookRequestData $request): array;
 }

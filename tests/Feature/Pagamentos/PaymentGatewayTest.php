@@ -117,13 +117,18 @@ it('so aceita aviso com assinatura correta', function () {
         ->and($gateway->verifyWebhookSignature(WebhookRequestData::fromPayload($aviso->payload)))->toBeFalse();
 });
 
-it('apenas traduz o aviso recebido, sem tocar no dominio', function () {
+it('apenas traduz o aviso recebido, sem tocar no dominio, e sempre em lista', function () {
     /** @var FakePaymentGateway $gateway */
     $gateway = app(PaymentGateway::class);
     $cobranca = $gateway->createPayment(cobrancaDeTeste());
-    $traduzido = $gateway->parseWebhook($gateway->emitWebhook($cobranca->externalId, 'paid'));
 
-    expect($traduzido->externalId)->toBe($cobranca->externalId)
+    // O contrato devolve uma LISTA de eventos, porque um aviso de provedor
+    // real pode trazer varios pagamentos de uma vez. O simulado manda um.
+    $traduzidos = $gateway->parseWebhook($gateway->emitWebhook($cobranca->externalId, 'paid'));
+    $traduzido = $traduzidos[0];
+
+    expect($traduzidos)->toHaveCount(1)
+        ->and($traduzido->externalId)->toBe($cobranca->externalId)
         ->and($traduzido->status)->toBe('paid')
         ->and($traduzido->eventType)->toBe('payment.paid')
         ->and($traduzido->isActionable())->toBeTrue()
