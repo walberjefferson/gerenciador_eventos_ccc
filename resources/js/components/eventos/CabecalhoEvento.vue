@@ -19,40 +19,6 @@ const props = defineProps<{
 
 const valor = computed<string>(() => formatarValor(props.evento.valor_centavos, props.evento.moeda));
 
-/**
- * Quantos dias faltam para as inscricoes fecharem.
- *
- * Conta dias de calendario, e nao intervalos de 24 horas: quem le "encerram em
- * 1 dia" numa quinta entende "amanha", nao "daqui a 24 horas". Devolve null
- * quando a data ja passou ou nao da para ler, e nesse caso a etiqueta some em
- * vez de mostrar numero negativo.
- */
-const diasParaFechar = computed<number | null>(() => {
-    const fecham = new Date(props.evento.inscricoes_fecham_em);
-
-    if (Number.isNaN(fecham.getTime())) {
-        return null;
-    }
-
-    const hoje = new Date();
-    const inicioDeHoje = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    const inicioDoFim = Date.UTC(fecham.getFullYear(), fecham.getMonth(), fecham.getDate());
-
-    const dias = Math.round((inicioDoFim - inicioDeHoje) / 86_400_000);
-
-    return dias > 0 ? dias : null;
-});
-
-const rotuloDoPrazo = computed<string | null>(() => {
-    const dias = diasParaFechar.value;
-
-    if (dias === null) {
-        return null;
-    }
-
-    return dias === 1 ? 'Encerram amanhã' : `Encerram em ${dias} dias`;
-});
-
 /** "62 de 200 restantes" quando ha teto; so a contagem quando nao ha. */
 const rotuloDeVagas = computed<string>(() => {
     if (props.evento.esgotado) {
@@ -107,8 +73,8 @@ const percentualOcupado = computed<number | null>(() => {
                 {{ evento.inscricoes_abertas ? 'Inscrições abertas' : evento.situacao_rotulo }}
             </Badge>
 
-            <Badge v-if="evento.inscricoes_abertas && rotuloDoPrazo" variant="atencao">
-                {{ rotuloDoPrazo }}
+            <Badge v-if="evento.prazo_rotulo" variant="atencao">
+                {{ evento.prazo_rotulo }}
             </Badge>
         </div>
 

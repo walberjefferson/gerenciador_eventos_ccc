@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\Models\Evento;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -57,6 +58,9 @@ class EventoEmDestaqueResource extends JsonResource
             // so obedece: sem isto verdadeiro, nao existe botao de inscricao.
             'inscricoes_abertas' => $this->inscricoesEstaoAbertas(),
             'abre_em_rotulo' => $this->aberturaEmPalavras(),
+            // Quanto tempo ainda ha. E o unico fato desta tela que muda com o
+            // relogio, e o que faz alguem agir hoje em vez de "depois eu vejo".
+            'prazo_rotulo' => $this->prazoEmPalavras(),
         ];
     }
 
@@ -97,5 +101,32 @@ class EventoEmDestaqueResource extends JsonResource
         return 'As inscrições abrem em '
             .$this->inscricoes_abrem_em->format('d/m/Y').' às '
             .$this->inscricoes_abrem_em->format('H:i').'.';
+    }
+
+    /**
+     * Quanto tempo ainda ha para se inscrever, ja escrito em portugues.
+     *
+     * Conta dias de CALENDARIO, e nao intervalos de 24 horas: quem le "encerram
+     * amanha" numa quinta entende sexta, e nao "daqui a 24 horas". Devolve null
+     * quando as inscricoes nao estao abertas — ai a frase seria sobre um prazo
+     * que nao existe mais, e a etiqueta simplesmente nao aparece.
+     */
+    private function prazoEmPalavras(): ?string
+    {
+        if (! $this->inscricoesEstaoAbertas()) {
+            return null;
+        }
+
+        $dias = (int) Carbon::now()->startOfDay()->diffInDays($this->inscricoes_fecham_em->copy()->startOfDay(), false);
+
+        if ($dias < 0) {
+            return null;
+        }
+
+        return match ($dias) {
+            0 => 'Encerram hoje',
+            1 => 'Encerram amanhã',
+            default => "Encerram em {$dias} dias",
+        };
     }
 }

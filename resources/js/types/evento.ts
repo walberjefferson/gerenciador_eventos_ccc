@@ -53,6 +53,8 @@ export interface EventoPublico {
     periodo_rotulo: string;
     inscricoes_abrem_em: string;
     inscricoes_fecham_em: string;
+    /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */
+    prazo_rotulo: string | null;
     valor_centavos: number;
     moeda: string;
     capacidade: number | null;

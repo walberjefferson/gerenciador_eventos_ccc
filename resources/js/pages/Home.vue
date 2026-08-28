@@ -37,6 +37,8 @@ interface EventoEmDestaque {
     inscricoes_abertas: boolean;
     /** Frase pronta dizendo a partir de quando da para se inscrever. */
     abre_em_rotulo: string | null;
+    /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */
+    prazo_rotulo: string | null;
 }
 
 const props = withDefaults(
@@ -56,7 +58,9 @@ const props = withDefaults(
 
 const destaque = computed<EventoEmDestaque | null>(() => props.destaque ?? null);
 
-const titulo = computed<string>(() => (destaque.value ? `${destaque.value.nome} — inscrições abertas` : 'Inscrições da Caminhada Comunitária com Cristo'));
+const titulo = computed<string>(() =>
+    destaque.value ? `${destaque.value.nome} — inscrições abertas` : 'Inscrições da Caminhada Comunitária com Cristo',
+);
 
 const descricao = computed<string>(() =>
     destaque.value
@@ -84,27 +88,50 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
              foto de uma edicao anterior, ela entra atras disto. -->
         <template v-if="destaque" #hero>
             <div class="bg-informacao text-informacao-foreground">
-                <div class="mx-auto w-full max-w-3xl px-4 pb-8 pt-8 sm:pb-12 sm:pt-12">
-                    <Badge variant="sucesso">Inscrições abertas</Badge>
+                <div class="mx-auto w-full max-w-3xl px-4 pt-8 pb-8 sm:pt-12 sm:pb-12">
+                    <div class="flex flex-wrap gap-2">
+                        <Badge variant="sucesso">Inscrições abertas</Badge>
 
-                    <h1 class="mt-3 text-3xl font-extrabold leading-none sm:text-5xl">{{ destaque.nome }}</h1>
+                        <!-- O prazo e o unico fato desta tela que muda com o
+                             relogio, e e o que faz alguem agir hoje em vez de
+                             "depois eu vejo". Vaga restante continua de fora,
+                             por decisao que nao mudou: na porta de entrada vira
+                             pressao sem contexto. -->
+                        <Badge v-if="destaque.prazo_rotulo" variant="atencao">{{ destaque.prazo_rotulo }}</Badge>
+                    </div>
 
-                    <p class="mt-2 text-sm font-medium opacity-90 sm:text-base">{{ destaque.periodo_rotulo }}</p>
+                    <h1 class="mt-3 text-3xl leading-none font-extrabold sm:text-5xl">{{ destaque.nome }}</h1>
+
+                    <!-- A data saiu daqui de proposito: ela esta na grade de
+                         fatos, logo abaixo. Repetida nos dois lugares, uma
+                         delas vira ruido — e a de cima era a que nao podia ser
+                         comparada com nada. -->
+                    <p v-if="destaque.resumo" class="mt-3 max-w-prose text-sm leading-relaxed opacity-90 sm:text-base">
+                        {{ destaque.resumo }}
+                    </p>
                 </div>
             </div>
 
-            <!-- A faixa de informacao. Mostra o que e fato do evento e nao muda
-                 enquanto a pessoa le. Vaga restante ficou de fora: na porta de
-                 entrada vira pressao sem contexto e desatualiza no segundo
-                 seguinte — quem precisa dela ve na vitrine, por atividade, que
-                 e onde a informacao significa alguma coisa. -->
-            <div class="border-b border-border bg-card">
-                <dl class="mx-auto flex w-full max-w-3xl flex-wrap items-baseline gap-x-2 px-4 py-4">
-                    <dt class="text-xs uppercase tracking-wide text-muted-foreground">Valor</dt>
-                    <dd class="w-full text-2xl font-bold">
-                        {{ formatarValor(destaque.valor_centavos) }}
-                        <span class="text-sm font-normal text-muted-foreground">por pessoa</span>
-                    </dd>
+            <!-- Os fatos decisivos, em caixas do mesmo peso.
+                 Antes, esta faixa dizia so o valor, e o resto da porta de
+                 entrada era espaco em branco: quem chegava pelo WhatsApp
+                 precisava abrir a vitrine so para saber quando e o evento.
+                 Vaga restante NAO entra aqui, e a decisao nao mudou — na porta
+                 de entrada ela vira pressao sem contexto e fica errada no
+                 segundo seguinte. Quem precisa dela ve na vitrine, por
+                 atividade, que e onde o numero significa alguma coisa. -->
+            <div class="border-border bg-card border-b">
+                <dl class="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 px-4 py-4">
+                    <div class="border-border space-y-1 rounded-lg border p-4">
+                        <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Quando</dt>
+                        <dd class="text-sm font-semibold">{{ destaque.periodo_rotulo }}</dd>
+                    </div>
+
+                    <div class="border-border space-y-1 rounded-lg border p-4">
+                        <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Investimento</dt>
+                        <dd class="text-sm font-semibold tabular-nums">{{ formatarValor(destaque.valor_centavos) }}</dd>
+                        <dd class="text-muted-foreground text-xs">por pessoa</dd>
+                    </div>
                 </dl>
             </div>
         </template>
@@ -112,22 +139,35 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
         <div class="space-y-8">
             <!-- Um evento com inscricoes abertas: o convite direto. -->
             <template v-if="destaque">
-                <p v-if="destaque.resumo" class="text-base leading-relaxed text-muted-foreground">
-                    {{ destaque.resumo }}
-                </p>
-
                 <section aria-labelledby="titulo-inscricao" class="space-y-3">
                     <h2 id="titulo-inscricao" class="sr-only">Inscrição</h2>
 
-                    <Button as-child class="h-12 w-full bg-acao text-base text-acao-foreground hover:bg-acao/90">
-                        <Link :href="`/eventos/${destaque.slug}`" data-testid="botao-fazer-inscricao">
-                            Fazer inscrição — {{ formatarValor(destaque.valor_centavos) }}
-                        </Link>
-                    </Button>
+                    <!--
+                        Uma acao principal, e uma so.
 
-                    <Button as-child variant="outline" class="h-12 w-full text-base">
-                        <Link :href="`/eventos/${destaque.slug}#titulo-programacao`" data-testid="link-programacao">Ver a programação</Link>
-                    </Button>
+                        "Fazer inscricao" e "Ver a programacao" tinham o mesmo
+                        peso visual e o mesmo tamanho, e por isso disputavam a
+                        mesma decisao. Ver a programacao e um pedido de quem
+                        ainda esta decidindo — nao precisa da mesma forca de um
+                        botao cheio, e agora e link.
+                    -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <Button as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base sm:w-auto sm:min-w-64">
+                            <Link :href="`/eventos/${destaque.slug}`" data-testid="botao-fazer-inscricao">
+                                Fazer inscrição — {{ formatarValor(destaque.valor_centavos) }}
+                            </Link>
+                        </Button>
+
+                        <Link
+                            :href="`/eventos/${destaque.slug}#titulo-programacao`"
+                            class="text-informacao-texto inline-flex min-h-11 items-center justify-center px-2 text-sm font-semibold underline underline-offset-4"
+                            data-testid="link-programacao"
+                        >
+                            Ver a programação
+                        </Link>
+                    </div>
+
+                    <p class="text-muted-foreground text-xs">Leva poucos minutos · o pagamento é por Pix, ao final.</p>
                 </section>
 
                 <!-- Mais de um evento aberto (DA-38): o de inicio mais proximo
@@ -140,10 +180,10 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                         <li v-for="evento in outros_abertos" :key="evento.slug">
                             <Link
                                 :href="`/eventos/${evento.slug}`"
-                                class="flex min-h-11 flex-col justify-center rounded-lg border border-border bg-card px-4 py-3"
+                                class="border-border bg-card flex min-h-11 flex-col justify-center rounded-lg border px-4 py-3"
                             >
                                 <span class="font-medium">{{ evento.nome }}</span>
-                                <span class="text-sm text-muted-foreground">{{ evento.periodo_rotulo }}</span>
+                                <span class="text-muted-foreground text-sm">{{ evento.periodo_rotulo }}</span>
                             </Link>
                         </li>
                     </ul>
@@ -153,7 +193,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
             <!-- Nenhum evento aberto: o aviso, sem botao nenhum de inscricao. -->
             <template v-else>
                 <header class="space-y-3">
-                    <h1 class="text-2xl font-bold leading-tight sm:text-3xl">Inscrições</h1>
+                    <h1 class="text-2xl leading-tight font-bold sm:text-3xl">Inscrições</h1>
                 </header>
 
                 <Alert variant="atencao" data-testid="aviso-sem-inscricoes">
@@ -168,8 +208,8 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                 <section v-if="proximo" aria-labelledby="titulo-proximo-evento" class="space-y-3" data-testid="proximo-evento">
                     <h2 id="titulo-proximo-evento" class="text-xl font-semibold">Próximo evento</h2>
 
-                    <div class="space-y-2 rounded-lg border border-border bg-card px-4 py-4">
-                        <p class="text-lg font-semibold leading-tight">{{ proximo.nome }}</p>
+                    <div class="border-border bg-card space-y-2 rounded-lg border px-4 py-4">
+                        <p class="text-lg leading-tight font-semibold">{{ proximo.nome }}</p>
 
                         <p class="text-base">{{ proximo.periodo_rotulo }}</p>
 
@@ -177,7 +217,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                             {{ proximo.abre_em_rotulo }}
                         </p>
 
-                        <p v-if="proximo.resumo" class="text-sm leading-relaxed text-muted-foreground">{{ proximo.resumo }}</p>
+                        <p v-if="proximo.resumo" class="text-muted-foreground text-sm leading-relaxed">{{ proximo.resumo }}</p>
                     </div>
                 </section>
             </template>
@@ -186,7 +226,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
             <p class="text-sm">
                 <Link
                     :href="enderecoDoAcesso"
-                    class="inline-flex min-h-11 items-center font-medium text-informacao-texto underline underline-offset-4"
+                    class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
                     data-testid="link-ja-fiz-minha-inscricao"
                 >
                     Já fiz minha inscrição

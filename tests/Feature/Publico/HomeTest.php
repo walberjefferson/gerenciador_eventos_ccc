@@ -221,6 +221,7 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
         'inscricoes_abertas',
         'nome',
         'periodo_rotulo',
+        'prazo_rotulo',
         'resumo',
         'situacao',
         'situacao_rotulo',
@@ -241,6 +242,12 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
     // dinheiro. A razao de ter mudado e o convite principal passar a dizer
     // quanto custa dentro do proprio botao: quem toca ja sabe o preco, em vez
     // de descobrir duas telas adiante. Foi decisao de quem encomendou.
+    //
+    // "prazo_rotulo" entrou na Etapa 25, com o redesenho da porta de entrada.
+    // E uma FRASE, e nao um contador: "Encerram em 12 dias" nao desatualiza
+    // enquanto a pessoa le, e diz o que ela precisa saber para agir hoje em vez
+    // de "depois eu vejo". Quem escreve a frase e o servidor, como em
+    // "periodo_rotulo" e "abre_em_rotulo".
     //
     // Vaga restante continua proibida, e por motivo que nao mudou: na porta de
     // entrada vira pressao sem contexto e desatualiza no segundo seguinte.

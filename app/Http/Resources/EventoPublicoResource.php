@@ -49,6 +49,7 @@ class EventoPublicoResource extends JsonResource
             'periodo_rotulo' => $this->periodoEmPalavras(),
             'inscricoes_abrem_em' => $this->inscricoes_abrem_em->toIso8601String(),
             'inscricoes_fecham_em' => $this->inscricoes_fecham_em->toIso8601String(),
+            'prazo_rotulo' => $this->prazoEmPalavras(),
             'valor_centavos' => $this->valor_centavos,
             'moeda' => $this->moeda,
             'capacidade' => $this->capacidade,
@@ -119,5 +120,32 @@ class EventoPublicoResource extends JsonResource
         }
 
         return 'As inscrições estão fechadas neste momento.';
+    }
+
+    /**
+     * Quanto tempo ainda ha para se inscrever, ja escrito em portugues.
+     *
+     * Conta dias de CALENDARIO, e nao intervalos de 24 horas: quem le "encerram
+     * amanha" numa quinta entende sexta, e nao "daqui a 24 horas". Devolve null
+     * quando as inscricoes nao estao abertas — ai a frase seria sobre um prazo
+     * que nao existe mais, e a etiqueta simplesmente nao aparece.
+     */
+    private function prazoEmPalavras(): ?string
+    {
+        if (! $this->inscricoesEstaoAbertas()) {
+            return null;
+        }
+
+        $dias = (int) Carbon::now()->startOfDay()->diffInDays($this->inscricoes_fecham_em->copy()->startOfDay(), false);
+
+        if ($dias < 0) {
+            return null;
+        }
+
+        return match ($dias) {
+            0 => 'Encerram hoje',
+            1 => 'Encerram amanhã',
+            default => "Encerram em {$dias} dias",
+        };
     }
 }
