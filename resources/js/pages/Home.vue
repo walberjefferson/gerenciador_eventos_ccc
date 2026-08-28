@@ -87,8 +87,19 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
              aqui vem do tamanho do nome sobre fundo cheio. No dia em que houver
              foto de uma edicao anterior, ela entra atras disto. -->
         <template v-if="destaque" #hero>
-            <div class="bg-informacao text-informacao-foreground">
-                <div class="mx-auto w-full max-w-3xl px-4 pt-8 pb-8 sm:pt-12 sm:pb-12">
+            <!--
+                O convite e um CARTAO sobre o fundo papel, e nao uma faixa
+                colorida de borda a borda.
+
+                A faixa era azul-petroleo porque usava o token de "informacao",
+                que a identidade nova derivou como tom frio. Numa tela cujo
+                botao principal e verde-mata, as duas cores disputavam a mesma
+                dobra e a pagina passava a ler como duas identidades brigando.
+                O proprio prototipo resolve assim: nenhuma faixa, um cartao
+                branco com sombra sobre o papel.
+            -->
+            <div class="mx-auto w-full max-w-3xl px-4 pt-8 sm:pt-12">
+                <div class="border-border bg-card rounded-2xl border p-6 shadow-sm sm:p-8">
                     <div class="flex flex-wrap gap-2">
                         <Badge variant="sucesso">Inscrições abertas</Badge>
 
@@ -100,28 +111,20 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                         <Badge v-if="destaque.prazo_rotulo" variant="atencao">{{ destaque.prazo_rotulo }}</Badge>
                     </div>
 
-                    <h1 class="mt-3 text-3xl leading-none font-extrabold sm:text-5xl">{{ destaque.nome }}</h1>
+                    <h1 class="mt-4 text-3xl leading-none font-bold tracking-tight sm:text-5xl">{{ destaque.nome }}</h1>
 
                     <!-- A data saiu daqui de proposito: ela esta na grade de
                          fatos, logo abaixo. Repetida nos dois lugares, uma
                          delas vira ruido — e a de cima era a que nao podia ser
                          comparada com nada. -->
-                    <p v-if="destaque.resumo" class="mt-3 max-w-prose text-sm leading-relaxed opacity-90 sm:text-base">
+                    <p v-if="destaque.resumo" class="text-muted-foreground mt-3 max-w-prose text-sm leading-relaxed sm:text-base">
                         {{ destaque.resumo }}
                     </p>
                 </div>
             </div>
 
-            <!-- Os fatos decisivos, em caixas do mesmo peso.
-                 Antes, esta faixa dizia so o valor, e o resto da porta de
-                 entrada era espaco em branco: quem chegava pelo WhatsApp
-                 precisava abrir a vitrine so para saber quando e o evento.
-                 Vaga restante NAO entra aqui, e a decisao nao mudou — na porta
-                 de entrada ela vira pressao sem contexto e fica errada no
-                 segundo seguinte. Quem precisa dela ve na vitrine, por
-                 atividade, que e onde o numero significa alguma coisa. -->
-            <div class="border-border bg-card border-b">
-                <dl class="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 px-4 py-4">
+            <div>
+                <dl class="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 px-4 pt-4">
                     <div class="border-border space-y-1 rounded-lg border p-4">
                         <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Quando</dt>
                         <dd class="text-sm font-semibold">{{ destaque.periodo_rotulo }}</dd>
