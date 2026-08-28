@@ -3,6 +3,7 @@ import IndicadorDePassos from '@/components/inscricao/IndicadorDePassos.vue';
 import PassoDadosPessoais from '@/components/inscricao/PassoDadosPessoais.vue';
 import PassoParticipacao from '@/components/inscricao/PassoParticipacao.vue';
 import PassoRevisao from '@/components/inscricao/PassoRevisao.vue';
+import ResumoDaInscricao from '@/components/inscricao/ResumoDaInscricao.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useGruposDaCidade } from '@/composables/useGruposDaCidade';
@@ -114,37 +115,75 @@ function apenasDigitos(valor: string): string {
 /**
  * Conferencia de formato — a mesma que o StoreInscricaoRequest faz. Nao e
  * regra de negocio: so evita a viagem ate o servidor por um campo vazio.
+ *
+ * Um conferidor por campo, e nao um bloco unico, porque agora o mesmo criterio
+ * e usado em dois momentos: quando a pessoa sai do campo e quando ela pede
+ * para continuar. Duas copias da mesma regra acabariam discordando.
+ *
+ * A ORDEM desta lista e a ordem dos campos na tela, e isso importa: e dela que
+ * sai qual campo recebe o cursor quando ha mais de um problema.
  */
+const conferidores: Record<string, (dados: FormularioInscricao) => string | null> = {
+    nome_completo: (dados) => (dados.nome_completo.trim().length < 3 ? 'Informe o seu nome completo.' : null),
+    email: (dados) => (/^\S+@\S+\.\S+$/.test(dados.email.trim()) ? null : 'Este e-mail parece incompleto. Confira e tente de novo.'),
+    telefone: (dados) => (apenasDigitos(dados.telefone).length < 8 ? 'Informe um telefone com DDD para contato.' : null),
+    documento: (dados) => (apenasDigitos(dados.documento).length !== 11 ? 'Este CPF não parece válido. Confira os números digitados.' : null),
+    data_nascimento: (dados) => (dados.data_nascimento === '' ? 'Informe a sua data de nascimento.' : null),
+    cidade_id: (dados) => (dados.cidade_id === null ? 'Escolha a sua cidade.' : null),
+    grupo_participante_id: (dados) => (dados.grupo_participante_id === null ? 'Escolha o seu grupo.' : null),
+};
+
+/** Um campo esta vazio quando a pessoa ainda nao escreveu nada nele. */
+function estaVazio(campo: string): boolean {
+    const valor = (formulario.value as unknown as Record<string, unknown>)[campo];
+
+    return valor === null || valor === '' || (typeof valor === 'string' && valor.trim() === '');
+}
+
+/**
+ * Confere UM campo, quando a pessoa sai dele.
+ *
+ * Campo vazio nao vira aviso: quem passou o dedo pelo formulario sem escrever
+ * nada ainda nao errou — so nao chegou la. Marcar tudo de vermelho antes da
+ * primeira letra transforma o formulario numa lista de repreensoes, e ensina a
+ * pessoa a ignorar o vermelho justamente onde ele precisaria ser levado a
+ * serio. Quem cobra campo vazio e o "Continuar".
+ *
+ * Quando o campo passa a estar certo, o aviso do servidor sobre ele tambem
+ * sai: manter na tela uma recusa que ja foi atendida e mentir para quem
+ * corrigiu.
+ */
+function conferirCampo(campo: string): void {
+    const conferidor = conferidores[campo];
+
+    if (conferidor === undefined || estaVazio(campo)) {
+        return;
+    }
+
+    const problema = conferidor(formulario.value);
+    const locais = { ...errosLocais.value };
+    const doServidor = { ...errosDoServidor.value };
+
+    if (problema === null) {
+        delete locais[campo];
+        delete doServidor[campo];
+    } else {
+        locais[campo] = problema;
+    }
+
+    errosLocais.value = locais;
+    errosDoServidor.value = doServidor;
+}
+
 function conferirDados(): boolean {
     const encontrados: Record<string, string> = {};
-    const dados = formulario.value;
 
-    if (dados.nome_completo.trim().length < 3) {
-        encontrados.nome_completo = 'Informe o seu nome completo.';
-    }
+    for (const [campo, conferidor] of Object.entries(conferidores)) {
+        const problema = conferidor(formulario.value);
 
-    if (!/^\S+@\S+\.\S+$/.test(dados.email.trim())) {
-        encontrados.email = 'Este e-mail parece incompleto. Confira e tente de novo.';
-    }
-
-    if (apenasDigitos(dados.telefone).length < 8) {
-        encontrados.telefone = 'Informe um telefone com DDD para contato.';
-    }
-
-    if (apenasDigitos(dados.documento).length !== 11) {
-        encontrados.documento = 'Este CPF não parece válido. Confira os números digitados.';
-    }
-
-    if (dados.data_nascimento === '') {
-        encontrados.data_nascimento = 'Informe a sua data de nascimento.';
-    }
-
-    if (dados.cidade_id === null) {
-        encontrados.cidade_id = 'Escolha a sua cidade.';
-    }
-
-    if (dados.grupo_participante_id === null) {
-        encontrados.grupo_participante_id = 'Escolha o seu grupo.';
+        if (problema !== null) {
+            encontrados[campo] = problema;
+        }
     }
 
     errosLocais.value = encontrados;
@@ -313,7 +352,7 @@ async function voltar(): Promise<void> {
         <title>{{ evento ? `Inscrição — ${evento.nome}` : 'Inscrição' }}</title>
     </Head>
 
-    <PublicoLayout :contato-email="evento?.contato_email" :contato-telefone="evento?.contato_telefone">
+    <PublicoLayout largura="ampla" :contato-email="evento?.contato_email" :contato-telefone="evento?.contato_telefone">
         <Alert v-if="!evento" variant="destructive">
             <AlertTitle>Não conseguimos carregar o formulário</AlertTitle>
             <AlertDescription>Tente recarregar a página em alguns instantes. Se o problema continuar, fale com a organização.</AlertDescription>
@@ -321,9 +360,9 @@ async function voltar(): Promise<void> {
 
         <div v-else class="space-y-6">
             <div>
-                <p class="text-sm text-muted-foreground">{{ evento.periodo_rotulo }}</p>
+                <p class="text-muted-foreground text-sm">{{ evento.periodo_rotulo }}</p>
                 <h1 class="text-2xl font-semibold">Inscrição — {{ evento.nome }}</h1>
-                <p class="mt-1 text-sm text-muted-foreground">
+                <p class="text-muted-foreground mt-1 text-sm">
                     Valor da inscrição: <strong>{{ formatarValor(evento.valor_centavos, evento.moeda) }}</strong>
                 </p>
             </div>
@@ -333,48 +372,105 @@ async function voltar(): Promise<void> {
             <!-- Anuncio da troca de etapa para quem usa leitor de tela. -->
             <p aria-live="polite" role="status" class="sr-only">{{ anuncio }}</p>
 
-            <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-hidden">{{ titulos[passo] }}</h2>
+            <!--
+                Duas colunas a partir de 1024px: o formulario e, ao lado dele, o
+                resumo do que ja foi escolhido. Abaixo disso volta a ser uma
+                coluna so — nao por simplificacao, mas porque num celular o
+                resumo roubaria a tela inteira do campo que esta sendo digitado.
+                Quem faz o papel dele ali e o total na barra do rodape.
+            -->
+            <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+                <div class="min-w-0 space-y-6">
+                    <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-hidden">{{ titulos[passo] }}</h2>
 
-            <PassoDadosPessoais
-                v-show="passo === 'dados'"
-                v-model="formulario"
-                :cidades="cidades"
-                :grupos-da-cidade="gruposDaCidade"
-                :aviso-sem-grupos="avisoSemGrupos"
-                :erros="erros"
-            />
+                    <PassoDadosPessoais
+                        v-show="passo === 'dados'"
+                        v-model="formulario"
+                        :cidades="cidades"
+                        :grupos-da-cidade="gruposDaCidade"
+                        :aviso-sem-grupos="avisoSemGrupos"
+                        :erros="erros"
+                        :ao-sair-do-campo="conferirCampo"
+                    />
 
-            <PassoParticipacao v-if="passo === 'participacao'" :dias="dias" :selecao="selecao" :mostrar-problemas="mostrarProblemasDaParticipacao" />
+                    <PassoParticipacao
+                        v-if="passo === 'participacao'"
+                        :dias="dias"
+                        :selecao="selecao"
+                        :mostrar-problemas="mostrarProblemasDaParticipacao"
+                    />
 
-            <PassoRevisao
-                v-if="passo === 'revisao'"
-                v-model="formulario"
-                :evento="evento"
-                :resumo-pessoal="resumoPessoal"
-                :atividades-por-dia="atividadesPorDia"
-                :erros="erros"
-                :enviando="enviando"
-                @editar="irPara"
-                @enviar="enviar"
-            />
+                    <PassoRevisao
+                        v-if="passo === 'revisao'"
+                        v-model="formulario"
+                        :evento="evento"
+                        :resumo-pessoal="resumoPessoal"
+                        :atividades-por-dia="atividadesPorDia"
+                        :erros="erros"
+                        :enviando="enviando"
+                        @editar="irPara"
+                        @enviar="enviar"
+                    />
 
-            <div class="flex flex-col gap-3 sm:flex-row-reverse">
-                <Button
-                    v-if="passo !== 'revisao'"
-                    type="button"
-                    class="h-12 w-full bg-acao text-base text-acao-foreground hover:bg-acao/90 sm:w-auto"
-                    @click="avancar"
-                >
-                    Continuar
-                </Button>
+                    <!--
+                        A barra de navegacao do formulario.
 
-                <Button v-if="passo !== 'dados'" type="button" variant="outline" class="h-12 w-full text-base sm:w-auto" @click="voltar">
-                    Voltar
-                </Button>
+                        "sticky" no celular: ela acompanha a rolagem sem sair do
+                        fluxo, entao o botao esta sempre a um toque de distancia
+                        e nunca cobre o campo que esta sendo preenchido. Em tela
+                        grande ela volta a ser uma linha comum no fim do
+                        formulario, porque ali o botao ja esta visivel.
+                    -->
+                    <div
+                        class="border-border bg-card/95 sticky bottom-0 z-30 -mx-4 border-t px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+                    >
+                        <!--
+                            No celular: total e acao principal na MESMA linha, e o
+                            botao secundario embaixo. A barra fica com duas linhas
+                            em vez de tres — cada linha que ela ganha e uma linha
+                            que o formulario perde, e e o formulario que a pessoa
+                            veio preencher.
+                        -->
+                        <div class="flex flex-wrap items-center gap-3 sm:flex-row-reverse">
+                            <Button
+                                v-if="passo !== 'revisao'"
+                                type="button"
+                                class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 flex-1 text-base sm:w-auto sm:flex-none"
+                                @click="avancar"
+                            >
+                                Continuar
+                            </Button>
 
-                <Button v-else as-child variant="ghost" class="h-12 w-full text-base sm:w-auto">
-                    <Link :href="`/eventos/${evento.slug}`">Voltar para o evento</Link>
-                </Button>
+                            <!-- O total so aparece onde o resumo lateral nao cabe:
+                                 em tela grande ele ja esta ao lado, e repeti-lo
+                                 seria dizer o mesmo numero duas vezes na mesma
+                                 tela. -->
+                            <p class="text-muted-foreground order-first text-sm sm:order-none sm:mr-auto lg:hidden">
+                                Total
+                                <strong class="text-foreground font-semibold tabular-nums">
+                                    {{ formatarValor(evento.valor_centavos, evento.moeda) }}
+                                </strong>
+                            </p>
+
+                            <Button v-if="passo !== 'dados'" type="button" variant="outline" class="h-12 w-full text-base sm:w-auto" @click="voltar">
+                                Voltar
+                            </Button>
+
+                            <Button v-else as-child variant="ghost" class="h-12 w-full text-base sm:w-auto">
+                                <Link :href="`/eventos/${evento.slug}`">Voltar para o evento</Link>
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                <ResumoDaInscricao
+                    class="hidden lg:sticky lg:top-6 lg:block"
+                    :evento="evento"
+                    :atividades-por-dia="atividadesPorDia"
+                    :contato-email="evento.contato_email"
+                    :contato-telefone="evento.contato_telefone"
+                    @editar="irPara('participacao')"
+                />
             </div>
         </div>
     </PublicoLayout>
