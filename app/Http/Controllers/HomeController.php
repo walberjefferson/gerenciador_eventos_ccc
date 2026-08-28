@@ -49,10 +49,15 @@ class HomeController extends Controller
         // consultas seria duas idas ao banco para montar uma tela so.
         $eventos = Evento::query()
             ->select([
+                'id',
                 'nome',
                 'slug',
+                'capacidade',
+                'vagas_reservadas',
+                'vagas_confirmadas',
                 'valor_centavos',
                 'descricao',
+                'local',
                 'data_inicio',
                 'data_fim',
                 'inscricoes_abrem_em',
@@ -86,6 +91,21 @@ class HomeController extends Controller
         // Nunca "o primeiro do banco": ordem sem criterio e defeito esperando
         // acontecer (DA-38). O destaque e o de data de inicio mais proxima.
         $destaque = $abertos->first();
+
+        // Os dias so do destaque, e nunca dos outros.
+        //
+        // A home continua sendo a pagina mais acessada e a primeira que um pico
+        // de acesso encontra: carregar a arvore de todos os eventos abertos
+        // seria pagar por uma informacao que a tela nem mostra. Sao duas
+        // consultas a mais — os dias e os grupos deles —, e so quando ha um
+        // evento em destaque. As ATIVIDADES continuam de fora: a home resume o
+        // dia, ela nao repete a programacao da vitrine.
+        if ($destaque instanceof Evento) {
+            $destaque->load([
+                'diasEvento' => fn ($consulta) => $consulta->select(['id', 'evento_id', 'nome', 'descricao', 'data', 'posicao'])->orderBy('posicao'),
+                'diasEvento.gruposAtividades' => fn ($consulta) => $consulta->select(['id', 'dia_evento_id', 'nome'])->orderBy('posicao'),
+            ]);
+        }
 
         $proximo = $futuros->first();
 

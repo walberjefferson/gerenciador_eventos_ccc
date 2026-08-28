@@ -47,6 +47,10 @@ class EventoEmDestaqueResource extends JsonResource
             'data_inicio' => $this->data_inicio->toDateString(),
             'data_fim' => $this->data_fim->toDateString(),
             'periodo_rotulo' => $this->periodoEmPalavras(),
+            // Onde. A terceira das tres perguntas que alguem faz antes de
+            // decidir se vai — e a unica que ate agora so tinha resposta no
+            // grupo do WhatsApp.
+            'local' => $this->local,
             // O valor vai para a home porque o convite principal o mostra
             // dentro do proprio botao: quem toca em "Fazer inscricao" ja sabe
             // quanto custa, e nao descobre duas telas adiante. E um campo do
@@ -61,6 +65,19 @@ class EventoEmDestaqueResource extends JsonResource
             // Quanto tempo ainda ha. E o unico fato desta tela que muda com o
             // relogio, e o que faz alguem agir hoje em vez de "depois eu vejo".
             'prazo_rotulo' => $this->prazoEmPalavras(),
+            // Vaga restante na porta de entrada. Entrou na Etapa 26, e ANTES
+            // dela era proibida — a razao da proibicao era que o numero vira
+            // pressao sem contexto e desatualiza no segundo seguinte. A razao
+            // de ter mudado e o dono do produto ter decidido, vendo a tela
+            // pronta, que a barra de ocupacao vale mais do que esse risco. Sao
+            // dois campos do proprio evento e um contador que ele ja mantem:
+            // nenhuma consulta a mais.
+            'vagas_disponiveis' => $this->vagasDisponiveis(),
+            'capacidade' => $this->capacidade === null ? null : (int) $this->capacidade,
+            // Os dois dias, e o que acontece em cada um. So vem preenchido
+            // para o evento em destaque: os demais nao carregam a relacao, e
+            // "whenLoaded" garante que a chave nem aparece para eles.
+            'dias' => $this->whenLoaded('diasEvento', fn (): array => $this->diasEmResumo()),
         ];
     }
 
@@ -128,5 +145,43 @@ class EventoEmDestaqueResource extends JsonResource
             1 => 'Encerram amanhã',
             default => "Encerram em {$dias} dias",
         };
+    }
+
+    /**
+     * Os dias do evento, do jeito que a porta da rua os mostra.
+     *
+     * E um RESUMO, e nao a arvore do evento: o nome do dia, quando ele e, e uma
+     * frase dizendo o que acontece. As atividades, as vagas de cada uma e as
+     * regras de escolha continuam sendo assunto da vitrine — repeti-las aqui
+     * faria a home refazer a consulta da tela seguinte.
+     *
+     * A frase e a descricao do dia quando ela existe; quando nao, os nomes dos
+     * grupos daquele dia, que e o mais proximo disso que o cadastro tem.
+     */
+    private function diasEmResumo(): array
+    {
+        return $this->diasEvento
+            ->sortBy('posicao')
+            ->map(fn ($dia): array => [
+                'id' => $dia->id,
+                'nome' => $dia->nome,
+                'quando' => $this->diaEmPalavras($dia->data),
+                'resumo' => $dia->descricao ?? $dia->gruposAtividades->pluck('nome')->implode(' · '),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * "Sábado · 17/10" — o dia da semana por extenso mais a data curta.
+     *
+     * O dia da semana entra porque e por ele que alguem sabe se consegue ir; a
+     * data sozinha obriga a abrir o calendario para descobrir isso.
+     */
+    private function diaEmPalavras(Carbon $data): string
+    {
+        $semana = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+
+        return Str::ucfirst($semana[(int) $data->dayOfWeek]).' · '.$data->format('d/m');
     }
 }

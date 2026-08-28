@@ -39,6 +39,8 @@ class EventoRequest extends FormRequest
                 Rule::unique('eventos', 'slug')->ignore($evento?->getKey()),
             ],
             'descricao' => ['nullable', 'string'],
+            'local' => ['nullable', 'string', 'max:160'],
+            'local_detalhe' => ['nullable', 'string', 'max:255'],
             'data_inicio' => ['required', 'date'],
             // Espelha eventos_periodo_check.
             'data_fim' => ['required', 'date', 'after_or_equal:data_inicio'],
@@ -110,6 +112,7 @@ class EventoRequest extends FormRequest
             'valor_centavos' => 'valor',
             'prazo_pagamento_minutos' => 'prazo de pagamento',
             'contato_email' => 'e-mail de contato',
+            'local_detalhe' => 'como chegar',
         ];
     }
 
@@ -136,6 +139,8 @@ class EventoRequest extends FormRequest
             'nome' => (string) $this->string('nome'),
             'slug' => (string) $this->string('slug'),
             'descricao' => $this->input('descricao'),
+            'local' => $this->input('local'),
+            'local_detalhe' => $this->input('local_detalhe'),
             'data_inicio' => $this->date('data_inicio'),
             'data_fim' => $this->date('data_fim'),
             'inscricoes_abrem_em' => $this->date('inscricoes_abrem_em'),

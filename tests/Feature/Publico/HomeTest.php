@@ -185,9 +185,28 @@ it('o evento com situacao aberta cuja janela ainda nao comecou tambem e apenas o
         );
 });
 
-it('monta a pagina inteira com uma consulta ao banco', function (): void {
-    Evento::factory()->count(3)->create();
+it('monta a pagina inteira com tres consultas ao banco, e nunca mais', function (): void {
+    $eventos = Evento::factory()->count(3)->create();
     Evento::factory()->inscricoesAindaNaoAbriram()->create();
+
+    // O evento em destaque precisa TER dias, senao o teste nunca percorre o
+    // caminho que ele existe para vigiar: sem dias, o Laravel nem dispara a
+    // consulta dos grupos, e a conta daria dois por acidente.
+    foreach ($eventos as $evento) {
+        $dia = $evento->diasEvento()->create([
+            'nome' => 'Dia 1',
+            'data' => $evento->data_inicio,
+            'posicao' => 1,
+        ]);
+
+        $dia->gruposAtividades()->create([
+            'nome' => 'Modalidades esportivas',
+            'obrigatorio' => true,
+            'min_selecoes' => 1,
+            'max_selecoes' => 2,
+            'posicao' => 1,
+        ]);
+    }
 
     // O preparo do request (rotas, configuracao) fica de fora: o que se conta e
     // a montagem da pagina, repetida na segunda chamada.
@@ -195,7 +214,18 @@ it('monta a pagina inteira com uma consulta ao banco', function (): void {
 
     $consultas = consultasDisparadas(fn () => $this->get('/')->assertOk());
 
-    expect($consultas)->toBe(1);
+    // Ate a Etapa 26 era UMA consulta, e o numero esta escrito aqui porque a
+    // home e a pagina mais acessada do sistema e a primeira que um pico de
+    // acesso encontra.
+    //
+    // Passaram a ser tres quando a porta da rua ganhou a trilha dos dois dias:
+    // os eventos, os dias do evento em destaque, e os grupos desses dias. As
+    // duas novas sao carregadas SO para o destaque — nunca para os outros
+    // eventos abertos nem para o proximo —, e por isso o numero nao cresce com
+    // a quantidade de eventos cadastrados. E o que este teste defende: se ele
+    // virar quatro, alguem carregou relacao onde nao devia, e o custo disso
+    // aparece no pior momento possivel.
+    expect($consultas)->toBe(3);
 });
 
 it('nao leva para o navegador nada alem do que a tela mostra', function (): void {
@@ -216,9 +246,11 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
 
     $esperadas = [
         'abre_em_rotulo',
+        'capacidade',
         'data_fim',
         'data_inicio',
         'inscricoes_abertas',
+        'local',
         'nome',
         'periodo_rotulo',
         'prazo_rotulo',
@@ -226,6 +258,7 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
         'situacao',
         'situacao_rotulo',
         'slug',
+        'vagas_disponiveis',
         'valor_centavos',
     ];
 
@@ -249,17 +282,42 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
     // de "depois eu vejo". Quem escreve a frase e o servidor, como em
     // "periodo_rotulo" e "abre_em_rotulo".
     //
-    // Vaga restante continua proibida, e por motivo que nao mudou: na porta de
-    // entrada vira pressao sem contexto e desatualiza no segundo seguinte.
-    $eventos->each(function (array $evento) use ($esperadas): void {
+    // "vagas_disponiveis" e "capacidade" entraram na Etapa 26, e ATE ELA eram
+    // proibidas. A razao da proibicao era boa e continua verdadeira: numero de
+    // vaga na porta de entrada vira pressao sem contexto e desatualiza no
+    // segundo seguinte. A razao de ter mudado e o dono do produto ter decidido,
+    // vendo a tela pronta, que a barra de ocupacao ao lado do preco vale mais
+    // do que esse risco — e a decisao de mostrar numero a quem chega e dele,
+    // nao de quem escreve a tela. Sao dois campos do proprio evento mais um
+    // contador que ele ja mantem: nenhuma consulta a mais.
+    //
+    // O que continua proibido e o que nao e do evento: contagem de inscritos e
+    // qualquer dado de participante.
+    // O evento em DESTAQUE carrega uma chave a mais: os dias, que so ele mostra.
+    // A forma do que sai daqui varia de proposito — carregar os dias dos outros
+    // seria pagar por uma informacao que a tela nem exibe.
+    $chavesDoDestaque = array_keys($props['destaque']);
+    sort($chavesDoDestaque);
+
+    $comOsDias = [...$esperadas, 'dias'];
+    sort($comOsDias);
+
+    expect($chavesDoDestaque)->toBe($comOsDias);
+
+    $outros = collect([$props['proximo'], ...$props['outros_abertos']])->filter();
+
+    $outros->each(function (array $evento) use ($esperadas): void {
         $chaves = array_keys($evento);
         sort($chaves);
 
         expect($chaves)->toBe($esperadas);
     });
 
-    // E, no texto cru da resposta, nada de contador de vaga nem de dinheiro,
-    // mesmo que alguem os acrescente um dia fora do Resource.
+    // E, no texto cru da resposta, nada dos CONTADORES internos do evento nem
+    // de dado de participante, mesmo que alguem os acrescente um dia fora do
+    // Resource. "vagas_reservadas" e "vagas_confirmadas" sao o mecanismo da
+    // reserva de vaga (D-04) e nao dizem nada a quem chega; o que a tela mostra
+    // e o saldo ja calculado.
     //
     // "codigo_publico" fica de fora desta lista de proposito: a palavra aparece
     // na tabela de rotas que o sistema escreve em toda pagina — e o nome do
@@ -267,7 +325,7 @@ it('nao leva para o navegador nada alem do que a tela mostra', function (): void
     // ninguem. Que nenhum evento leve o seu ja esta provado acima, nas chaves.
     $conteudo = $this->get('/')->getContent();
 
-    foreach (['vagas_reservadas', 'vagas_confirmadas', 'vagas_disponiveis', 'capacidade'] as $proibido) {
+    foreach (['vagas_reservadas', 'vagas_confirmadas', 'documento', 'documento_hash'] as $proibido) {
         expect($conteudo)->not->toContain($proibido);
     }
 });

@@ -47,6 +47,8 @@ class EventoPublicoResource extends JsonResource
             'data_inicio' => $this->data_inicio->toDateString(),
             'data_fim' => $this->data_fim->toDateString(),
             'periodo_rotulo' => $this->periodoEmPalavras(),
+            'local' => $this->local,
+            'local_detalhe' => $this->local_detalhe,
             'inscricoes_abrem_em' => $this->inscricoes_abrem_em->toIso8601String(),
             'inscricoes_fecham_em' => $this->inscricoes_fecham_em->toIso8601String(),
             'prazo_rotulo' => $this->prazoEmPalavras(),

@@ -33,6 +33,8 @@ class Evento extends Model
         'nome',
         'slug',
         'descricao',
+        'local',
+        'local_detalhe',
         'banner_caminho',
         'data_inicio',
         'data_fim',

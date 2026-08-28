@@ -36,6 +36,8 @@ class EventoDemoSeeder extends Seeder
                 'codigo_publico' => (string) Str::ulid(),
                 'nome' => 'Copa CCC 2026',
                 'descricao' => 'Dois dias de atividades: modalidades esportivas no sábado e trilha no domingo.',
+                'local' => 'Sítio Santa Clara',
+                'local_detalhe' => 'Cerca de 20 minutos do centro. Estacionamento no local.',
                 'data_inicio' => $primeiroDia->toDateString(),
                 'data_fim' => $segundoDia->toDateString(),
                 'inscricoes_abrem_em' => Carbon::parse('2026-08-01 00:00'),

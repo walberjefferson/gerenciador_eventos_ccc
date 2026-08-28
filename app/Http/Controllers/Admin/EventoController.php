@@ -89,6 +89,8 @@ class EventoController extends Controller
                 'nome' => $evento->nome,
                 'slug' => $evento->slug,
                 'descricao' => $evento->descricao,
+                'local' => $evento->local,
+                'local_detalhe' => $evento->local_detalhe,
                 'data_inicio' => $evento->data_inicio->toDateString(),
                 'data_fim' => $evento->data_fim->toDateString(),
                 'inscricoes_abrem_em' => $evento->inscricoes_abrem_em->format('Y-m-d\TH:i'),

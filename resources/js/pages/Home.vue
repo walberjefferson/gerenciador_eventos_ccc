@@ -11,14 +11,28 @@ import { computed } from 'vue';
  * A porta da rua.
  *
  * Quem chega aqui veio de um link no WhatsApp, esta no celular e decide em
- * segundos se aquilo e o lugar certo. Entao a tela responde tres perguntas —
- * qual e o evento, quando ele acontece e como se inscrever — e encaminha para
- * a vitrine, que e quem tem programacao, regulamento e formulario. Nada disso
- * e repetido aqui.
+ * segundos se aquilo e o lugar certo. Entao a tela responde as perguntas que
+ * vem antes da decisao — qual e o evento, quando, onde, quanto custa e o que
+ * acontece em cada dia — e encaminha para a vitrine, que e quem tem a
+ * programacao completa, o regulamento e o formulario.
+ *
+ * O convite e um CARTAO de duas colunas: o que o evento e, a esquerda; o que
+ * custa e como entrar, a direita. Em tela estreita as duas viram uma so, nessa
+ * ordem — porque no celular a pessoa le antes de decidir.
  *
  * Quem decide se da para se inscrever e o servidor: sem `inscricoes_abertas`
  * verdadeiro no que ele mandou, nao existe convite para se inscrever.
  */
+
+/** Um dia do evento, resumido pelo servidor. */
+interface DiaEmResumo {
+    id: number;
+    nome: string;
+    /** "Sábado · 17/10", ja escrito. */
+    quando: string;
+    /** O que acontece nesse dia, numa frase. */
+    resumo: string;
+}
 
 /** O evento como a porta da rua o conhece: o minimo para apresentar e encaminhar. */
 interface EventoEmDestaque {
@@ -30,8 +44,13 @@ interface EventoEmDestaque {
     data_fim: string;
     /** O periodo ja escrito em portugues pelo servidor. */
     periodo_rotulo: string;
+    /** O nome curto do lugar, ou null enquanto ninguem o cadastrou. */
+    local: string | null;
     /** Em centavos inteiros, como o dominio guarda (D-06). */
     valor_centavos: number;
+    /** null quando o evento nao tem teto de vagas. */
+    vagas_disponiveis: number | null;
+    capacidade: number | null;
     situacao: string;
     situacao_rotulo: string;
     inscricoes_abertas: boolean;
@@ -39,6 +58,8 @@ interface EventoEmDestaque {
     abre_em_rotulo: string | null;
     /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */
     prazo_rotulo: string | null;
+    /** So o evento em destaque carrega os dias; nos outros a chave nem vem. */
+    dias?: DiaEmResumo[];
 }
 
 const props = withDefaults(
@@ -57,6 +78,40 @@ const props = withDefaults(
 );
 
 const destaque = computed<EventoEmDestaque | null>(() => props.destaque ?? null);
+
+const dias = computed<DiaEmResumo[]>(() => destaque.value?.dias ?? []);
+
+/** A linha acima do titulo: quando e, e onde — quando o lugar ja foi cadastrado. */
+const quandoEOnde = computed<string>(() => {
+    const evento = destaque.value;
+
+    if (evento === null) {
+        return '';
+    }
+
+    return evento.local === null ? evento.periodo_rotulo : `${evento.periodo_rotulo} · ${evento.local}`;
+});
+
+/**
+ * Quanto da capacidade ja foi tomada, de 0 a 100.
+ *
+ * A barra mede o que JA FOI OCUPADO — e é assim que se lê uma barra que enche.
+ * O protótipo desenha o contrário, com a barra cheia representando vaga livre;
+ * seguir isso deixaria as duas barras do sistema dizendo coisas opostas, e a
+ * da vitrine já estava escrita. Sem capacidade declarada não há fração
+ * possível, e a barra simplesmente não aparece.
+ */
+const percentualOcupado = computed<number | null>(() => {
+    const evento = destaque.value;
+
+    if (evento === null || evento.capacidade === null || evento.capacidade <= 0 || evento.vagas_disponiveis === null) {
+        return null;
+    }
+
+    const ocupadas = Math.min(Math.max(evento.capacidade - evento.vagas_disponiveis, 0), evento.capacidade);
+
+    return Math.round((ocupadas / evento.capacidade) * 100);
+});
 
 const titulo = computed<string>(() =>
     destaque.value ? `${destaque.value.nome} — inscrições abertas` : 'Inscrições da Caminhada Comunitária com Cristo',
@@ -80,122 +135,177 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
         <meta name="description" :content="descricao" />
     </Head>
 
-    <PublicoLayout>
-        <!-- O hero e a faixa de informacao sangram de borda a borda; o conteudo
-             dentro deles respeita o mesmo max-w-3xl das demais secoes. Sem foto
-             de proposito: imagem de banco numa comunidade soa falsa, e a forca
-             aqui vem do tamanho do nome sobre fundo cheio. No dia em que houver
-             foto de uma edicao anterior, ela entra atras disto. -->
-        <template v-if="destaque" #hero>
-            <!--
-                O convite e um CARTAO sobre o fundo papel, e nao uma faixa
-                colorida de borda a borda.
-
-                A faixa era azul-petroleo porque usava o token de "informacao",
-                que a identidade nova derivou como tom frio. Numa tela cujo
-                botao principal e verde-mata, as duas cores disputavam a mesma
-                dobra e a pagina passava a ler como duas identidades brigando.
-                O proprio prototipo resolve assim: nenhuma faixa, um cartao
-                branco com sombra sobre o papel.
-            -->
-            <div class="mx-auto w-full max-w-3xl px-4 pt-8 sm:pt-12">
-                <div class="border-border bg-card rounded-2xl border p-6 shadow-sm sm:p-8">
-                    <div class="flex flex-wrap gap-2">
-                        <Badge variant="sucesso">Inscrições abertas</Badge>
-
-                        <!-- O prazo e o unico fato desta tela que muda com o
-                             relogio, e e o que faz alguem agir hoje em vez de
-                             "depois eu vejo". Vaga restante continua de fora,
-                             por decisao que nao mudou: na porta de entrada vira
-                             pressao sem contexto. -->
-                        <Badge v-if="destaque.prazo_rotulo" variant="atencao">{{ destaque.prazo_rotulo }}</Badge>
-                    </div>
-
-                    <h1 class="mt-4 text-3xl leading-none font-bold tracking-tight sm:text-5xl">{{ destaque.nome }}</h1>
-
-                    <!-- A data saiu daqui de proposito: ela esta na grade de
-                         fatos, logo abaixo. Repetida nos dois lugares, uma
-                         delas vira ruido — e a de cima era a que nao podia ser
-                         comparada com nada. -->
-                    <p v-if="destaque.resumo" class="text-muted-foreground mt-3 max-w-prose text-sm leading-relaxed sm:text-base">
-                        {{ destaque.resumo }}
-                    </p>
-                </div>
-            </div>
-
-            <div>
-                <dl class="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 px-4 pt-4">
-                    <div class="border-border space-y-1 rounded-lg border p-4">
-                        <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Quando</dt>
-                        <dd class="text-sm font-semibold">{{ destaque.periodo_rotulo }}</dd>
-                    </div>
-
-                    <div class="border-border space-y-1 rounded-lg border p-4">
-                        <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Investimento</dt>
-                        <dd class="text-sm font-semibold tabular-nums">{{ formatarValor(destaque.valor_centavos) }}</dd>
-                        <dd class="text-muted-foreground text-xs">por pessoa</dd>
-                    </div>
-                </dl>
-            </div>
-        </template>
-
-        <div class="space-y-8">
+    <PublicoLayout largura="ampla">
+        <div class="space-y-12">
             <!-- Um evento com inscricoes abertas: o convite direto. -->
             <template v-if="destaque">
-                <section aria-labelledby="titulo-inscricao" class="space-y-3">
-                    <h2 id="titulo-inscricao" class="sr-only">Inscrição</h2>
+                <section aria-labelledby="titulo-inscricao">
+                    <p class="text-muted-foreground text-xs font-bold tracking-[0.14em] uppercase">Próximo encontro da comunidade</p>
 
-                    <!--
-                        Uma acao principal, e uma so.
+                    <div class="border-border bg-card mt-4 grid overflow-hidden rounded-2xl border shadow-sm lg:grid-cols-[minmax(0,1fr)_20rem]">
+                        <!-- Coluna da esquerda: o que o evento e. -->
+                        <div class="p-6 sm:p-8">
+                            <div class="flex flex-wrap gap-2">
+                                <Badge variant="sucesso">Inscrições abertas</Badge>
 
-                        "Fazer inscricao" e "Ver a programacao" tinham o mesmo
-                        peso visual e o mesmo tamanho, e por isso disputavam a
-                        mesma decisao. Ver a programacao e um pedido de quem
-                        ainda esta decidindo — nao precisa da mesma forca de um
-                        botao cheio, e agora e link.
-                    -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <Button as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base sm:w-auto sm:min-w-64">
-                            <Link :href="`/eventos/${destaque.slug}`" data-testid="botao-fazer-inscricao">
-                                Fazer inscrição — {{ formatarValor(destaque.valor_centavos) }}
-                            </Link>
-                        </Button>
+                                <!-- O prazo e o unico fato desta tela que muda com
+                                     o relogio, e e o que faz alguem agir hoje em
+                                     vez de "depois eu vejo". -->
+                                <Badge v-if="destaque.prazo_rotulo" variant="atencao">{{ destaque.prazo_rotulo }}</Badge>
+                            </div>
 
-                        <Link
-                            :href="`/eventos/${destaque.slug}#titulo-programacao`"
-                            class="text-informacao-texto inline-flex min-h-11 items-center justify-center px-2 text-sm font-semibold underline underline-offset-4"
-                            data-testid="link-programacao"
-                        >
-                            Ver a programação
-                        </Link>
+                            <p class="text-acao-texto mt-5 text-xs font-bold tracking-wider uppercase">{{ quandoEOnde }}</p>
+
+                            <h1 id="titulo-inscricao" class="mt-2 text-3xl leading-none font-bold tracking-tight sm:text-5xl">
+                                {{ destaque.nome }}
+                            </h1>
+
+                            <p v-if="destaque.resumo" class="text-muted-foreground mt-4 max-w-prose leading-relaxed">
+                                {{ destaque.resumo }}
+                            </p>
+
+                            <!--
+                                A trilha dos dias.
+
+                                Ela responde "o que eu vou fazer la?" sem obrigar a
+                                abrir a vitrine — que era o passo que a porta da rua
+                                cobrava de todo mundo. A linha pontilhada e os
+                                pontos sao DECORACAO e saem do leitor de tela: a
+                                ordem ja vem da propria lista numerada.
+                            -->
+                            <ol v-if="dias.length > 0" class="border-border mt-7 border-t pt-6">
+                                <li v-for="(dia, indice) in dias" :key="dia.id" class="relative pb-6 pl-8 last:pb-0">
+                                    <span aria-hidden="true" class="border-acao bg-card absolute top-1 left-0 size-3 rounded-full border-2"></span>
+
+                                    <span
+                                        v-if="indice < dias.length - 1"
+                                        aria-hidden="true"
+                                        class="border-border absolute top-4 bottom-0 left-[5px] w-px border-l border-dashed"
+                                    ></span>
+
+                                    <p class="text-muted-foreground text-xs font-bold tracking-wider uppercase">{{ dia.quando }}</p>
+                                    <p class="mt-1 font-semibold">{{ dia.nome }}</p>
+                                    <p class="text-muted-foreground mt-1 max-w-prose text-sm leading-relaxed">{{ dia.resumo }}</p>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <!-- Coluna da direita: o que custa e como entrar. -->
+                        <div class="border-border bg-muted/40 border-t p-6 sm:p-8 lg:border-t-0 lg:border-l">
+                            <p class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Investimento</p>
+
+                            <!-- O preco e a unidade em LINHAS separadas.
+                                 Na mesma linha, a fonte monoespacada dos numeros
+                                 nao cabe nos 20rem da coluna e o "/ pessoa"
+                                 quebrava sozinho, orfao, embaixo do valor. -->
+                            <p class="mt-2 text-3xl font-bold tracking-tight tabular-nums">
+                                {{ formatarValor(destaque.valor_centavos) }}
+                            </p>
+                            <p class="text-muted-foreground text-sm">por pessoa</p>
+
+                            <!-- Vaga restante na porta de entrada entrou na Etapa
+                                 26, por decisao do dono do produto. Antes era
+                                 proibida, e a ressalva continua verdadeira: o
+                                 numero desatualiza no segundo seguinte. Por isso
+                                 ele vem do servidor a cada carga, e nunca de
+                                 cache. -->
+                            <div v-if="percentualOcupado !== null" class="mt-5">
+                                <p class="text-muted-foreground text-sm">
+                                    {{ destaque.vagas_disponiveis }} de {{ destaque.capacidade }} vagas livres
+                                </p>
+
+                                <div aria-hidden="true" class="bg-muted mt-2 h-1.5 overflow-hidden rounded-full">
+                                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualOcupado}%` }"></div>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 grid gap-3">
+                                <Button as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base">
+                                    <Link :href="`/eventos/${destaque.slug}`" data-testid="botao-fazer-inscricao">
+                                        Fazer inscrição — {{ formatarValor(destaque.valor_centavos) }}
+                                    </Link>
+                                </Button>
+
+                                <Button as-child variant="outline" class="h-12 w-full text-base">
+                                    <Link :href="`/eventos/${destaque.slug}#titulo-programacao`" data-testid="link-programacao">
+                                        Ver a programação
+                                    </Link>
+                                </Button>
+                            </div>
+
+                            <p class="text-muted-foreground mt-6 text-sm leading-relaxed">Leva poucos minutos. O pagamento é por Pix, ao final.</p>
+
+                            <p class="mt-1 text-sm">
+                                <Link
+                                    :href="enderecoDoAcesso"
+                                    class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                                    data-testid="link-ja-fiz-minha-inscricao"
+                                >
+                                    Já fiz minha inscrição
+                                </Link>
+                            </p>
+                        </div>
                     </div>
-
-                    <p class="text-muted-foreground text-xs">Leva poucos minutos · o pagamento é por Pix, ao final.</p>
                 </section>
 
-                <!-- Mais de um evento aberto (DA-38): o de inicio mais proximo
-                     ficou em destaque; os demais vem aqui, de forma enxuta,
-                     cada um levando a sua propria vitrine. -->
-                <section v-if="outros_abertos.length > 0" aria-labelledby="titulo-outros-eventos" class="space-y-3">
-                    <h2 id="titulo-outros-eventos" class="text-xl font-semibold">Outros eventos com inscrições abertas</h2>
+                <!-- Depois dessa: o que ainda vem.
+                     Reune os outros eventos com inscricao aberta (DA-38) e o que
+                     ainda vai abrir (DA-35). Sao coisas diferentes e por isso o
+                     cartao de cada um diz o que da para fazer com ele: um leva a
+                     vitrine, o outro so avisa a data de abertura. -->
+                <section v-if="outros_abertos.length > 0 || proximo" aria-labelledby="titulo-depois-dessa" class="space-y-4">
+                    <div class="border-border flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b pb-4">
+                        <h2 id="titulo-depois-dessa" class="text-xl font-semibold">Depois dessa</h2>
+                        <span class="text-muted-foreground text-sm">Os próximos encontros da comunidade</span>
+                    </div>
 
-                    <ul class="space-y-2" data-testid="lista-outros-eventos">
+                    <ul v-if="outros_abertos.length > 0" class="grid gap-4 sm:grid-cols-2" data-testid="lista-outros-eventos">
                         <li v-for="evento in outros_abertos" :key="evento.slug">
                             <Link
                                 :href="`/eventos/${evento.slug}`"
-                                class="border-border bg-card flex min-h-11 flex-col justify-center rounded-lg border px-4 py-3"
+                                class="border-border bg-card hover:border-acao flex h-full flex-col rounded-2xl border p-6 transition-colors"
                             >
-                                <span class="font-medium">{{ evento.nome }}</span>
-                                <span class="text-muted-foreground text-sm">{{ evento.periodo_rotulo }}</span>
+                                <Badge variant="sucesso" class="self-start">Inscrições abertas</Badge>
+
+                                <span class="mt-3 text-lg font-semibold tracking-tight">{{ evento.nome }}</span>
+                                <span class="text-muted-foreground mt-1 text-sm">{{ evento.periodo_rotulo }}</span>
+
+                                <span v-if="evento.resumo" class="text-muted-foreground mt-3 text-sm leading-relaxed">
+                                    {{ evento.resumo }}
+                                </span>
+
+                                <span class="mt-auto pt-4 text-sm font-semibold tabular-nums">
+                                    {{ formatarValor(evento.valor_centavos) }}
+                                    <span class="text-muted-foreground text-xs font-normal">por pessoa</span>
+                                </span>
                             </Link>
                         </li>
                     </ul>
+
+                    <!-- Quem chegou cedo demais precisa saber quando voltar
+                         (DA-35). O evento ja esta publicado, mas a janela de
+                         inscricao ainda nao comecou: aqui ele so se apresenta, e
+                         nunca ganha botao de inscricao. -->
+                    <div v-if="proximo" class="grid gap-4 sm:grid-cols-2" data-testid="proximo-evento">
+                        <div class="border-border bg-card flex flex-col rounded-2xl border p-6">
+                            <Badge variant="secondary" class="self-start">Inscrições ainda não abertas</Badge>
+
+                            <p class="mt-3 text-lg font-semibold tracking-tight">{{ proximo.nome }}</p>
+                            <p class="text-muted-foreground mt-1 text-sm">{{ proximo.periodo_rotulo }}</p>
+
+                            <p v-if="proximo.abre_em_rotulo" class="mt-3 text-sm font-medium" data-testid="abertura-do-proximo">
+                                {{ proximo.abre_em_rotulo }}
+                            </p>
+
+                            <p v-if="proximo.resumo" class="text-muted-foreground mt-2 text-sm leading-relaxed">{{ proximo.resumo }}</p>
+                        </div>
+                    </div>
                 </section>
             </template>
 
             <!-- Nenhum evento aberto: o aviso, sem botao nenhum de inscricao. -->
             <template v-else>
-                <header class="space-y-3">
+                <header>
                     <h1 class="text-2xl leading-tight font-bold sm:text-3xl">Inscrições</h1>
                 </header>
 
@@ -204,14 +314,10 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                     <AlertDescription> Assim que um novo evento abrir inscrições, ele aparece aqui. </AlertDescription>
                 </Alert>
 
-                <!-- Quem chegou cedo demais precisa saber quando voltar
-                     (DA-35). O evento ja esta publicado, mas a janela de
-                     inscricao ainda nao comecou: aqui ele so se apresenta, e
-                     nunca ganha botao de inscricao. -->
                 <section v-if="proximo" aria-labelledby="titulo-proximo-evento" class="space-y-3" data-testid="proximo-evento">
                     <h2 id="titulo-proximo-evento" class="text-xl font-semibold">Próximo evento</h2>
 
-                    <div class="border-border bg-card space-y-2 rounded-lg border px-4 py-4">
+                    <div class="border-border bg-card space-y-2 rounded-2xl border p-6">
                         <p class="text-lg leading-tight font-semibold">{{ proximo.nome }}</p>
 
                         <p class="text-base">{{ proximo.periodo_rotulo }}</p>
@@ -223,18 +329,18 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                         <p v-if="proximo.resumo" class="text-muted-foreground text-sm leading-relaxed">{{ proximo.resumo }}</p>
                     </div>
                 </section>
-            </template>
 
-            <!-- Quem ja se inscreveu e perdeu o link volta por aqui (DA-36). -->
-            <p class="text-sm">
-                <Link
-                    :href="enderecoDoAcesso"
-                    class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
-                    data-testid="link-ja-fiz-minha-inscricao"
-                >
-                    Já fiz minha inscrição
-                </Link>
-            </p>
+                <!-- Quem ja se inscreveu e perdeu o link volta por aqui (DA-36). -->
+                <p class="text-sm">
+                    <Link
+                        :href="enderecoDoAcesso"
+                        class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                        data-testid="link-ja-fiz-minha-inscricao"
+                    >
+                        Já fiz minha inscrição
+                    </Link>
+                </p>
+            </template>
         </div>
     </PublicoLayout>
 </template>

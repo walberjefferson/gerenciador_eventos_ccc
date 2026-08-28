@@ -51,6 +51,10 @@ export interface EventoPublico {
     data_inicio: string;
     data_fim: string;
     periodo_rotulo: string;
+    /** O nome curto do lugar, ou null enquanto ninguem o cadastrou. */
+    local: string | null;
+    /** Como chegar: distancia, referencia, estacionamento. */
+    local_detalhe: string | null;
     inscricoes_abrem_em: string;
     inscricoes_fecham_em: string;
     /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */

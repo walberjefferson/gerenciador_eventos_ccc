@@ -64,6 +64,10 @@ export interface EventoEmEdicao {
     nome: string;
     slug: string;
     descricao: string | null;
+    /** O nome curto do lugar. */
+    local: string | null;
+    /** Como chegar: distancia, referencia, estacionamento. */
+    local_detalhe: string | null;
     data_inicio: string;
     data_fim: string;
     inscricoes_abrem_em: string;
