@@ -995,3 +995,82 @@ motivo escrito**; em CI isso nunca acontece.
 > fábrica, as duas sobrevivem e a do shadcn vence. Hoje isso acontece em **um
 > único lugar** — a gaveta da barra lateral no celular, que por isso carrega um
 > `!` com o motivo escrito ao lado. Subir para a 3.x é a pendência **P-11**.
+
+
+### 14.5 São dois temas, e o escopo mora no `<html>`
+
+O sistema tem **duas caras**, e isso é decisão de produto (**DA-51**): o lado do
+visitante usa a identidade verde-mata sobre papel; o painel administrativo
+continua no tema azul do shadcn studio. **Um componente, dois temas** — nenhum
+botão, etiqueta ou campo foi duplicado para ter "a versão verde".
+
+**Como uma tela sabe em que tema está.** O `<html>` carrega um atributo:
+
+```html
+<html lang="pt-BR" data-tema="publico">   <!-- as seis telas do visitante -->
+<html lang="pt-BR" data-tema="admin">     <!-- todo o resto -->
+```
+
+No CSS, os tokens são redeclarados dentro de `[data-tema='publico']` (e de
+`[data-tema='publico'].dark`, para o modo escuro), e existe uma variante do
+Tailwind para as formas:
+
+```css
+@custom-variant publico (&:is([data-tema='publico'] *));
+```
+
+É ela que permite `publico:rounded-full` numa classe: *"pílula, mas só do lado
+público"*. O botão do painel não muda de forma nem de altura.
+
+**Por que o atributo não pode morar no `PublicoLayout`.** Esta é a armadilha
+que custaria caro descobrir tarde. `SelectContent.vue` e `DialogContent.vue`
+usam `SelectPortal` e `DialogPortal`: o conteúdo deles é **teleportado para o
+`document.body`**, fora da subárvore da página. Um escopo posto na `div` do
+layout **não alcançaria a lista de cidades do formulário** — ela abriria com as
+cores do painel no meio de uma tela verde. No `<html>` alcança, porque o
+`document.body` também é descendente dele.
+
+Quem vigia isso é o terceiro cenário de `tests/e2e/identidade-publica.spec.ts`.
+Ele abre a lista de cidades, confirma que ela **saiu da página** (`closest('main')`
+é nulo) e exige que, mesmo assim, ela esteja sob `data-tema="publico"`. O
+cenário foi visto vermelho: com o atributo movido para a raiz do layout, ele
+falha com "a lista de cidades saiu fora do tema público".
+
+**Por que o atributo é escrito em dois lugares.** Os dois são necessários:
+
+| Onde | Quando age | O que acontece sem ele |
+|---|---|---|
+| `resources/views/app.blade.php` | primeira pintura | a tela nasce no tema errado e o JavaScript a corrige um quadro depois — a **piscada** |
+| `resources/js/app.ts` (`router.on('navigate')`) | toda navegação do Inertia | o Inertia troca só o corpo da página e **nunca reescreve o `<html>`**: sair da porta da rua para o painel manteria a tela verde |
+
+A regra que decide o tema é a **mesma nos dois**, escrita a partir do nome do
+componente Inertia — o único dado que existe dos dois lados: são públicas a
+`Home` e tudo que começa com `Eventos/` ou `Inscricoes/`. `Admin/Inscricoes/Index`
+não entra, porque a comparação é de prefixo. **Se uma das duas mudar, a outra
+tem de mudar junto**, e há teste do Pest cobrindo os dois lados.
+
+**As três famílias tipográficas vêm todas do `fonts.bunny.net`**, e isso não é
+gosto: a CSP (§11.2) libera essa origem, e só ela, em `style-src` e `font-src`.
+A Bricolage Grotesque veste os títulos e a DM Mono, os números; as duas foram
+conferidas no bunny.net antes de entrar, justamente para **não precisar
+acrescentar origem à política**. As regras que as aplicam moram no CSS
+(`[data-tema='publico'] :is(h1,h2,h3,h4)`), e não numa classe em cada `<h1>`,
+para que a etapa não precisasse tocar em nenhuma tela — e para que tela nova
+nasça certa sem ninguém lembrar.
+
+**A regra de contraste da DA-42 continua valendo, e agora ela é recalculada por
+teste.** `tests/Feature/Interface/TemaPublicoTest.php` lê o `app.css`, extrai os
+hexadecimais e **refaz a conta da WCAG 2.1** para cada par — ele não confia no
+número escrito no comentário. Três tons do protótipo reprovaram e entraram
+ajustados, com os dois valores registrados ao lado:
+
+| Tom do protótipo | Papel | Media | Entrou como | Passa a |
+|---|---|---|---|---|
+| `--sol` `#E9922B` como **texto** | atenção | 2,18:1 sobre o papel | `#8A5310` | 5,65:1 |
+| `--linha-forte` `#C7D0C6` como **borda de campo** | contorno de controle (WCAG 1.4.11) | 1,58:1 sobre o cartão | `#7C8B83` | 3,57:1 |
+| `#8A968E` na etiqueta "encerrado" | texto | 2,53:1 sobre a etiqueta | `#5B6C64` | 4,58:1 |
+
+O mesmo teste exige **paridade de tokens**: todo token do `:root` precisa ter par
+no bloco público, e todo token do `.dark` no bloco público escuro. Sem isso, um
+token esquecido continuaria valendo a cor do painel — azul num canto verde que
+ninguém abre todo dia.
