@@ -677,18 +677,36 @@
         font-family: var(--font-titulo);
         letter-spacing: -0.02em;
     }
+}
 
+/*
+ * A familia dos numeros mora em `utilities`, e nao em `base`, por um motivo
+ * que custou um defeito para aparecer.
+ *
+ * `font-mono` e um UTILITARIO do Tailwind, e utilitario vence base na ordem
+ * das camadas. Com a regra na camada base, todo elemento que pedia `font-mono`
+ * continuava caindo na monoespacada do sistema: a DM Mono nunca chegava
+ * justamente onde alguem a tinha pedido. Aqui, na mesma camada e com
+ * especificidade maior, ela chega.
+ */
+@layer utilities {
     /*
-     * Os numeros sao DM Mono.
+     * A DM Mono e pedida, nunca deduzida.
      *
-     * O gancho e `tabular-nums`, que e a classe que este projeto ja usa em
-     * todo lugar onde o algarismo precisa de largura fixa — preco, contagem,
-     * prazo. Ou seja: onde a tela ja dizia "isto e numero", a familia passa a
-     * ser a do numero. Quem escrever tela nova pode pedir a familia
-     * diretamente, pela classe `font-numero`.
+     * Houve aqui uma versao que ligava a familia monoespacada a classe
+     * `tabular-nums`, e ela estava errada: `tabular-nums` quer dizer
+     * "algarismos de largura fixa", que e um recurso tipografico que fontes
+     * proporcionais tambem tem. Nao quer dizer "monoespacada". Com o atalho, o
+     * PRECO — que no prototipo e Bricolage Grotesque — saia monoespacado, e
+     * junto com ele toda contagem e todo prazo da interface.
+     *
+     * O prototipo usa a monoespacada em tres lugares, e sao tres lugares onde
+     * os caracteres precisam alinhar em coluna uns sob os outros: o horario da
+     * programacao, a opcao de horario do formulario e o codigo Pix. Quem quer
+     * essa familia pede por ela, com `font-mono` ou `font-numero`.
      */
-    [data-tema='publico'] .tabular-nums,
-    [data-tema='publico'] .font-mono {
+    [data-tema='publico'] .font-mono,
+    [data-tema='publico'] .font-numero {
         font-family: var(--font-numero);
     }
 }

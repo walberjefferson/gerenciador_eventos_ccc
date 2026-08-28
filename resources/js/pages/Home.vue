@@ -140,7 +140,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
             <!-- Um evento com inscricoes abertas: o convite direto. -->
             <template v-if="destaque">
                 <section aria-labelledby="titulo-inscricao">
-                    <p class="text-muted-foreground text-xs font-bold tracking-[0.14em] uppercase">Próximo encontro da comunidade</p>
+                    <p class="text-muted-foreground text-[12.5px] font-semibold tracking-[0.14em] uppercase">Próximo encontro da comunidade</p>
 
                     <div class="border-border bg-card mt-4 grid overflow-hidden rounded-2xl border shadow-sm lg:grid-cols-[minmax(0,1fr)_20rem]">
                         <!-- Coluna da esquerda: o que o evento e. -->
@@ -154,7 +154,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                                 <Badge v-if="destaque.prazo_rotulo" variant="atencao">{{ destaque.prazo_rotulo }}</Badge>
                             </div>
 
-                            <p class="text-acao-texto mt-5 text-xs font-bold tracking-wider uppercase">{{ quandoEOnde }}</p>
+                            <p class="text-acao-texto mt-5 text-xs font-semibold tracking-[0.14em] uppercase">{{ quandoEOnde }}</p>
 
                             <h1 id="titulo-inscricao" class="mt-2 text-3xl leading-none font-bold tracking-tight sm:text-5xl">
                                 {{ destaque.nome }}
@@ -183,22 +183,28 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                                         class="border-border absolute top-4 bottom-0 left-[5px] w-px border-l border-dashed"
                                     ></span>
 
-                                    <p class="text-muted-foreground text-xs font-bold tracking-wider uppercase">{{ dia.quando }}</p>
-                                    <p class="mt-1 font-semibold">{{ dia.nome }}</p>
-                                    <p class="text-muted-foreground mt-1 max-w-prose text-sm leading-relaxed">{{ dia.resumo }}</p>
+                                    <p class="text-muted-foreground text-xs font-semibold tracking-[0.12em] uppercase">{{ dia.quando }}</p>
+                                    <p class="mt-[3px] text-[17px] font-semibold tracking-[-0.01em]">{{ dia.nome }}</p>
+                                    <p class="text-muted-foreground mt-1 max-w-prose text-[14.5px] leading-relaxed">{{ dia.resumo }}</p>
                                 </li>
                             </ol>
                         </div>
 
                         <!-- Coluna da direita: o que custa e como entrar. -->
                         <div class="border-border bg-muted/40 border-t p-6 sm:p-8 lg:border-t-0 lg:border-l">
-                            <p class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Investimento</p>
+                            <p class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Investimento</p>
 
                             <!-- O preco e a unidade em LINHAS separadas.
                                  Na mesma linha, a fonte monoespacada dos numeros
                                  nao cabe nos 20rem da coluna e o "/ pessoa"
                                  quebrava sozinho, orfao, embaixo do valor. -->
-                            <p class="mt-2 text-3xl font-bold tracking-tight tabular-nums">
+                            <!-- O preco e da familia dos TITULOS, e nao da
+                                 monoespacada: no prototipo ele e Bricolage
+                                 Grotesque, com o espacamento negativo que faz o
+                                 numero grande parecer desenhado e nao digitado.
+                                 A monoespacada e para o que precisa alinhar em
+                                 coluna — horario e codigo Pix. -->
+                            <p class="font-titulo mt-2 text-3xl font-bold tracking-[-0.03em] tabular-nums">
                                 {{ formatarValor(destaque.valor_centavos) }}
                             </p>
                             <p class="text-muted-foreground text-sm">por pessoa</p>
