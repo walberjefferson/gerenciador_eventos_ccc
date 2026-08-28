@@ -34,12 +34,12 @@ const problemaDoGrupo = computed<Record<number, string>>(() => {
             </AlertDescription>
         </Alert>
 
-        <p v-if="dias.length === 0" class="text-sm text-muted-foreground">A programação ainda será divulgada. Você pode seguir para a revisão.</p>
+        <p v-if="dias.length === 0" class="text-muted-foreground text-sm">A programação ainda será divulgada. Você pode seguir para a revisão.</p>
 
         <section v-for="dia in dias" :key="dia.id" class="space-y-4" :aria-labelledby="`dia-${dia.id}`">
             <div>
                 <h3 :id="`dia-${dia.id}`" class="text-lg font-semibold">{{ dia.nome }}</h3>
-                <p class="text-sm text-muted-foreground">{{ dia.data_rotulo }}</p>
+                <p class="text-muted-foreground text-sm">{{ dia.data_rotulo }}</p>
             </div>
 
             <GrupoDeAtividades

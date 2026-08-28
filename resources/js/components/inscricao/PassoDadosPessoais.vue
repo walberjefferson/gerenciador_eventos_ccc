@@ -60,21 +60,21 @@ function sair(campo: string): void {
 </script>
 
 <template>
-    <div class="space-y-5">
-        <div class="space-y-2">
-            <Label for="nome_completo">Nome completo</Label>
+    <div class="space-y-[18px]">
+        <div class="space-y-[7px]">
+            <Label for="nome_completo" class="text-[14.5px] font-medium">Nome completo</Label>
             <Input
                 id="nome_completo"
                 v-model="formulario.nome_completo"
                 name="nome_completo"
                 type="text"
                 autocomplete="name"
-                class="h-11"
+                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                 :aria-invalid="erro('nome_completo') ? 'true' : undefined"
                 :aria-describedby="erro('nome_completo') ? 'erro-nome_completo' : undefined"
                 @blur="sair('nome_completo')"
             />
-            <p v-if="erro('nome_completo')" id="erro-nome_completo" role="alert" class="text-destructive text-sm font-medium">
+            <p v-if="erro('nome_completo')" id="erro-nome_completo" role="alert" class="text-destructive text-[13.5px] font-medium">
                 {{ erro('nome_completo') }}
             </p>
         </div>
@@ -82,9 +82,9 @@ function sair(campo: string): void {
         <!-- E-mail e telefone lado a lado a partir do tablet: os dois sao "como
              falamos com voce", e lidos juntos fazem mais sentido do que
              separados por uma rolagem. -->
-        <div class="grid gap-5 sm:grid-cols-2">
-            <div class="space-y-2">
-                <Label for="email">E-mail</Label>
+        <div class="grid gap-[18px] sm:grid-cols-2">
+            <div class="space-y-[7px]">
+                <Label for="email" class="text-[14.5px] font-medium">E-mail</Label>
                 <Input
                     id="email"
                     v-model="formulario.email"
@@ -92,17 +92,17 @@ function sair(campo: string): void {
                     type="email"
                     autocomplete="email"
                     inputmode="email"
-                    class="h-11"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                     :aria-invalid="erro('email') ? 'true' : undefined"
                     :aria-describedby="erro('email') ? 'erro-email' : 'ajuda-email'"
                     @blur="sair('email')"
                 />
-                <p id="ajuda-email" class="text-muted-foreground text-sm">É por ele que enviaremos a confirmação da sua inscrição.</p>
-                <p v-if="erro('email')" id="erro-email" role="alert" class="text-destructive text-sm font-medium">{{ erro('email') }}</p>
+                <p id="ajuda-email" class="text-muted-foreground text-[13.5px]">É por ele que enviaremos a confirmação da sua inscrição.</p>
+                <p v-if="erro('email')" id="erro-email" role="alert" class="text-destructive text-[13.5px] font-medium">{{ erro('email') }}</p>
             </div>
 
-            <div class="space-y-2">
-                <Label for="telefone">Telefone com DDD</Label>
+            <div class="space-y-[7px]">
+                <Label for="telefone" class="text-[14.5px] font-medium">Telefone com DDD</Label>
                 <Input
                     id="telefone"
                     v-model="formulario.telefone"
@@ -110,21 +110,23 @@ function sair(campo: string): void {
                     type="tel"
                     autocomplete="tel"
                     inputmode="tel"
-                    class="h-11 font-mono tabular-nums"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
                     :aria-invalid="erro('telefone') ? 'true' : undefined"
                     :aria-describedby="erro('telefone') ? 'erro-telefone' : undefined"
                     @blur="sair('telefone')"
                 />
-                <p v-if="erro('telefone')" id="erro-telefone" role="alert" class="text-destructive text-sm font-medium">{{ erro('telefone') }}</p>
+                <p v-if="erro('telefone')" id="erro-telefone" role="alert" class="text-destructive text-[13.5px] font-medium">
+                    {{ erro('telefone') }}
+                </p>
             </div>
         </div>
 
         <!-- CPF e data de nascimento: dois dados de tamanho fixo. A caixa para
              de crescer em telas grandes porque onze digitos nao ficam mais
              legiveis por ocuparem meia tela. -->
-        <div class="grid gap-5 sm:max-w-md sm:grid-cols-2">
-            <div class="space-y-2">
-                <Label for="documento">CPF</Label>
+        <div class="grid gap-[18px] sm:max-w-md sm:grid-cols-2">
+            <div class="space-y-[7px]">
+                <Label for="documento" class="text-[14.5px] font-medium">CPF</Label>
                 <Input
                     id="documento"
                     v-model="formulario.documento"
@@ -132,39 +134,42 @@ function sair(campo: string): void {
                     type="text"
                     inputmode="numeric"
                     autocomplete="off"
-                    class="h-11 font-mono tabular-nums"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
                     :aria-invalid="erro('documento') ? 'true' : undefined"
                     :aria-describedby="erro('documento') ? 'erro-documento' : 'ajuda-documento'"
                     @blur="sair('documento')"
                 />
-                <p id="ajuda-documento" class="text-muted-foreground text-sm">Só os números, sem ponto nem traço.</p>
-                <p v-if="erro('documento')" id="erro-documento" role="alert" class="text-destructive text-sm font-medium">{{ erro('documento') }}</p>
+                <p id="ajuda-documento" class="text-muted-foreground text-[13.5px]">Só os números, sem ponto nem traço.</p>
+                <p v-if="erro('documento')" id="erro-documento" role="alert" class="text-destructive text-[13.5px] font-medium">
+                    {{ erro('documento') }}
+                </p>
             </div>
 
-            <div class="space-y-2">
-                <Label for="data_nascimento">Data de nascimento</Label>
+            <div class="space-y-[7px]">
+                <Label for="data_nascimento" class="text-[14.5px] font-medium">Data de nascimento</Label>
                 <DateField
                     id="data_nascimento"
                     v-model="formulario.data_nascimento"
                     name="data_nascimento"
                     :max="hoje"
-                    class="font-mono tabular-nums"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
                     :aria-invalid="erro('data_nascimento') ? 'true' : undefined"
                     :aria-describedby="erro('data_nascimento') ? 'erro-data_nascimento' : 'ajuda-data_nascimento'"
                     @blur="sair('data_nascimento')"
                 />
-                <p id="ajuda-data_nascimento" class="text-muted-foreground text-sm">Algumas atividades têm idade mínima ou máxima.</p>
-                <p v-if="erro('data_nascimento')" id="erro-data_nascimento" role="alert" class="text-destructive text-sm font-medium">
+                <p id="ajuda-data_nascimento" class="text-muted-foreground text-[13.5px]">Algumas atividades têm idade mínima ou máxima.</p>
+                <p v-if="erro('data_nascimento')" id="erro-data_nascimento" role="alert" class="text-destructive text-[13.5px] font-medium">
                     {{ erro('data_nascimento') }}
                 </p>
             </div>
         </div>
 
-        <div class="grid gap-5 sm:grid-cols-2">
-            <div class="space-y-2">
-                <Label for="cidade_id">Cidade</Label>
+        <div class="grid gap-[18px] sm:grid-cols-2">
+            <div class="space-y-[7px]">
+                <Label for="cidade_id" class="text-[14.5px] font-medium">Cidade</Label>
                 <Select v-model="cidadeSelecionada">
                     <SelectTrigger
+                        class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                         id="cidade_id"
                         :aria-invalid="erro('cidade_id') ? 'true' : undefined"
                         :aria-describedby="erro('cidade_id') ? 'erro-cidade_id' : undefined"
@@ -175,13 +180,16 @@ function sair(campo: string): void {
                         <SelectItem v-for="cidade in cidades" :key="cidade.id" :value="String(cidade.id)">{{ cidade.rotulo }}</SelectItem>
                     </SelectContent>
                 </Select>
-                <p v-if="erro('cidade_id')" id="erro-cidade_id" role="alert" class="text-destructive text-sm font-medium">{{ erro('cidade_id') }}</p>
+                <p v-if="erro('cidade_id')" id="erro-cidade_id" role="alert" class="text-destructive text-[13.5px] font-medium">
+                    {{ erro('cidade_id') }}
+                </p>
             </div>
 
-            <div class="space-y-2">
-                <Label for="grupo_participante_id">Grupo</Label>
+            <div class="space-y-[7px]">
+                <Label for="grupo_participante_id" class="text-[14.5px] font-medium">Grupo</Label>
                 <Select v-model="grupoSelecionado" :disabled="formulario.cidade_id === null || gruposDaCidade.length === 0">
                     <SelectTrigger
+                        class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                         id="grupo_participante_id"
                         :aria-invalid="erro('grupo_participante_id') ? 'true' : undefined"
                         :aria-describedby="erro('grupo_participante_id') ? 'erro-grupo_participante_id' : 'ajuda-grupo'"
@@ -192,10 +200,15 @@ function sair(campo: string): void {
                         <SelectItem v-for="grupo in gruposDaCidade" :key="grupo.id" :value="String(grupo.id)">{{ grupo.nome }}</SelectItem>
                     </SelectContent>
                 </Select>
-                <p id="ajuda-grupo" class="text-muted-foreground text-sm">
+                <p id="ajuda-grupo" class="text-muted-foreground text-[13.5px]">
                     {{ avisoSemGrupos ?? 'A lista mostra apenas os grupos da cidade que você escolheu.' }}
                 </p>
-                <p v-if="erro('grupo_participante_id')" id="erro-grupo_participante_id" role="alert" class="text-destructive text-sm font-medium">
+                <p
+                    v-if="erro('grupo_participante_id')"
+                    id="erro-grupo_participante_id"
+                    role="alert"
+                    class="text-destructive text-[13.5px] font-medium"
+                >
                     {{ erro('grupo_participante_id') }}
                 </p>
             </div>

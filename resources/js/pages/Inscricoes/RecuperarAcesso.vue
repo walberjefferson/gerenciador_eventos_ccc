@@ -42,9 +42,9 @@ function enviar(): void {
     <PublicoLayout>
         <div class="space-y-6">
             <header class="space-y-1">
-                <p v-if="evento?.nome" class="text-sm text-muted-foreground">{{ evento.nome }}</p>
-                <h1 class="text-2xl font-semibold leading-tight sm:text-3xl">Acessar minha inscrição</h1>
-                <p class="text-sm leading-relaxed text-muted-foreground">
+                <p v-if="evento?.nome" class="text-muted-foreground text-sm">{{ evento.nome }}</p>
+                <h1 class="text-2xl leading-tight font-semibold sm:text-3xl">Acessar minha inscrição</h1>
+                <p class="text-muted-foreground text-sm leading-relaxed">
                     Informe o e-mail que você usou na inscrição. Enviaremos para ele o link de acompanhamento.
                 </p>
             </header>
@@ -59,9 +59,9 @@ function enviar(): void {
 
             <Card>
                 <CardContent class="pt-6">
-                    <form class="space-y-5" novalidate @submit.prevent="enviar">
-                        <div class="space-y-2">
-                            <Label for="email">E-mail da inscrição</Label>
+                    <form class="space-y-[18px]" novalidate @submit.prevent="enviar">
+                        <div class="space-y-[7px]">
+                            <Label for="email" class="text-[14.5px] font-medium">E-mail da inscrição</Label>
                             <Input
                                 id="email"
                                 v-model="formulario.email"
@@ -69,18 +69,18 @@ function enviar(): void {
                                 type="email"
                                 autocomplete="email"
                                 inputmode="email"
-                                class="h-12"
+                                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                                 :aria-invalid="erro ? 'true' : undefined"
                                 :aria-describedby="erro ? 'ajuda-email erro-email' : 'ajuda-email'"
                                 data-testid="campo-email"
                             />
-                            <p id="ajuda-email" class="text-sm text-muted-foreground">Use o mesmo e-mail que você informou ao se inscrever.</p>
-                            <p v-if="erro" id="erro-email" role="alert" class="text-sm font-medium text-destructive">{{ erro }}</p>
+                            <p id="ajuda-email" class="text-muted-foreground text-[13.5px]">Use o mesmo e-mail que você informou ao se inscrever.</p>
+                            <p v-if="erro" id="erro-email" role="alert" class="text-destructive text-[13.5px] font-medium">{{ erro }}</p>
                         </div>
 
                         <Button
                             type="submit"
-                            class="h-12 w-full bg-acao text-base text-acao-foreground hover:bg-acao/90"
+                            class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base"
                             :disabled="formulario.processing"
                             data-testid="botao-enviar-acesso"
                         >
@@ -90,7 +90,7 @@ function enviar(): void {
                 </CardContent>
             </Card>
 
-            <p class="text-sm leading-relaxed text-muted-foreground">
+            <p class="text-muted-foreground text-sm leading-relaxed">
                 O link vale por alguns dias. Se ele parar de funcionar, é só pedir outro por aqui.
             </p>
 

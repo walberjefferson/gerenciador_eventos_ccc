@@ -32,10 +32,10 @@ const emit = defineEmits<{
 
 <template>
     <aside aria-labelledby="titulo-resumo" class="space-y-3">
-        <div class="border-border bg-muted/40 space-y-3 rounded-lg border p-4">
+        <div class="border-border bg-card rounded-[14px] border p-[22px] shadow-sm">
             <h2 id="titulo-resumo" class="text-base font-semibold">Resumo</h2>
 
-            <dl class="space-y-1.5 text-sm">
+            <dl class="border-border mt-4 grid gap-[11px] border-t pt-4 text-sm">
                 <div>
                     <dt class="font-medium">{{ evento.nome }}</dt>
                     <dd class="text-muted-foreground text-xs">{{ evento.periodo_rotulo }}</dd>
@@ -49,24 +49,24 @@ const emit = defineEmits<{
                 </template>
             </dl>
 
-            <div class="bg-border h-px"></div>
-
-            <div class="flex items-baseline justify-between gap-3">
+            <div class="border-border mt-4 flex items-baseline border-t pt-4">
                 <span class="text-muted-foreground text-sm">Total</span>
-                <strong class="text-lg tabular-nums">{{ formatarValor(evento.valor_centavos, evento.moeda) }}</strong>
+                <strong class="font-titulo ml-auto text-2xl font-semibold tracking-[-0.02em] tabular-nums">{{
+                    formatarValor(evento.valor_centavos, evento.moeda)
+                }}</strong>
             </div>
 
             <button
                 v-if="atividadesPorDia.some((dia) => dia.atividades.length > 0)"
                 type="button"
-                class="text-informacao-texto text-xs font-medium underline underline-offset-4"
+                class="text-acao-texto mt-3 inline-block text-[13px] font-semibold"
                 @click="emit('editar')"
             >
                 Alterar atividades
             </button>
         </div>
 
-        <div v-if="contatoTelefone || contatoEmail" class="border-border space-y-1 rounded-lg border p-4">
+        <div v-if="contatoTelefone || contatoEmail" class="border-border bg-card mt-3 space-y-1 rounded-[14px] border p-[22px]">
             <p class="text-xs font-semibold">Precisa de ajuda?</p>
 
             <p v-if="contatoTelefone" class="text-xs">

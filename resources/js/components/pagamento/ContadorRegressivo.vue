@@ -36,11 +36,11 @@ watch(expirado, (acabou) => {
 <template>
     <div
         v-if="prazo"
-        class="flex items-start gap-3 rounded-lg border px-4 py-3"
-        :class="proximoDoFim ? 'border-transparent bg-atencao text-atencao-foreground' : 'border-border bg-card text-card-foreground'"
+        class="flex items-start gap-3 rounded-full px-[13px] py-[7px] text-[13.5px] font-semibold"
+        :class="proximoDoFim ? 'bg-atencao text-atencao-foreground' : 'bg-atencao-suave text-atencao-suave-foreground'"
         data-testid="contador-regressivo"
     >
-        <Clock class="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <Clock class="mt-[2px] size-4 shrink-0" aria-hidden="true" />
 
         <div class="min-w-0">
             <p class="font-semibold" aria-live="polite">
@@ -48,7 +48,7 @@ watch(expirado, (acabou) => {
                 <span v-else>{{ rotulo }} para pagar</span>
             </p>
 
-            <p class="text-sm" :class="proximoDoFim ? 'text-atencao-foreground' : 'text-muted-foreground'">
+            <p class="text-[13px] font-normal opacity-90">
                 <span v-if="expirado">O prazo era até {{ prazoPorExtenso }}.</span>
                 <span v-else>Você tem até {{ prazoPorExtenso }} para fazer o pagamento.</span>
             </p>

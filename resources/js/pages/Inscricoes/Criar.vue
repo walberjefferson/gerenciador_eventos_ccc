@@ -379,7 +379,7 @@ async function voltar(): Promise<void> {
                 resumo roubaria a tela inteira do campo que esta sendo digitado.
                 Quem faz o papel dele ali e o total na barra do rodape.
             -->
-            <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+            <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
                 <div class="min-w-0 space-y-6">
                     <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-hidden">{{ titulos[passo] }}</h2>
 
@@ -422,7 +422,7 @@ async function voltar(): Promise<void> {
                         formulario, porque ali o botao ja esta visivel.
                     -->
                     <div
-                        class="border-border bg-card/95 sticky bottom-0 z-30 -mx-4 border-t px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+                        class="border-border bg-card/95 sticky bottom-0 z-30 -mx-4 border-t px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:mt-[30px] lg:bg-transparent lg:px-0 lg:pt-6 lg:pb-0 lg:backdrop-blur-none"
                     >
                         <!--
                             No celular: total e acao principal na MESMA linha, e o
