@@ -119,10 +119,14 @@ test('da home ate o formulario de inscricao em dois cliques', async ({ page }) =
     await page.goto('/');
 
     await page.getByTestId('botao-fazer-inscricao').click();
-    await page
-        .getByRole('link', { name: 'Quero me inscrever' })
-        .first()
-        .click();
+
+    // Espera chegar na vitrine ANTES de procurar o proximo link. Desde que os
+    // dois botoes passaram a se chamar "Fazer inscrição", o nome casa tambem
+    // com o botao da propria home — e o Playwright procura por trecho, nao por
+    // texto exato. Sem esta espera, o cenario podia clicar duas vezes na home.
+    await page.waitForURL(new RegExp(`/eventos/${EVENTO_DEMO.slug}$`));
+
+    await page.getByRole('link', { name: 'Fazer inscrição' }).first().click();
 
     await page.waitForURL(/\/inscricao$/);
     await expect(page.getByRole('heading', { name: 'Seus dados' })).toBeVisible();

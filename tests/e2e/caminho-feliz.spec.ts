@@ -29,7 +29,11 @@ test('da pagina do evento ate o QR Code do Pix', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Como funciona o fim de semana' })).toBeVisible();
     await expect(page.getByText('Futebol').first()).toBeVisible();
 
-    await page.getByRole('link', { name: 'Quero me inscrever' }).first().click();
+    // O botao da pagina do evento passou a se chamar "Fazer inscrição" na Etapa
+    // 27, seguindo o prototipo — e e o mesmo texto que a porta da rua ja usava.
+    // A mesma acao com dois nomes obriga quem chega a conferir se sao a mesma
+    // coisa.
+    await page.getByRole('link', { name: 'Fazer inscrição' }).first().click();
 
     // Passo 1 — dados pessoais.
     await expect(page.getByRole('heading', { name: 'Seus dados' })).toBeVisible();

@@ -98,7 +98,7 @@ test('a pagina do evento e o formulario funcionam inteiros com a politica ligada
     // O botao so leva ao formulario se a tabela de rotas tiver sido aceita pelo
     // navegador: e ela que o sistema escreve na propria pagina.
     await page
-        .getByRole('link', { name: /Quero me inscrever/ })
+        .getByRole('link', { name: /Fazer inscrição/ })
         .first()
         .click();
     await page.waitForURL(/\/inscricao$/);

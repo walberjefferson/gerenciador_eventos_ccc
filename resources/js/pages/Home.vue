@@ -93,24 +93,20 @@ const quandoEOnde = computed<string>(() => {
 });
 
 /**
- * Quanto da capacidade ja foi tomada, de 0 a 100.
+ * Quanto da capacidade ainda esta LIVRE, de 0 a 100.
  *
- * A barra mede o que JA FOI OCUPADO — e é assim que se lê uma barra que enche.
- * O protótipo desenha o contrário, com a barra cheia representando vaga livre;
- * seguir isso deixaria as duas barras do sistema dizendo coisas opostas, e a
- * da vitrine já estava escrita. Sem capacidade declarada não há fração
- * possível, e a barra simplesmente não aparece.
+ * Mede o que sobra, e nao o que foi tomado — o mesmo criterio da barra da
+ * pagina do evento. Duas barras iguais dizendo coisas opostas seria pior que
+ * qualquer um dos dois criterios sozinho.
  */
-const percentualOcupado = computed<number | null>(() => {
+const percentualLivre = computed<number | null>(() => {
     const evento = destaque.value;
 
     if (evento === null || evento.capacidade === null || evento.capacidade <= 0 || evento.vagas_disponiveis === null) {
         return null;
     }
 
-    const ocupadas = Math.min(Math.max(evento.capacidade - evento.vagas_disponiveis, 0), evento.capacidade);
-
-    return Math.round((ocupadas / evento.capacidade) * 100);
+    return Math.round((Math.min(Math.max(evento.vagas_disponiveis, 0), evento.capacidade) / evento.capacidade) * 100);
 });
 
 const titulo = computed<string>(() =>
@@ -215,13 +211,13 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                                  numero desatualiza no segundo seguinte. Por isso
                                  ele vem do servidor a cada carga, e nunca de
                                  cache. -->
-                            <div v-if="percentualOcupado !== null" class="mt-5">
+                            <div v-if="percentualLivre !== null" class="mt-5">
                                 <p class="text-muted-foreground text-sm">
                                     {{ destaque.vagas_disponiveis }} de {{ destaque.capacidade }} vagas livres
                                 </p>
 
                                 <div aria-hidden="true" class="bg-muted mt-2 h-1.5 overflow-hidden rounded-full">
-                                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualOcupado}%` }"></div>
+                                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualLivre}%` }"></div>
                                 </div>
                             </div>
 
@@ -244,7 +240,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                             <p class="mt-1 text-sm">
                                 <Link
                                     :href="enderecoDoAcesso"
-                                    class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                                    class="text-acao-texto inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline"
                                     data-testid="link-ja-fiz-minha-inscricao"
                                 >
                                     Já fiz minha inscrição
@@ -340,7 +336,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                 <p class="text-sm">
                     <Link
                         :href="enderecoDoAcesso"
-                        class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                        class="text-acao-texto inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline"
                         data-testid="link-ja-fiz-minha-inscricao"
                     >
                         Já fiz minha inscrição

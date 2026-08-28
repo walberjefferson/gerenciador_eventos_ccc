@@ -311,7 +311,7 @@ const passosDoPagamento = computed<string[]>(() => [
             <nav aria-label="Outras páginas da sua inscrição" class="border-border flex flex-col gap-1 border-t pt-4">
                 <Link
                     :href="url_acompanhamento"
-                    class="text-informacao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+                    class="text-acao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
                     data-testid="link-acompanhamento"
                 >
                     Acompanhar minha inscrição
@@ -320,7 +320,7 @@ const passosDoPagamento = computed<string[]>(() => [
                 <Link
                     v-if="estado === 'expirada'"
                     :href="evento.slug ? `/acesso?evento=${evento.slug}` : '/acesso'"
-                    class="text-informacao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+                    class="text-acao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
                     data-testid="link-recuperar-acesso"
                 >
                     Perdi o link da minha inscrição. Receber outro por e-mail

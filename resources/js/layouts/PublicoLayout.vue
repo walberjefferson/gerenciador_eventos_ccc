@@ -83,14 +83,14 @@ const anoAtual = new Date().getFullYear();
                     Precisa de ajuda? Fale com a organização
                     <template v-if="contatoEmail">
                         pelo e-mail
-                        <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`mailto:${contatoEmail}`">
+                        <a class="text-acao-texto font-medium underline underline-offset-4" :href="`mailto:${contatoEmail}`">
                             {{ contatoEmail }}
                         </a>
                     </template>
                     <template v-if="contatoEmail && contatoTelefone"> ou </template>
                     <template v-if="contatoTelefone">
                         pelo telefone
-                        <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`tel:${contatoTelefone}`">
+                        <a class="text-acao-texto font-medium underline underline-offset-4" :href="`tel:${contatoTelefone}`">
                             {{ contatoTelefone }}
                         </a>
                     </template>

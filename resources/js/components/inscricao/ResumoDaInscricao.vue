@@ -70,13 +70,13 @@ const emit = defineEmits<{
             <p class="text-xs font-semibold">Precisa de ajuda?</p>
 
             <p v-if="contatoTelefone" class="text-xs">
-                <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`tel:${contatoTelefone}`">
+                <a class="text-acao-texto font-medium underline-offset-4 hover:underline" :href="`tel:${contatoTelefone}`">
                     {{ contatoTelefone }}
                 </a>
             </p>
 
             <p v-if="contatoEmail" class="text-xs">
-                <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`mailto:${contatoEmail}`">
+                <a class="text-acao-texto font-medium underline-offset-4 hover:underline" :href="`mailto:${contatoEmail}`">
                     {{ contatoEmail }}
                 </a>
             </p>

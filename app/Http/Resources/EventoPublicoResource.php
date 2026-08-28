@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * O evento como ele chega na tela publica.
@@ -47,6 +48,11 @@ class EventoPublicoResource extends JsonResource
             'data_inicio' => $this->data_inicio->toDateString(),
             'data_fim' => $this->data_fim->toDateString(),
             'periodo_rotulo' => $this->periodoEmPalavras(),
+            // "17 e 18 de outubro" e, embaixo, "Sábado e domingo, 2026".
+            // A data por extenso e o dia da semana respondem coisas
+            // diferentes: uma diz quando, a outra diz se a pessoa consegue ir.
+            'quando_rotulo' => $this->quandoEmPalavras(),
+            'quando_nota' => $this->quandoNota(),
             'local' => $this->local,
             'local_detalhe' => $this->local_detalhe,
             // Listas vazias em vez de nulo: a tela pergunta "tem item?" com
@@ -154,5 +160,54 @@ class EventoPublicoResource extends JsonResource
             1 => 'Encerram amanhã',
             default => "Encerram em {$dias} dias",
         };
+    }
+
+    private const MESES = [
+        1 => 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+    ];
+
+    private const SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+
+    /**
+     * "17 e 18 de outubro" — a data escrita como alguem a fala.
+     *
+     * Quando os dois dias caem no mesmo mes, o mes aparece uma vez so; quando
+     * nao caem, cada dia leva o seu. Um dia so vira "17 de outubro".
+     */
+    private function quandoEmPalavras(): string
+    {
+        $inicio = $this->data_inicio;
+        $fim = $this->data_fim;
+
+        if ($inicio->isSameDay($fim)) {
+            return $inicio->day.' de '.self::MESES[$inicio->month];
+        }
+
+        if ($inicio->month === $fim->month && $inicio->year === $fim->year) {
+            return $inicio->day.' e '.$fim->day.' de '.self::MESES[$inicio->month];
+        }
+
+        return $inicio->day.' de '.self::MESES[$inicio->month].' a '.$fim->day.' de '.self::MESES[$fim->month];
+    }
+
+    /**
+     * "Sábado e domingo, 2026" — o dia da semana e o ano.
+     *
+     * O dia da semana e o que faz alguem saber se consegue ir; o ano so aparece
+     * aqui porque a linha de cima o deixou de fora para caber.
+     */
+    private function quandoNota(): string
+    {
+        $inicio = $this->data_inicio;
+        $fim = $this->data_fim;
+
+        $primeiro = Str::ucfirst(self::SEMANA[(int) $inicio->dayOfWeek]);
+
+        if ($inicio->isSameDay($fim)) {
+            return $primeiro.', '.$inicio->year;
+        }
+
+        return $primeiro.' e '.self::SEMANA[(int) $fim->dayOfWeek].', '.$fim->year;
     }
 }

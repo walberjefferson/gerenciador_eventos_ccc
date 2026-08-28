@@ -43,22 +43,25 @@ const rotuloDeVagas = computed<string>(() => {
 });
 
 /**
- * Quanto da capacidade ja foi tomada, de 0 a 100.
+ * Quanto da capacidade ainda esta LIVRE, de 0 a 100.
  *
- * A barra mede o que JA FOI OCUPADO, e nao o que sobra — e assim que se le uma
- * barra que enche, e e o mesmo criterio da barra da porta da rua (DA-61). Sem
- * capacidade declarada nao ha fracao possivel, e a barra nao aparece.
+ * A barra mede o que sobra, e nao o que foi tomado. Foi o contrario ate a
+ * Etapa 27, por um argumento que parecia bom — "barra que enche se le como
+ * preenchimento" —, e o dono do produto corrigiu mostrando o desenho: aqui a
+ * barra e uma reserva que se esvazia, e cheia quer dizer "ainda da tempo".
+ * As duas barras do sistema, esta e a da porta da rua, medem a mesma coisa.
+ *
+ * Sem capacidade declarada nao ha fracao possivel, e a barra nao aparece —
+ * inventar um denominador seria desenhar um dado que ninguem forneceu.
  */
-const percentualOcupado = computed<number | null>(() => {
+const percentualLivre = computed<number | null>(() => {
     const { capacidade, vagas_disponiveis: disponiveis } = props.evento;
 
     if (capacidade === null || capacidade <= 0 || disponiveis === null) {
         return null;
     }
 
-    const ocupadas = Math.min(Math.max(capacidade - disponiveis, 0), capacidade);
-
-    return Math.round((ocupadas / capacidade) * 100);
+    return Math.round((Math.min(Math.max(disponiveis, 0), capacidade) / capacidade) * 100);
 });
 </script>
 
@@ -75,7 +78,12 @@ const percentualOcupado = computed<number | null>(() => {
 
         <!-- .pills — gap de 8px -->
         <div class="flex flex-wrap gap-2">
-            <Badge :variant="evento.inscricoes_abertas ? 'sucesso' : 'secondary'">
+            <!-- O ponto antes do texto e do prototipo, e ele nao e enfeite:
+                 e o que faz a etiqueta "aberta" ser distinguida da de prazo sem
+                 depender so da cor. Some do leitor de tela, que ja recebe a
+                 palavra. -->
+            <Badge :variant="evento.inscricoes_abertas ? 'sucesso' : 'secondary'" class="gap-[6px]">
+                <span v-if="evento.inscricoes_abertas" aria-hidden="true" class="size-[6px] shrink-0 rounded-full bg-current"></span>
                 {{ evento.inscricoes_abertas ? 'Inscrições abertas' : evento.situacao_rotulo }}
             </Badge>
 
@@ -96,7 +104,8 @@ const percentualOcupado = computed<number | null>(() => {
         <dl class="bg-border border-border my-8 grid gap-px overflow-hidden rounded-[14px] border sm:grid-cols-2 lg:grid-cols-4">
             <div class="bg-card px-5 py-[18px]">
                 <dt class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Quando</dt>
-                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em]">{{ evento.periodo_rotulo }}</dd>
+                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em]">{{ evento.quando_rotulo }}</dd>
+                <dd class="text-muted-foreground mt-[3px] text-[13.5px]">{{ evento.quando_nota }}</dd>
             </div>
 
             <!-- "Onde" so existe depois que alguem cadastrou o lugar. Caixa com
@@ -123,8 +132,8 @@ const percentualOcupado = computed<number | null>(() => {
                 <!-- .bar — 5px de altura, 10px acima. A barra repete o que a
                      linha de cima ja diz por extenso, entao e decoracao e sai
                      do leitor de tela. -->
-                <dd v-if="percentualOcupado !== null" aria-hidden="true" class="bg-secondary mt-[10px] h-[5px] overflow-hidden rounded-full">
-                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualOcupado}%` }"></div>
+                <dd v-if="percentualLivre !== null" aria-hidden="true" class="bg-secondary mt-[10px] h-[5px] overflow-hidden rounded-full">
+                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualLivre}%` }"></div>
                 </dd>
             </div>
         </dl>

@@ -47,6 +47,18 @@ const enderecoDaInscricao = computed<string>(() => `/eventos/${evento.value?.slu
 
 const valor = computed<string>(() => (evento.value ? formatarValor(evento.value.valor_centavos, evento.value.moeda) : ''));
 
+const fechamentoEmPalavras = computed<string | null>(() => {
+    const dados = evento.value;
+
+    if (dados === null || !dados.inscricoes_abertas) {
+        return null;
+    }
+
+    const data = new Date(dados.inscricoes_fecham_em);
+
+    return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(data);
+});
+
 const vagasEmPalavras = computed<string | null>(() => {
     const dados = evento.value;
 
@@ -168,6 +180,10 @@ const vagasEmPalavras = computed<string | null>(() => {
                 </div>
 
                 <!-- .aside / .buy — acompanha a rolagem a partir de 1024px -->
+                <!-- "Fazer inscricao", e nao "Quero me inscrever": e o texto do
+                     prototipo e o mesmo que a porta da rua ja usava. A mesma acao
+                     com dois nomes obriga quem chega a conferir se sao a mesma
+                     coisa. -->
                 <aside aria-labelledby="titulo-inscricao" class="lg:sticky lg:top-6">
                     <h2 id="titulo-inscricao" class="sr-only">Inscrição</h2>
 
@@ -189,7 +205,7 @@ const vagasEmPalavras = computed<string | null>(() => {
                                 as-child
                                 class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base"
                             >
-                                <Link :href="enderecoDaInscricao">Quero me inscrever</Link>
+                                <Link :href="enderecoDaInscricao">Fazer inscrição</Link>
                             </Button>
 
                             <Alert v-else variant="atencao">
@@ -201,7 +217,11 @@ const vagasEmPalavras = computed<string | null>(() => {
                         <!-- .buy__list — 14px, 9px entre linhas, linha acima -->
                         <div class="border-border text-muted-foreground mt-[18px] grid gap-[9px] border-t pt-[18px] text-sm">
                             <p v-if="vagasEmPalavras">{{ vagasEmPalavras }}</p>
-                            <p v-if="evento.prazo_rotulo">Inscrições {{ evento.prazo_rotulo.toLowerCase() }}</p>
+                            <!-- A DATA, e nao a contagem: a etiqueta la em cima
+                                 ja diz "encerram em 43 dias", e repetir a mesma
+                                 frase duas vezes na mesma tela gasta a atencao
+                                 de quem le sem dizer nada novo. -->
+                            <p v-if="fechamentoEmPalavras">Inscrições até {{ fechamentoEmPalavras }}</p>
                         </div>
 
                         <!-- .help — 14px, linha acima, 16px de respiro -->
@@ -210,13 +230,25 @@ const vagasEmPalavras = computed<string | null>(() => {
                             class="border-border text-muted-foreground mt-4 border-t pt-4 text-sm"
                         >
                             <p>Precisa de ajuda?</p>
-                            <p v-if="evento.contato_telefone">
-                                <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`tel:${evento.contato_telefone}`">
+
+                            <!-- Telefone e e-mail na MESMA linha, separados por
+                                 ponto, como no prototipo: sao duas formas de
+                                 fazer a mesma coisa, e empilhados pareciam duas
+                                 instrucoes diferentes. -->
+                            <p class="mt-1">
+                                <a
+                                    v-if="evento.contato_telefone"
+                                    class="text-acao-texto font-medium underline-offset-4 hover:underline"
+                                    :href="`tel:${evento.contato_telefone}`"
+                                >
                                     {{ evento.contato_telefone }}
                                 </a>
-                            </p>
-                            <p v-if="evento.contato_email">
-                                <a class="text-informacao-texto font-medium underline underline-offset-4" :href="`mailto:${evento.contato_email}`">
+                                <span v-if="evento.contato_telefone && evento.contato_email" aria-hidden="true"> · </span>
+                                <a
+                                    v-if="evento.contato_email"
+                                    class="text-acao-texto font-medium underline-offset-4 hover:underline"
+                                    :href="`mailto:${evento.contato_email}`"
+                                >
                                     {{ evento.contato_email }}
                                 </a>
                             </p>
@@ -226,7 +258,7 @@ const vagasEmPalavras = computed<string | null>(() => {
                     <p class="mt-4 text-sm">
                         <Link
                             :href="`/acesso?evento=${evento.slug}`"
-                            class="text-informacao-texto inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                            class="text-acao-texto inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline"
                             data-testid="link-ja-me-inscrevi"
                         >
                             Já me inscrevi — acessar minha inscrição
@@ -253,7 +285,7 @@ const vagasEmPalavras = computed<string | null>(() => {
                     </div>
 
                     <Button as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 flex-1 text-base">
-                        <Link :href="enderecoDaInscricao">Quero me inscrever</Link>
+                        <Link :href="enderecoDaInscricao">Fazer inscrição</Link>
                     </Button>
                 </div>
             </div>

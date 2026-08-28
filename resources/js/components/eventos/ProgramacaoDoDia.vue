@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { contarVagas } from '@/lib/formato';
 import type { AtividadePublica, DiaEventoPublico } from '@/types/evento';
+import { computed } from 'vue';
 
 /**
  * Um dia da programacao, desenhado como um trecho de trilha.
@@ -16,9 +17,20 @@ import type { AtividadePublica, DiaEventoPublico } from '@/types/evento';
  * comparar vira trabalho de memoria, que e exatamente o que alguem faz aqui
  * antes de escolher.
  */
-defineProps<{
+const props = defineProps<{
     dia: DiaEventoPublico;
 }>();
+
+/**
+ * O dia tem um grupo so?
+ *
+ * Quando tem, o titulo do bloco e o NOME DO GRUPO — "Modalidades esportivas" —
+ * e o nome do dia nao aparece. Os dois empilhados diziam quase a mesma coisa
+ * uma embaixo da outra, e a data ja esta na linha verde logo acima. Quando o
+ * dia tem mais de um grupo, o nome do dia volta a fazer falta: e ele que
+ * explica o que aqueles blocos tem em comum.
+ */
+const grupoUnico = computed(() => (props.dia.grupos.length === 1 ? props.dia.grupos[0] : null));
 
 function faixaEtaria(atividade: AtividadePublica): string | null {
     const { idade_minima: minima, idade_maxima: maxima } = atividade;
@@ -49,23 +61,29 @@ function faixaEtaria(atividade: AtividadePublica): string | null {
         <!-- .day__k — 12px, 0.12em, verde-mata -->
         <p class="text-acao-texto text-xs font-semibold tracking-[0.12em] uppercase">{{ dia.quando }}</p>
 
-        <!-- .day__t — 21px -->
+        <!-- .day__t — 21px. O titulo e o nome do grupo quando ha um so. -->
         <h3 :id="`dia-${dia.id}`" class="mt-[6px] mb-[2px] text-[21px] leading-[1.15] font-semibold tracking-[-0.02em]">
-            {{ dia.nome }}
+            {{ grupoUnico ? grupoUnico.nome : dia.nome }}
         </h3>
 
-        <!-- .day__n — 14.5px -->
-        <p v-if="dia.descricao" class="text-muted-foreground mb-4 text-[14.5px] leading-[1.55]">{{ dia.descricao }}</p>
+        <!-- .day__n — 14.5px. A regra de escolha entra AQUI, no corpo do texto,
+             e nao como etiqueta flutuando a direita: ela e parte da explicacao,
+             e lida junto com ela em vez de disputar o olhar com o titulo. -->
+        <p v-if="grupoUnico" class="text-muted-foreground mb-4 max-w-[58ch] text-[14.5px] leading-[1.55]">
+            {{ [grupoUnico.descricao, grupoUnico.regra_rotulo].filter(Boolean).join(' ') }}
+        </p>
+        <p v-else-if="dia.descricao" class="text-muted-foreground mb-4 max-w-[58ch] text-[14.5px] leading-[1.55]">{{ dia.descricao }}</p>
 
         <p v-if="dia.grupos.length === 0" class="text-muted-foreground text-[14.5px]">A programação deste dia ainda será divulgada.</p>
 
-        <div v-for="grupo in dia.grupos" :key="grupo.id" class="mt-4 first:mt-0">
-            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <template v-for="grupo in dia.grupos" :key="grupo.id">
+            <!-- Com mais de um grupo no dia, cada um volta a ter o seu titulo. -->
+            <div v-if="!grupoUnico" class="mt-4 first:mt-0">
                 <h4 class="text-[15px] font-semibold">{{ grupo.nome }}</h4>
-                <p class="text-acao-texto text-[13px] font-medium">{{ grupo.regra_rotulo }}</p>
+                <p class="text-muted-foreground mt-1 mb-2 max-w-[58ch] text-[13.5px] leading-[1.55]">
+                    {{ [grupo.descricao, grupo.regra_rotulo].filter(Boolean).join(' ') }}
+                </p>
             </div>
-
-            <p v-if="grupo.descricao" class="text-muted-foreground mb-2 text-[13.5px] leading-[1.55]">{{ grupo.descricao }}</p>
 
             <ul>
                 <!-- .slot — 13px/16px de recheio, raio de 10px, 8px entre linhas -->
@@ -75,8 +93,8 @@ function faixaEtaria(atividade: AtividadePublica): string | null {
                     class="border-border bg-card mt-2 flex flex-wrap items-center gap-x-[14px] gap-y-1 rounded-[10px] border px-4 py-[13px] first:mt-0"
                     :class="atividade.esgotado ? 'opacity-60' : ''"
                 >
-                    <!-- .slot__t — coluna de 104px, monoespacada: e ela que
-                         alinha os horarios de linhas diferentes na vertical -->
+                    <!-- .slot__t — coluna fixa e monoespacada: e ela que alinha
+                         os horarios de linhas diferentes na vertical -->
                     <span class="text-muted-foreground w-[124px] shrink-0 font-mono text-[13.5px] whitespace-nowrap tabular-nums">
                         {{ atividade.horario_rotulo }}
                     </span>
@@ -94,6 +112,6 @@ function faixaEtaria(atividade: AtividadePublica): string | null {
                     </span>
                 </li>
             </ul>
-        </div>
+        </template>
     </section>
 </template>

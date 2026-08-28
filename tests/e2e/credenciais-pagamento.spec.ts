@@ -102,10 +102,7 @@ test('quem administra cadastra homologação, salva, e o que salvou não volta p
     expect(html).not.toContain(valorGerado);
 
     // O que a tela mostra é a existência do valor, e não o valor.
-    await expect(page.getByTestId('credenciais-client-id-homologacao')).toHaveAttribute(
-        'placeholder',
-        /valor guardado/i,
-    );
+    await expect(page.getByTestId('credenciais-client-id-homologacao')).toHaveAttribute('placeholder', /valor guardado/i);
 
     // E recarregar a página não traz o segredo de volta pela porta dos fundos.
     await page.reload();
