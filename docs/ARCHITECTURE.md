@@ -944,3 +944,54 @@ números do oklch como se fossem canais de cor e chegaria a um valor sem
 sentido. **Se um dia alguém trocar as cores por `oklch`, é esse cenário que
 avisa.**
 
+
+### 14.4 A sintaxe de variável CSS mudou no Tailwind 4 — e há uma vistoria vigiando
+
+Esta é a armadilha mais silenciosa que o projeto encontrou até hoje, e vale
+conhecer antes de escrever qualquer classe nova.
+
+No Tailwind 3, `w-[--sidebar-width]` queria dizer *"largura igual ao valor dessa
+variável CSS"*. **Na versão 4 a forma passou a ser `w-(--sidebar-width)`, com
+parêntese**, e a antiga passou a ser lida como valor literal. O ponto perigoso é
+que **o compilador não reclama**: ele gera a regra assim mesmo.
+
+| Escrito na classe | CSS que sai | O navegador |
+|---|---|---|
+| `w-(--sidebar-width)` | `width: var(--sidebar-width)` | aplica |
+| `w-[--sidebar-width]` | `width: --sidebar-width` | **descarta em silêncio** |
+
+Foi assim que a barra lateral do painel ficou sem largura e passou a flutuar por
+cima do conteúdo, cobrindo o próprio botão de recolher (decisão **D-86** em
+`docs/PROGRESS.md`). Nenhum erro apareceu em lugar nenhum — nem no `npm run
+build`, nem no `vue-tsc`, nem nos 44 cenários de navegador, porque todos rodavam
+em tela de celular e o trecho quebrado só existe em tela grande.
+
+**O colchete continua certo em quase tudo.** A troca vale **só** quando o
+conteúdo do colchete começa com `--` e é o valor inteiro:
+
+- `data-[state=open]`, `group-data-[collapsible=icon]`, `peer-data-[variant=inset]`
+  são **seletores de atributo** — a sintaxe deles não mudou;
+- `w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]` já usa `var(...)`
+  dentro de `calc(...)`, que sempre foi válido.
+
+Trocar um colchete que não precisava trocar quebra o que estava funcionando.
+
+**Quem vigia isso é `tests/Feature/Interface/CssConstruidoTest.php`.** Ele lê o
+CSS que o `npm run build` acabou de produzir — descobrindo quais arquivos são
+pelo `public/build/manifest.json`, e não por curinga, para que sobra de build
+antiga não acuse defeito já corrigido — e falha em qualquer declaração cujo
+valor seja um nome de variável solto. A mensagem de falha diz a propriedade, o
+valor, o seletor e o comando para achar a classe no código-fonte: quem esbarrar
+nela não precisa refazer a investigação que a originou.
+
+Ele mora no Pest, e não num script à parte, porque o `.github/workflows/tests.yml`
+roda `npm run build` **antes** dos testes — é o único momento em que o CSS
+construído existe e alguém olha para ele. Sem build, o teste se **pula com o
+motivo escrito**; em CI isso nunca acontece.
+
+> **Uma peça ainda desalinhada:** o `tailwind-merge` instalado é o **2.6.0**,
+> feito para o Tailwind 3, e ele **não reconhece** `w-(--variavel)` como classe
+> de largura. Onde um componente do shadcn traz uma classe concorrente de
+> fábrica, as duas sobrevivem e a do shadcn vence. Hoje isso acontece em **um
+> único lugar** — a gaveta da barra lateral no celular, que por isso carrega um
+> `!` com o motivo escrito ao lado. Subir para a 3.x é a pendência **P-11**.
