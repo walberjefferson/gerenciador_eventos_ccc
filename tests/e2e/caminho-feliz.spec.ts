@@ -1,6 +1,6 @@
-import { expect, test } from './base';
 import { EVENTO_DEMO } from './ambiente';
 import { escolherAtividade, preencherDadosPessoais, type PessoaDeTeste } from './apoio';
+import { expect, test } from './base';
 
 /**
  * O caminho que a maioria das pessoas vai percorrer: encontra o evento,
@@ -21,7 +21,12 @@ test('da pagina do evento ate o QR Code do Pix', async ({ page }) => {
     // A vitrine se apresenta: nome, valor e programacao.
     await expect(page.getByRole('heading', { name: EVENTO_DEMO.nome, level: 1 })).toBeVisible();
     await expect(page.getByText(EVENTO_DEMO.valor).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Programação' })).toBeVisible();
+    // O titulo desta secao virou "Como funciona o fim de semana" na Etapa 27,
+    // seguindo o prototipo: quem chega pela primeira vez entende melhor uma
+    // frase do que a palavra "Programação" sozinha. A ancora da home continua
+    // se chamando "titulo-programacao", e e ela que o link usa — o endereco nao
+    // mudou, so o texto que a pessoa le.
+    await expect(page.getByRole('heading', { name: 'Como funciona o fim de semana' })).toBeVisible();
     await expect(page.getByText('Futebol').first()).toBeVisible();
 
     await page.getByRole('link', { name: 'Quero me inscrever' }).first().click();

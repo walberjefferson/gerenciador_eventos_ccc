@@ -49,6 +49,11 @@ class EventoPublicoResource extends JsonResource
             'periodo_rotulo' => $this->periodoEmPalavras(),
             'local' => $this->local,
             'local_detalhe' => $this->local_detalhe,
+            // Listas vazias em vez de nulo: a tela pergunta "tem item?" com
+            // `length`, e nao precisa saber a diferenca entre "nunca preenchi"
+            // e "apaguei tudo".
+            'itens_incluidos' => $this->itens_incluidos ?? [],
+            'perguntas_frequentes' => $this->perguntas_frequentes ?? [],
             'inscricoes_abrem_em' => $this->inscricoes_abrem_em->toIso8601String(),
             'inscricoes_fecham_em' => $this->inscricoes_fecham_em->toIso8601String(),
             'prazo_rotulo' => $this->prazoEmPalavras(),

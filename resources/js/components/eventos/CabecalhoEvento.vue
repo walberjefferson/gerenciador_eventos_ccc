@@ -8,10 +8,16 @@ import { computed } from 'vue';
  * Rosto do evento: o convite e os fatos que a pessoa precisa saber ANTES de
  * decidir se clica.
  *
- * A ordem nao e estetica. Quando, quanto custa e quantas vagas restam sao as
- * tres perguntas que alguem faz antes de gastar tres minutos preenchendo um
+ * A ordem nao e estetica. Quando, onde, quanto custa e quantas vagas restam sao
+ * as perguntas que alguem faz antes de gastar tres minutos preenchendo um
  * formulario — e a versao anterior desta tela obrigava a rolar ate a
- * programacao para responder duas delas.
+ * programacao para responder metade delas.
+ *
+ * As caixas de fatos usam um truque de borda que vem do prototipo: a grade tem
+ * `gap: 1px` sobre um fundo da cor da linha, e cada caixa e branca. O resultado
+ * e uma malha de linhas de UM pixel entre as caixas, sem borda dupla nos
+ * encontros e sem que nenhuma caixa precise saber se e a primeira ou a ultima
+ * da fileira — o que muda a cada largura de tela.
  */
 const props = defineProps<{
     evento: EventoPublico;
@@ -19,7 +25,7 @@ const props = defineProps<{
 
 const valor = computed<string>(() => formatarValor(props.evento.valor_centavos, props.evento.moeda));
 
-/** "62 de 200 restantes" quando ha teto; so a contagem quando nao ha. */
+/** "62 de 200 livres" quando ha teto; so a contagem quando nao ha. */
 const rotuloDeVagas = computed<string>(() => {
     if (props.evento.esgotado) {
         return 'Vagas esgotadas';
@@ -30,19 +36,18 @@ const rotuloDeVagas = computed<string>(() => {
     }
 
     if (props.evento.capacidade === null) {
-        return `${contarVagas(props.evento.vagas_disponiveis)} restantes`;
+        return `${contarVagas(props.evento.vagas_disponiveis)} livres`;
     }
 
-    return `${props.evento.vagas_disponiveis} de ${props.evento.capacidade} restantes`;
+    return `${props.evento.vagas_disponiveis} de ${props.evento.capacidade} livres`;
 });
 
 /**
  * Quanto da capacidade ja foi tomada, de 0 a 100.
  *
- * A barra mede o que JA FOI OCUPADO, e nao o que sobra: e assim que se le uma
- * barra que enche. Sem capacidade declarada nao ha fracao possivel, e a barra
- * simplesmente nao aparece — inventar um denominador seria desenhar uma
- * informacao que ninguem forneceu.
+ * A barra mede o que JA FOI OCUPADO, e nao o que sobra — e assim que se le uma
+ * barra que enche, e e o mesmo criterio da barra da porta da rua (DA-61). Sem
+ * capacidade declarada nao ha fracao possivel, e a barra nao aparece.
  */
 const percentualOcupado = computed<number | null>(() => {
     const { capacidade, vagas_disponiveis: disponiveis } = props.evento;
@@ -58,61 +63,68 @@ const percentualOcupado = computed<number | null>(() => {
 </script>
 
 <template>
-    <header class="space-y-5">
+    <header>
         <img
             v-if="evento.banner_url"
             :src="evento.banner_url"
             :alt="`Imagem de divulgação do evento ${evento.nome}`"
-            class="border-border w-full rounded-lg border object-cover"
+            class="border-border mb-6 w-full rounded-lg border object-cover"
             loading="lazy"
             decoding="async"
         />
 
+        <!-- .pills — gap de 8px -->
         <div class="flex flex-wrap gap-2">
             <Badge :variant="evento.inscricoes_abertas ? 'sucesso' : 'secondary'">
                 {{ evento.inscricoes_abertas ? 'Inscrições abertas' : evento.situacao_rotulo }}
             </Badge>
 
-            <Badge v-if="evento.prazo_rotulo" variant="atencao">
-                {{ evento.prazo_rotulo }}
-            </Badge>
+            <Badge v-if="evento.prazo_rotulo" variant="atencao">{{ evento.prazo_rotulo }}</Badge>
         </div>
 
-        <div class="space-y-2">
-            <h1 class="text-3xl leading-tight font-bold tracking-tight sm:text-4xl">{{ evento.nome }}</h1>
+        <!-- .ev-hero h1 — clamp(34px, 5.6vw, 54px), peso 600, 14px acima -->
+        <h1 class="mt-[14px] text-[clamp(34px,5.6vw,54px)] leading-[1.08] font-semibold tracking-[-0.02em]">
+            {{ evento.nome }}
+        </h1>
 
-            <p v-if="evento.descricao" class="text-muted-foreground max-w-prose text-base leading-relaxed whitespace-pre-line">
-                {{ evento.descricao }}
-            </p>
-        </div>
+        <!-- .ev-hero__sub — 18px, 52ch, 14px acima -->
+        <p v-if="evento.descricao" class="text-muted-foreground mt-[14px] max-w-[52ch] text-[18px] leading-[1.55] whitespace-pre-line">
+            {{ evento.descricao }}
+        </p>
 
-        <!-- Os fatos, em caixas do mesmo peso. Lista de descricao e nao tabela:
-             cada caixa e um par pergunta/resposta, e e assim que um leitor de
-             tela vai anuncia-la. -->
-        <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div class="border-border space-y-1 rounded-lg border p-4">
-                <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Quando</dt>
-                <dd class="text-sm font-semibold">{{ evento.periodo_rotulo }}</dd>
+        <!-- .facts — a malha de linhas de 1px descrita acima -->
+        <dl class="bg-border border-border my-8 grid gap-px overflow-hidden rounded-[14px] border sm:grid-cols-2 lg:grid-cols-4">
+            <div class="bg-card px-5 py-[18px]">
+                <dt class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Quando</dt>
+                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em]">{{ evento.periodo_rotulo }}</dd>
             </div>
 
-            <div class="border-border space-y-1 rounded-lg border p-4">
-                <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Investimento</dt>
-                <dd class="text-sm font-semibold tabular-nums">{{ valor }}</dd>
-                <dd class="text-muted-foreground text-xs">por pessoa</dd>
+            <!-- "Onde" so existe depois que alguem cadastrou o lugar. Caixa com
+                 titulo e nada embaixo nao informa quem visita: informa que falta
+                 alguem preencher, o que e assunto de quem administra. -->
+            <div v-if="evento.local" class="bg-card px-5 py-[18px]">
+                <dt class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Onde</dt>
+                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em]">{{ evento.local }}</dd>
+                <dd v-if="evento.local_detalhe" class="text-muted-foreground mt-[3px] text-[13.5px]">{{ evento.local_detalhe }}</dd>
             </div>
 
-            <div class="border-border space-y-1 rounded-lg border p-4">
-                <dt class="text-muted-foreground text-xs font-bold tracking-wider uppercase">Vagas</dt>
-                <dd class="text-sm font-semibold" :class="evento.esgotado ? 'text-destructive' : 'text-sucesso-texto'">
+            <div class="bg-card px-5 py-[18px]">
+                <dt class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Investimento</dt>
+                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em] tabular-nums">{{ valor }}</dd>
+                <dd class="text-muted-foreground mt-[3px] text-[13.5px]">por pessoa</dd>
+            </div>
+
+            <div class="bg-card px-5 py-[18px]">
+                <dt class="text-muted-foreground text-[11.5px] font-semibold tracking-[0.12em] uppercase">Vagas</dt>
+                <dd class="mt-[7px] text-[17px] font-semibold tracking-[-0.01em]" :class="evento.esgotado ? 'text-destructive' : ''">
                     {{ rotuloDeVagas }}
                 </dd>
-                <dd v-if="percentualOcupado !== null" class="pt-1">
-                    <!-- A barra repete o que a linha de cima ja diz por extenso,
-                         entao ela e decoracao: escondida do leitor de tela para
-                         nao anunciar o mesmo numero duas vezes. -->
-                    <div aria-hidden="true" class="bg-muted h-1.5 overflow-hidden rounded-full">
-                        <div class="bg-informacao h-full rounded-full" :style="{ width: `${percentualOcupado}%` }"></div>
-                    </div>
+
+                <!-- .bar — 5px de altura, 10px acima. A barra repete o que a
+                     linha de cima ja diz por extenso, entao e decoracao e sai
+                     do leitor de tela. -->
+                <dd v-if="percentualOcupado !== null" aria-hidden="true" class="bg-secondary mt-[10px] h-[5px] overflow-hidden rounded-full">
+                    <div class="bg-acao h-full rounded-full" :style="{ width: `${percentualOcupado}%` }"></div>
                 </dd>
             </div>
         </dl>

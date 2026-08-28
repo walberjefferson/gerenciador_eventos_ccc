@@ -38,6 +38,22 @@ class EventoDemoSeeder extends Seeder
                 'descricao' => 'Dois dias de atividades: modalidades esportivas no sábado e trilha no domingo.',
                 'local' => 'Sítio Santa Clara',
                 'local_detalhe' => 'Cerca de 20 minutos do centro. Estacionamento no local.',
+                'itens_incluidos' => [
+                    'Camiseta do encontro, retirada na chegada',
+                    'Almoço comunitário no sábado e lanche na trilha',
+                    'Água e frutas nos pontos de apoio',
+                    'Equipe de primeiros socorros nos dois dias',
+                ],
+                'perguntas_frequentes' => [
+                    [
+                        'pergunta' => 'Posso me inscrever para a família toda?',
+                        'resposta' => 'Cada pessoa precisa de uma inscrição, porque as vagas por atividade são individuais. Dá para fazer uma depois da outra.',
+                    ],
+                    [
+                        'pergunta' => 'Preciso levar alguma coisa?',
+                        'resposta' => 'Roupa de esporte, tênis, garrafa de água e um documento com foto. Para a trilha, boné e protetor solar.',
+                    ],
+                ],
                 'data_inicio' => $primeiroDia->toDateString(),
                 'data_fim' => $segundoDia->toDateString(),
                 'inscricoes_abrem_em' => Carbon::parse('2026-08-01 00:00'),

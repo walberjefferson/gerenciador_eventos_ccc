@@ -2,7 +2,7 @@
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { EventoEmEdicao, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, nextTick } from 'vue';
 
 /**
  * A ficha do evento: os dados gerais que valem para todo mundo que se inscreve.
@@ -26,6 +26,8 @@ const formulario = useForm({
     descricao: props.evento?.descricao ?? '',
     local: props.evento?.local ?? '',
     local_detalhe: props.evento?.local_detalhe ?? '',
+    itens_incluidos: [...(props.evento?.itens_incluidos ?? [])],
+    perguntas_frequentes: (props.evento?.perguntas_frequentes ?? []).map((linha) => ({ ...linha })),
     data_inicio: props.evento?.data_inicio ?? '',
     data_fim: props.evento?.data_fim ?? '',
     inscricoes_abrem_em: props.evento?.inscricoes_abrem_em ?? '',
@@ -40,6 +42,36 @@ const formulario = useForm({
     contato_email: props.evento?.contato_email ?? '',
     contato_telefone: props.evento?.contato_telefone ?? '',
 });
+
+/**
+ * As duas listas de conteudo da pagina do evento.
+ *
+ * Sao listas simples de texto, entao a edicao e simples de proposito:
+ * acrescentar cria uma linha vazia e leva o cursor ate ela; remover tira a
+ * linha. Quem limpa o que ficou em branco e o servidor, no envio — assim
+ * ninguem precisa apagar linha por linha antes de gravar.
+ */
+async function acrescentarItem(): Promise<void> {
+    formulario.itens_incluidos.push('');
+
+    await nextTick();
+    document.getElementById(`evento-incluido-${formulario.itens_incluidos.length - 1}`)?.focus();
+}
+
+function removerItem(indice: number): void {
+    formulario.itens_incluidos.splice(indice, 1);
+}
+
+async function acrescentarPergunta(): Promise<void> {
+    formulario.perguntas_frequentes.push({ pergunta: '', resposta: '' });
+
+    await nextTick();
+    document.getElementById(`evento-pergunta-${formulario.perguntas_frequentes.length - 1}`)?.focus();
+}
+
+function removerPergunta(indice: number): void {
+    formulario.perguntas_frequentes.splice(indice, 1);
+}
 
 function gravar(): void {
     if (props.evento === null) {
@@ -378,6 +410,84 @@ function gravar(): void {
                     Voltar para a lista
                 </Link>
             </div>
+
+            <!-- O conteudo que a pagina do evento mostra alem da programacao.
+                 Sao as duvidas que hoje a organizacao responde no WhatsApp toda
+                 semana, e que fazem a pessoa adiar a inscricao. -->
+            <section aria-labelledby="titulo-conteudo" class="grid gap-4">
+                <h2 id="titulo-conteudo" class="text-lg font-semibold">Conteúdo da página do evento</h2>
+
+                <div class="grid gap-3">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-medium">O que está incluído</p>
+                        <p class="text-muted-foreground text-sm">Camiseta, alimentação, seguro — um item por linha.</p>
+                    </div>
+
+                    <div v-for="(item, indice) in formulario.itens_incluidos" :key="`incluido-${indice}`" class="flex items-center gap-2">
+                        <label :for="`evento-incluido-${indice}`" class="sr-only">Item {{ indice + 1 }} do que está incluído</label>
+                        <input
+                            :id="`evento-incluido-${indice}`"
+                            v-model="formulario.itens_incluidos[indice]"
+                            type="text"
+                            class="border-input bg-background focus-visible:ring-ring h-10 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                        <Button type="button" variant="ghost" class="h-10" @click="removerItem(indice)">
+                            Remover<span class="sr-only"> o item {{ indice + 1 }}</span>
+                        </Button>
+                    </div>
+
+                    <p v-if="formulario.itens_incluidos.length === 0" class="text-muted-foreground text-sm">
+                        Nenhum item. A seção não aparece na página do evento enquanto a lista estiver vazia.
+                    </p>
+
+                    <div>
+                        <Button type="button" variant="outline" class="h-10" @click="acrescentarItem">Acrescentar item</Button>
+                    </div>
+                </div>
+
+                <div class="border-border grid gap-3 border-t pt-4">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-medium">Perguntas frequentes</p>
+                        <p class="text-muted-foreground text-sm">Pergunta sem resposta não é gravada.</p>
+                    </div>
+
+                    <div
+                        v-for="(pergunta, indice) in formulario.perguntas_frequentes"
+                        :key="`pergunta-${indice}`"
+                        class="border-border grid gap-2 rounded-md border p-3"
+                    >
+                        <label :for="`evento-pergunta-${indice}`" class="text-sm font-medium">Pergunta {{ indice + 1 }}</label>
+                        <input
+                            :id="`evento-pergunta-${indice}`"
+                            v-model="pergunta.pergunta"
+                            type="text"
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+
+                        <label :for="`evento-resposta-${indice}`" class="text-sm font-medium">Resposta</label>
+                        <textarea
+                            :id="`evento-resposta-${indice}`"
+                            v-model="pergunta.resposta"
+                            rows="3"
+                            class="border-input bg-background focus-visible:ring-ring rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        ></textarea>
+
+                        <div>
+                            <Button type="button" variant="ghost" class="h-10" @click="removerPergunta(indice)">
+                                Remover<span class="sr-only"> a pergunta {{ indice + 1 }}</span>
+                            </Button>
+                        </div>
+                    </div>
+
+                    <p v-if="formulario.perguntas_frequentes.length === 0" class="text-muted-foreground text-sm">
+                        Nenhuma pergunta. A seção não aparece na página do evento enquanto a lista estiver vazia.
+                    </p>
+
+                    <div>
+                        <Button type="button" variant="outline" class="h-10" @click="acrescentarPergunta">Acrescentar pergunta</Button>
+                    </div>
+                </div>
+            </section>
         </form>
     </AdminLayout>
 </template>

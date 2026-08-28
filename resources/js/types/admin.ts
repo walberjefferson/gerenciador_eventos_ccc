@@ -68,6 +68,8 @@ export interface EventoEmEdicao {
     local: string | null;
     /** Como chegar: distancia, referencia, estacionamento. */
     local_detalhe: string | null;
+    itens_incluidos: string[];
+    perguntas_frequentes: Array<{ pergunta: string; resposta: string }>;
     data_inicio: string;
     data_fim: string;
     inscricoes_abrem_em: string;

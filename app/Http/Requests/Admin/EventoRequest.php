@@ -53,6 +53,14 @@ class EventoRequest extends FormRequest
             'prazo_pagamento_minutos' => ['required', 'integer', 'min:5', 'max:43200'],
             'situacao' => ['required', Rule::enum(SituacaoEvento::class)],
             'regulamento' => ['required', 'string', 'min:10'],
+            // As duas listas de conteudo da pagina do evento. Sao opcionais: a
+            // secao correspondente some quando a lista esta vazia, em vez de
+            // aparecer com um titulo e nada embaixo.
+            'itens_incluidos' => ['nullable', 'array', 'max:12'],
+            'itens_incluidos.*' => ['required', 'string', 'max:160'],
+            'perguntas_frequentes' => ['nullable', 'array', 'max:12'],
+            'perguntas_frequentes.*.pergunta' => ['required', 'string', 'max:200'],
+            'perguntas_frequentes.*.resposta' => ['required', 'string', 'max:1000'],
             'versao_termos' => ['required', 'string', 'max:40'],
             'contato_email' => ['required', 'email', 'max:160'],
             'contato_telefone' => ['nullable', 'string', 'max:40'],
@@ -113,6 +121,8 @@ class EventoRequest extends FormRequest
             'prazo_pagamento_minutos' => 'prazo de pagamento',
             'contato_email' => 'e-mail de contato',
             'local_detalhe' => 'como chegar',
+            'itens_incluidos' => 'lista do que está incluído',
+            'perguntas_frequentes' => 'perguntas frequentes',
         ];
     }
 
@@ -151,6 +161,8 @@ class EventoRequest extends FormRequest
             'prazo_pagamento_minutos' => $this->integer('prazo_pagamento_minutos'),
             'situacao' => (string) $this->string('situacao'),
             'regulamento' => (string) $this->string('regulamento'),
+            'itens_incluidos' => $this->listaLimpa('itens_incluidos'),
+            'perguntas_frequentes' => $this->perguntasLimpas(),
             'versao_termos' => (string) $this->string('versao_termos'),
             'contato_email' => (string) $this->string('contato_email'),
             'contato_telefone' => $this->input('contato_telefone'),
@@ -207,5 +219,43 @@ class EventoRequest extends FormRequest
                 .'encerre as inscrições ou crie outro evento.'
             );
         }
+    }
+
+    /**
+     * A lista sem as linhas em branco, ou null quando nao sobrou nada.
+     *
+     * A tela sempre manda a lista inteira, inclusive os campos que a pessoa
+     * abriu e nao preencheu. Guardar linha vazia faria a pagina do evento
+     * mostrar um marcador com nada ao lado.
+     */
+    private function listaLimpa(string $campo): ?array
+    {
+        $itens = collect((array) $this->input($campo, []))
+            ->map(fn ($item): string => trim((string) $item))
+            ->reject(fn (string $item): bool => $item === '')
+            ->values()
+            ->all();
+
+        return $itens === [] ? null : $itens;
+    }
+
+    /**
+     * As perguntas em que AS DUAS metades foram preenchidas.
+     *
+     * Pergunta sem resposta e pior que pergunta nenhuma: ela levanta a duvida
+     * na cabeca de quem le e nao a resolve.
+     */
+    private function perguntasLimpas(): ?array
+    {
+        $perguntas = collect((array) $this->input('perguntas_frequentes', []))
+            ->map(fn ($linha): array => [
+                'pergunta' => trim((string) ($linha['pergunta'] ?? '')),
+                'resposta' => trim((string) ($linha['resposta'] ?? '')),
+            ])
+            ->reject(fn (array $linha): bool => $linha['pergunta'] === '' || $linha['resposta'] === '')
+            ->values()
+            ->all();
+
+        return $perguntas === [] ? null : $perguntas;
     }
 }
