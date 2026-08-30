@@ -6,14 +6,18 @@ import { useForm } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
 
 /**
- * O catálogo de cidades.
+ * O catálogo de setores.
  *
  * Uma tela só: o formulário em cima, a lista embaixo. Editar traz a linha para
  * o formulário em vez de abrir outra página — são poucos campos e ninguém
  * precisa perder a lista de vista.
  *
- * Cidade em uso não é excluída. A tela diz isso antes de qualquer clique, e o
+ * Setor em uso não é excluído. A tela diz isso antes de qualquer clique, e o
  * servidor recusa de novo se alguém insistir.
+ *
+ * O tipo continua sendo `CidadeDoCatalogo` e as rotas apontam para o
+ * `CidadeController`: o renome para "setor" vale para o que a pessoa lê e para
+ * o endereço, não para o banco nem para os nomes do código.
  */
 const props = defineProps<{
     cidades: CidadeDoCatalogo[];
@@ -27,7 +31,9 @@ const campoNome = ref<HTMLInputElement | null>(null);
 
 const formulario = useForm({
     nome: '',
-    uf: 'SP',
+    // Todos os setores da comunidade são de Alagoas; o campo continua editável
+    // porque a coluna é obrigatória e entra na chave única (nome, uf).
+    uf: 'AL',
     ativo: true as boolean,
 });
 
@@ -38,7 +44,7 @@ const formulario = useForm({
 const erroDeExclusao = computed<string | undefined>(() => usePage().props.errors?.exclusao);
 const excluindo = ref(false);
 
-const titulo = computed(() => (emEdicao.value === null ? 'Nova cidade' : `Editando ${emEdicao.value.nome}`));
+const titulo = computed(() => (emEdicao.value === null ? 'Novo setor' : `Editando ${emEdicao.value.nome}`));
 
 function editar(cidade: CidadeDoCatalogo): void {
     emEdicao.value = cidade;
@@ -58,7 +64,7 @@ function cancelarEdicao(): void {
 
 function gravar(): void {
     if (emEdicao.value === null) {
-        formulario.post(route('admin.catalogo.cidades.store'), {
+        formulario.post(route('admin.catalogo.setores.store'), {
             preserveScroll: true,
             onSuccess: () => formulario.reset(),
         });
@@ -66,7 +72,7 @@ function gravar(): void {
         return;
     }
 
-    formulario.put(route('admin.catalogo.cidades.update', { cidade: emEdicao.value.id }), {
+    formulario.put(route('admin.catalogo.setores.update', { setor: emEdicao.value.id }), {
         preserveScroll: true,
         onSuccess: () => cancelarEdicao(),
     });
@@ -75,7 +81,7 @@ function gravar(): void {
 function excluir(cidade: CidadeDoCatalogo): void {
     excluindo.value = true;
 
-    router.delete(route('admin.catalogo.cidades.destroy', { cidade: cidade.id }), {
+    router.delete(route('admin.catalogo.setores.destroy', { setor: cidade.id }), {
         preserveScroll: true,
         onFinish: () => {
             excluindo.value = false;
@@ -87,8 +93,8 @@ function excluir(cidade: CidadeDoCatalogo): void {
 
 <template>
     <AdminLayout
-        titulo="Cidades"
-        descricao="O catálogo de cidades vale para todos os eventos. Cidade em uso não pode ser excluída: desative-a para que ela pare de aparecer no formulário sem apagar o histórico de quem já se inscreveu."
+        titulo="Setores"
+        descricao="O catálogo de setores vale para todos os eventos. Setor em uso não pode ser excluído: desative-o para que ele pare de aparecer no formulário sem apagar o histórico de quem já se inscreveu."
     >
         <p v-if="props.sucesso" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">
             {{ props.sucesso }}
@@ -102,26 +108,26 @@ function excluir(cidade: CidadeDoCatalogo): void {
             {{ erroDeExclusao }}
         </p>
 
-        <section aria-labelledby="titulo-formulario-cidade" class="rounded-lg border border-border p-4">
-            <h2 id="titulo-formulario-cidade" class="text-lg font-semibold">{{ titulo }}</h2>
+        <section aria-labelledby="titulo-formulario-setor" class="rounded-lg border border-border p-4">
+            <h2 id="titulo-formulario-setor" class="text-lg font-semibold">{{ titulo }}</h2>
 
             <form class="mt-4 grid gap-4 md:grid-cols-[1fr_8rem_auto_auto]" @submit.prevent="gravar">
                 <div class="flex flex-col gap-1">
-                    <label for="cidade-nome" class="text-sm font-medium">Nome da cidade</label>
+                    <label for="setor-nome" class="text-sm font-medium">Nome do setor</label>
                     <input
-                        id="cidade-nome"
+                        id="setor-nome"
                         ref="campoNome"
                         v-model="formulario.nome"
                         type="text"
                         maxlength="120"
                         required
-                        :aria-describedby="formulario.errors.nome ? 'erro-cidade-nome' : undefined"
+                        :aria-describedby="formulario.errors.nome ? 'erro-setor-nome' : undefined"
                         :aria-invalid="formulario.errors.nome ? true : undefined"
                         class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <p
                         v-if="formulario.errors.nome"
-                        id="erro-cidade-nome"
+                        id="erro-setor-nome"
                         role="alert"
                         class="text-sm text-destructive"
                     >
@@ -130,23 +136,23 @@ function excluir(cidade: CidadeDoCatalogo): void {
                 </div>
 
                 <div class="flex flex-col gap-1">
-                    <label for="cidade-uf" class="text-sm font-medium">Estado</label>
+                    <label for="setor-uf" class="text-sm font-medium">Estado</label>
                     <select
-                        id="cidade-uf"
+                        id="setor-uf"
                         v-model="formulario.uf"
-                        :aria-describedby="formulario.errors.uf ? 'erro-cidade-uf' : undefined"
+                        :aria-describedby="formulario.errors.uf ? 'erro-setor-uf' : undefined"
                         class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option v-for="uf in props.ufs" :key="uf" :value="uf">{{ uf }}</option>
                     </select>
-                    <p v-if="formulario.errors.uf" id="erro-cidade-uf" role="alert" class="text-sm text-destructive">
+                    <p v-if="formulario.errors.uf" id="erro-setor-uf" role="alert" class="text-sm text-destructive">
                         {{ formulario.errors.uf }}
                     </p>
                 </div>
 
                 <div class="flex items-end gap-2">
-                    <input id="cidade-ativo" v-model="formulario.ativo" type="checkbox" class="size-4 rounded border-input" />
-                    <label for="cidade-ativo" class="pb-2 text-sm font-medium">Ativa</label>
+                    <input id="setor-ativo" v-model="formulario.ativo" type="checkbox" class="size-4 rounded border-input" />
+                    <label for="setor-ativo" class="pb-2 text-sm font-medium">Ativo</label>
                 </div>
 
                 <div class="flex items-end gap-2">
@@ -169,22 +175,22 @@ function excluir(cidade: CidadeDoCatalogo): void {
             </form>
         </section>
 
-        <section aria-labelledby="titulo-lista-cidades" class="rounded-lg border border-border">
-            <h2 id="titulo-lista-cidades" class="border-b border-border px-4 py-3 text-lg font-semibold">
-                Cidades cadastradas
+        <section aria-labelledby="titulo-lista-setores" class="rounded-lg border border-border">
+            <h2 id="titulo-lista-setores" class="border-b border-border px-4 py-3 text-lg font-semibold">
+                Setores cadastrados
             </h2>
 
             <p v-if="props.cidades.length === 0" class="px-4 py-6 text-sm text-muted-foreground">
-                Nenhuma cidade cadastrada ainda.
+                Nenhum setor cadastrado ainda.
             </p>
 
             <table v-else class="w-full text-sm">
                 <caption class="sr-only">
-                    Cidades do catálogo, com o estado, a situação e quantos grupos de participantes dependem de cada uma.
+                    Setores do catálogo, com o estado, a situação e quantos grupos de participantes dependem de cada um.
                 </caption>
                 <thead>
                     <tr class="border-b border-border text-left">
-                        <th scope="col" class="px-4 py-2 font-medium">Cidade</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Estado</th>
                         <th scope="col" class="px-4 py-2 font-medium">Situação</th>
                         <th scope="col" class="px-4 py-2 font-medium">Grupos</th>
@@ -195,7 +201,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                     <tr v-for="cidade in props.cidades" :key="cidade.id" class="border-b border-border last:border-0">
                         <th scope="row" class="px-4 py-2 text-left font-normal">{{ cidade.nome }}</th>
                         <td class="px-4 py-2">{{ cidade.uf }}</td>
-                        <td class="px-4 py-2">{{ cidade.ativo ? 'Ativa' : 'Desativada' }}</td>
+                        <td class="px-4 py-2">{{ cidade.ativo ? 'Ativo' : 'Desativado' }}</td>
                         <td class="px-4 py-2">{{ cidade.grupos }}</td>
                         <td class="px-4 py-2">
                             <div class="flex flex-wrap items-center gap-2">

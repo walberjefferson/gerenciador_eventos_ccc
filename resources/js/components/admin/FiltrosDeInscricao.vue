@@ -6,7 +6,7 @@ import { reactive } from 'vue';
 /**
  * Os filtros da lista de inscrições.
  *
- * Todos se combinam: escolher o evento e a situação e a cidade vai estreitando
+ * Todos se combinam: escolher o evento e a situação e o setor vai estreitando
  * o resultado, e o endereço da página guarda tudo — assim a segunda página é
  * mesmo a continuação do que se estava vendo, e o link pode ser mandado para
  * outra pessoa.
@@ -86,9 +86,9 @@ function limpar(): void {
             </div>
 
             <div class="flex flex-col gap-1">
-                <label for="filtro-cidade" class="text-sm font-medium">Cidade</label>
+                <label for="filtro-setor" class="text-sm font-medium">Setor</label>
                 <select
-                    id="filtro-cidade"
+                    id="filtro-setor"
                     v-model="campos.cidade_id"
                     class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >

@@ -7,13 +7,13 @@
  * nenhum tipo o declara.
  */
 
-/** Uma cidade do catálogo global. */
+/** Um setor do catálogo global. O tipo guarda o nome antigo, como a tabela. */
 export interface CidadeDoCatalogo {
     id: number;
     nome: string;
     uf: string;
     ativo: boolean;
-    /** Quantos grupos de participantes dependem desta cidade. */
+    /** Quantos grupos de participantes dependem deste setor. */
     grupos: number;
 }
 
@@ -23,13 +23,13 @@ export interface GrupoDoCatalogo {
     nome: string;
     ativo: boolean;
     cidade_id: number;
-    /** Nome da cidade já formatado como "Cidade/UF". */
+    /** Nome do setor já formatado como "Setor/UF", na tela de catálogo. */
     cidade: string;
     /** Quantas inscrições apontam para este grupo. */
     inscricoes: number;
 }
 
-/** Opção de cidade nos seletores. */
+/** Opção de setor nos seletores. */
 export interface OpcaoDeCidade {
     id: number;
     nome: string;

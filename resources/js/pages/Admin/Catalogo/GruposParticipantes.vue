@@ -8,9 +8,13 @@ import { computed, nextTick, ref } from 'vue';
 /**
  * O catálogo de grupos de participantes.
  *
- * Mesma forma da tela de cidades: formulário em cima, lista embaixo. Grupo com
+ * Mesma forma da tela de setores: formulário em cima, lista embaixo. Grupo com
  * inscrição não é excluído — apagar o grupo apagaria a resposta que a pessoa
  * deu no formulário, e neste sistema histórico não se perde.
+ *
+ * A prop e o campo continuam se chamando `cidades` e `cidade_id`, como as
+ * colunas: o renome para "setor" vale para o que a pessoa lê, não para o
+ * contrato com o servidor.
  */
 const props = defineProps<{
     grupos: GrupoDoCatalogo[];
@@ -85,7 +89,7 @@ function excluir(grupo: GrupoDoCatalogo): void {
 <template>
     <AdminLayout
         titulo="Grupos de participantes"
-        descricao="Cada grupo pertence a uma cidade. Grupo que já tem gente inscrita não pode ser excluído: desative-o para tirá-lo do formulário sem apagar nenhuma resposta."
+        descricao="Cada grupo pertence a um setor. Grupo que já tem gente inscrita não pode ser excluído: desative-o para tirá-lo do formulário sem apagar nenhuma resposta."
     >
         <p v-if="props.sucesso" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">
             {{ props.sucesso }}
@@ -100,7 +104,7 @@ function excluir(grupo: GrupoDoCatalogo): void {
         </p>
 
         <p v-if="props.cidades.length === 0" class="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
-            Cadastre ao menos uma cidade antes de criar grupos de participantes.
+            Cadastre ao menos um setor antes de criar grupos de participantes.
         </p>
 
         <section v-else aria-labelledby="titulo-formulario-grupo" class="rounded-lg border border-border p-4">
@@ -131,18 +135,18 @@ function excluir(grupo: GrupoDoCatalogo): void {
                 </div>
 
                 <div class="flex flex-col gap-1">
-                    <label for="grupo-cidade" class="text-sm font-medium">Cidade</label>
+                    <label for="grupo-setor" class="text-sm font-medium">Setor</label>
                     <select
-                        id="grupo-cidade"
+                        id="grupo-setor"
                         v-model="formulario.cidade_id"
-                        :aria-describedby="formulario.errors.cidade_id ? 'erro-grupo-cidade' : undefined"
+                        :aria-describedby="formulario.errors.cidade_id ? 'erro-grupo-setor' : undefined"
                         class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <option v-for="cidade in props.cidades" :key="cidade.id" :value="cidade.id">
-                            {{ cidade.nome }}{{ cidade.ativo ? '' : ' (desativada)' }}
+                            {{ cidade.nome }}{{ cidade.ativo ? '' : ' (desativado)' }}
                         </option>
                     </select>
-                    <p v-if="formulario.errors.cidade_id" id="erro-grupo-cidade" role="alert" class="text-sm text-destructive">
+                    <p v-if="formulario.errors.cidade_id" id="erro-grupo-setor" role="alert" class="text-sm text-destructive">
                         {{ formulario.errors.cidade_id }}
                     </p>
                 </div>
@@ -183,12 +187,12 @@ function excluir(grupo: GrupoDoCatalogo): void {
 
             <table v-else class="w-full text-sm">
                 <caption class="sr-only">
-                    Grupos de participantes, com a cidade, a situação e quantas inscrições apontam para cada um.
+                    Grupos de participantes, com o setor, a situação e quantas inscrições apontam para cada um.
                 </caption>
                 <thead>
                     <tr class="border-b border-border text-left">
                         <th scope="col" class="px-4 py-2 font-medium">Grupo</th>
-                        <th scope="col" class="px-4 py-2 font-medium">Cidade</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Situação</th>
                         <th scope="col" class="px-4 py-2 font-medium">Inscrições</th>
                         <th scope="col" class="px-4 py-2 font-medium">Ações</th>

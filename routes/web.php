@@ -101,16 +101,25 @@ Route::middleware(['auth', 'verified'])
             ->middleware('permission:painel.ver')
             ->name('painel');
 
-        // Catalogo global: cidades e grupos de participantes. Sao listas que
+        // Catalogo global: setores e grupos de participantes. Sao listas que
         // valem para todos os eventos, por isso vivem sob a mesma permissao.
+        //
+        // A URL e o parametro dizem "setor", que e como a comunidade chama isso.
+        // O Model, a tabela e a coluna continuam sendo `Cidade`/`cidades`/
+        // `cidade_id`: o renome nao atravessa para o banco. O type-hint
+        // `Cidade $setor` resolve porque o binding do Laravel casa pelo NOME do
+        // parametro, nao pelo da classe.
+        //
+        // Nao ha redirecionamento de `catalogo/cidades`: o sistema nao esta
+        // publicado e ninguem tem esse endereco guardado.
         Route::middleware('permission:catalogo.gerenciar')
             ->prefix('catalogo')
             ->name('catalogo.')
             ->group(function (): void {
-                Route::get('cidades', [CidadeController::class, 'index'])->name('cidades');
-                Route::post('cidades', [CidadeController::class, 'store'])->name('cidades.store');
-                Route::put('cidades/{cidade}', [CidadeController::class, 'update'])->name('cidades.update');
-                Route::delete('cidades/{cidade}', [CidadeController::class, 'destroy'])->name('cidades.destroy');
+                Route::get('setores', [CidadeController::class, 'index'])->name('setores');
+                Route::post('setores', [CidadeController::class, 'store'])->name('setores.store');
+                Route::put('setores/{setor}', [CidadeController::class, 'update'])->name('setores.update');
+                Route::delete('setores/{setor}', [CidadeController::class, 'destroy'])->name('setores.destroy');
 
                 Route::get('grupos-participantes', [GrupoParticipanteController::class, 'index'])
                     ->name('grupos-participantes');

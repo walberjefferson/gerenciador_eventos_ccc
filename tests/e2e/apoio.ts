@@ -21,7 +21,7 @@ export function artisan(argumentos: string[]): string {
 }
 
 /**
- * Banco do zero com o catalogo de cidades e o evento de demonstracao.
+ * Banco do zero com o catalogo real de setores e o evento de demonstracao.
  *
  * Sempre o mesmo estado inicial: nenhum cenario depende do que outro deixou
  * para tras.
@@ -65,8 +65,10 @@ export async function preencherDadosPessoais(page: Page, pessoa: PessoaDeTeste):
     await page.getByLabel('CPF').fill(pessoa.cpf);
     await page.getByLabel('Data de nascimento').fill(dataComoNaTela(pessoa.nascimento));
 
-    await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
-    await escolherNaLista(page, 'Grupo', 'Centro');
+    // Dado real do catalogo. O grupo tem PARENTESE de proposito: e o que
+    // quebraria um seletor mal escrito, e e o nome que a comunidade usa.
+    await escolherNaLista(page, 'Setor', 'Setor Batalha');
+    await escolherNaLista(page, 'Grupo', 'Batalha (Sede)');
 }
 
 /**

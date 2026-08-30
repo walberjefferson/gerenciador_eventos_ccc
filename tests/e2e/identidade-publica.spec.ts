@@ -9,7 +9,7 @@ import { expect, test } from './base';
  * O tema verde vale para as seis telas do visitante e para nenhuma outra. Isso
  * parece obvio olhando o CSS e nao e: o escopo mora no `<html>`, e um escopo
  * mal posto falha de dois jeitos opostos — ou nao alcanca o que devia (a lista
- * de cidades, que e teleportada para fora da pagina), ou alcanca o que nao
+ * de setores, que e teleportada para fora da pagina), ou alcanca o que nao
  * devia (o painel administrativo, que continua azul).
  *
  * Os quatro cenarios abaixo cobrem os dois lados, e o terceiro e o mais
@@ -113,11 +113,11 @@ test('o painel administrativo continua no azul de hoje', async ({ page }) => {
     }
 });
 
-test('a lista de cidades, que e teleportada para fora da pagina, sai no tema publico', async ({ page }) => {
+test('a lista de setores, que e teleportada para fora da pagina, sai no tema publico', async ({ page }) => {
     await page.goto(`/eventos/${EVENTO_DEMO.slug}/inscricao`);
 
-    await page.getByLabel('Cidade', { exact: true }).click();
-    await expect(page.getByRole('option', { name: 'São Paulo (SP)', exact: true })).toBeVisible();
+    await page.getByLabel('Setor', { exact: true }).click();
+    await expect(page.getByRole('option', { name: 'Setor Batalha', exact: true })).toBeVisible();
 
     const painel = page.getByRole('listbox').first();
 
@@ -134,8 +134,8 @@ test('a lista de cidades, que e teleportada para fora da pagina, sai no tema pub
     }));
 
     expect(retrato.saiuDaPagina, 'o painel deixou de ser um portal — o cenario perdeu o sentido').toBe(true);
-    expect(retrato.tema, 'a lista de cidades saiu fora do tema publico').toBe('publico');
-    expect(retrato.borda, 'a lista de cidades esta com o fio do painel administrativo').toBe(LINHA_PUBLICA);
+    expect(retrato.tema, 'a lista de setores saiu fora do tema publico').toBe('publico');
+    expect(retrato.borda, 'a lista de setores esta com o fio do painel administrativo').toBe(LINHA_PUBLICA);
     // O raio do tema publico e 14px, e `rounded-md` tira 2px: 12px. No painel
     // seriam 8px.
     expect(Number.parseFloat(retrato.raio)).toBeCloseTo(12, 1);

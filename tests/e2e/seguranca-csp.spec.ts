@@ -105,10 +105,10 @@ test('a pagina do evento e o formulario funcionam inteiros com a politica ligada
 
     await expect(page.getByLabel('Nome completo')).toBeVisible();
 
-    // A lista de cidades e um painel desenhado pela interface, nao o `<select>`
+    // A lista de setores e um painel desenhado pela interface, nao o `<select>`
     // do sistema: se a politica tivesse barrado o JavaScript, ela nem abriria.
-    await page.getByLabel('Cidade', { exact: true }).click();
-    await expect(page.getByRole('option', { name: 'São Paulo (SP)', exact: true })).toBeVisible();
+    await page.getByLabel('Setor', { exact: true }).click();
+    await expect(page.getByRole('option', { name: 'Setor Batalha', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
 
     expect(await violacoesDaPagina(page, doConsole)).toEqual([]);

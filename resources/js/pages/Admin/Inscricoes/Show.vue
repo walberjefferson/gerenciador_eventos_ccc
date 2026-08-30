@@ -111,7 +111,7 @@ function confirmarPagamento(): void {
                     <dd class="text-sm font-medium">{{ props.inscricao.telefone ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Cidade</dt>
+                    <dt class="text-sm text-muted-foreground">Setor</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.cidade || '—' }}</dd>
                 </div>
                 <div>

@@ -52,7 +52,9 @@ class ExportarInscricoesController extends Controller
         'E-mail',
         'Telefone',
         'Evento',
-        'Cidade',
+        // A coluna sempre trouxe o nome do setor da pessoa; so o cabecalho
+        // mudou. As subconsultas continuam lendo a tabela `cidades`.
+        'Setor',
         'Grupo',
         'Situação',
         'Situação da cobrança',

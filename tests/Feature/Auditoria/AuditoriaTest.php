@@ -225,17 +225,17 @@ it('registra o cadastro, a alteracao e a remocao feitos pelo painel', function (
     $administrador = CenarioAdmin::usuarioCom('administrador');
 
     $this->actingAs($administrador)
-        ->post(route('admin.catalogo.cidades.store'), ['nome' => 'Ribeirão Preto', 'uf' => 'SP', 'ativo' => true])
+        ->post(route('admin.catalogo.setores.store'), ['nome' => 'Setor Palmeira', 'uf' => 'AL', 'ativo' => true])
         ->assertRedirect();
 
-    $cidade = Cidade::query()->where('nome', 'Ribeirão Preto')->sole();
+    $cidade = Cidade::query()->where('nome', 'Setor Palmeira')->sole();
 
     $this->actingAs($administrador)
-        ->put(route('admin.catalogo.cidades.update', $cidade), ['nome' => 'Ribeirão Preto', 'uf' => 'SP', 'ativo' => false])
+        ->put(route('admin.catalogo.setores.update', $cidade), ['nome' => 'Setor Palmeira', 'uf' => 'AL', 'ativo' => false])
         ->assertRedirect();
 
     $this->actingAs($administrador)
-        ->delete(route('admin.catalogo.cidades.destroy', $cidade))
+        ->delete(route('admin.catalogo.setores.destroy', $cidade))
         ->assertRedirect();
 
     $registros = LogAuditoria::query()->daEntidade('cidade', (int) $cidade->id)->orderBy('id')->get();
@@ -253,10 +253,10 @@ it('registra o cadastro, a alteracao e a remocao feitos pelo painel', function (
 it('nao registra alteracao quando o formulario foi enviado sem mudar nada', function (): void {
     CenarioAdmin::semearPapeis();
     $administrador = CenarioAdmin::usuarioCom('administrador');
-    $cidade = Cidade::factory()->create(['nome' => 'Bauru', 'uf' => 'SP', 'ativo' => true]);
+    $cidade = Cidade::factory()->create(['nome' => 'Setor Delmiro', 'uf' => 'AL', 'ativo' => true]);
 
     $this->actingAs($administrador)
-        ->put(route('admin.catalogo.cidades.update', $cidade), ['nome' => 'Bauru', 'uf' => 'SP', 'ativo' => true])
+        ->put(route('admin.catalogo.setores.update', $cidade), ['nome' => 'Setor Delmiro', 'uf' => 'AL', 'ativo' => true])
         ->assertRedirect();
 
     expect(

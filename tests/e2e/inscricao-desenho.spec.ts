@@ -75,17 +75,18 @@ test.describe('em tela de computador', () => {
         const telefone = await largura(page.locator('#telefone'));
         const cpf = await largura(page.locator('#documento'));
         const nascimento = await largura(page.locator('#data_nascimento'));
-        const cidade = await largura(page.locator('#cidade_id'));
+        // O campo continua se chamando `cidade_id`; o rotulo dele e "Setor".
+        const setor = await largura(page.locator('#cidade_id'));
         const grupo = await largura(page.locator('#grupo_participante_id'));
 
         // O DEFEITO da imagem "antes": CPF e nascimento vinham de uma grade com
         // `sm:max-w-md` e mediam pouco mais da metade da coluna de e-mail e de
-        // cidade. Numa grade unica, as duas colunas tem sempre a mesma medida.
+        // setor. Numa grade unica, as duas colunas tem sempre a mesma medida.
         for (const [rotulo, medida] of [
             ['telefone', telefone],
             ['CPF', cpf],
             ['nascimento', nascimento],
-            ['cidade', cidade],
+            ['setor', setor],
             ['grupo', grupo],
         ] as const) {
             expect(Math.abs(medida - email), `${rotulo} nao tem a largura de coluna do e-mail (${medida} contra ${email})`).toBeLessThanOrEqual(1);
@@ -112,9 +113,9 @@ test.describe('em tela de computador', () => {
         await expect(page.locator('#documento')).toHaveAttribute('placeholder', '000.000.000-00');
         await expect(page.locator('#data_nascimento')).toHaveAttribute('placeholder', 'dd/mm/aaaa');
 
-        // O texto de espera do grupo diz o que fazer ANTES: sem cidade, a lista
+        // O texto de espera do grupo diz o que fazer ANTES: sem setor, a lista
         // esta vazia e "Escolha o seu grupo" seria um convite falso.
-        await expect(page.locator('#grupo_participante_id')).toContainText('Escolha a cidade primeiro');
+        await expect(page.locator('#grupo_participante_id')).toContainText('Escolha o setor primeiro');
     });
 
     test('o resumo abre pelo nome do evento, com a data e o lugar embaixo', async ({ page }) => {

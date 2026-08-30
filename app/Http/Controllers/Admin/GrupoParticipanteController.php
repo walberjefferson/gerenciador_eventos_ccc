@@ -15,9 +15,13 @@ use Inertia\Response;
 /**
  * O catalogo de grupos de participantes.
  *
- * Mesma ideia das cidades, com um detalhe a mais: grupo que ja tem gente
+ * Mesma ideia dos setores, com um detalhe a mais: grupo que ja tem gente
  * inscrita nao e apagado de jeito nenhum. Apagar o grupo apagaria a resposta
  * que a pessoa deu no formulario, e neste sistema historico nao se perde.
+ *
+ * As props continuam se chamando `cidades` e `cidade_id`, como as colunas: o
+ * renome para "setor" vale para o que a pessoa le, nao para o contrato. E aqui
+ * o rotulo ainda traz a UF, porque esta e a tela onde ela e cadastrada.
  */
 class GrupoParticipanteController extends Controller
 {
@@ -38,6 +42,7 @@ class GrupoParticipanteController extends Controller
                     'nome' => $grupo->nome,
                     'ativo' => $grupo->ativo,
                     'cidade_id' => $grupo->cidade_id,
+                    // O setor do grupo, como a tela de catalogo o mostra.
                     'cidade' => $grupo->cidade === null ? '' : $grupo->cidade->nome.'/'.$grupo->cidade->uf,
                     'inscricoes' => $grupo->inscricoes_count,
                 ])

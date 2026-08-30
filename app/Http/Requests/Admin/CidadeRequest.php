@@ -9,11 +9,18 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * O que precisa ser verdade para uma cidade ser gravada.
+ * O que precisa ser verdade para um setor ser gravado.
+ *
+ * A classe, a tabela e o Model continuam se chamando "cidade": o renome para
+ * "setor" vale para o que a pessoa le, nao para o banco.
  *
  * Cada regra daqui espelha uma restricao do banco (ver docs/DATABASE.md), para
  * que quem esta na tela receba uma frase em portugues antes de o PostgreSQL
  * recusar com a mensagem dele, que ninguem entende.
+ *
+ * O CAMPO UF CONTINUA NA TELA, mesmo tendo sumido do rotulo publico: a coluna
+ * e obrigatoria e entra na chave unica (`nome`, `uf`). Escondido, o cadastro de
+ * um setor novo falharia sem explicar por que.
  */
 class CidadeRequest extends FormRequest
 {
@@ -28,15 +35,16 @@ class CidadeRequest extends FormRequest
      */
     public function rules(): array
     {
-        $cidade = $this->route('cidade');
-        $id = $cidade instanceof Cidade ? $cidade->getKey() : null;
+        // O parametro da rota se chama `setor`; o que ele resolve continua
+        // sendo um Model `Cidade`.
+        $setor = $this->route('setor');
+        $id = $setor instanceof Cidade ? $setor->getKey() : null;
 
         return [
             // O banco guarda no maximo 120 caracteres.
             'nome' => [
                 'required', 'string', 'min:2', 'max:120',
-                // A unicidade e do par nome + UF: existe Franca em SP e pode
-                // existir cidade de mesmo nome em outro estado.
+                // A unicidade e do par nome + UF, como o banco a declara.
                 Rule::unique('cidades', 'nome')
                     ->where(fn ($consulta) => $consulta->where('uf', $this->uf()))
                     ->ignore($id),
@@ -52,7 +60,7 @@ class CidadeRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'nome' => 'nome da cidade',
+            'nome' => 'nome do setor',
             'uf' => 'estado',
         ];
     }
@@ -63,11 +71,11 @@ class CidadeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nome.required' => 'Informe o nome da cidade.',
-            'nome.max' => 'O nome da cidade pode ter no máximo 120 caracteres.',
+            'nome.required' => 'Informe o nome do setor.',
+            'nome.max' => 'O nome do setor pode ter no máximo 120 caracteres.',
             'uf.required' => 'Escolha o estado.',
             'uf.in' => 'Escolha um estado válido, com as duas letras da sigla.',
-            'nome.unique' => 'Já existe uma cidade com esse nome neste estado.',
+            'nome.unique' => 'Já existe um setor com esse nome neste estado.',
         ];
     }
 
