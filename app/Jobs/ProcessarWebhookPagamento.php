@@ -8,6 +8,7 @@ use App\Actions\Pagamentos\CancelarPagamento;
 use App\Actions\Pagamentos\ConfirmarPagamento;
 use App\Contracts\Payments\PaymentGateway;
 use App\DTOs\Payments\WebhookRequestData;
+use App\DTOs\Payments\WebhookResult;
 use App\Enums\SituacaoPagamento;
 use App\Enums\SituacaoWebhook;
 use App\Models\Pagamento;
@@ -44,11 +45,15 @@ class ProcessarWebhookPagamento implements ShouldQueue
         }
 
         try {
+            // O provedor traduz uma lista de eventos, porque um aviso pode
+            // trazer varios pagamentos. Quem desdobrou a lista foi o
+            // controller: cada registro guarda o recorte de UM evento, e e
+            // esse unico evento que chega aqui.
             $resultado = $gateway->parseWebhook(
                 WebhookRequestData::fromPayload((array) $webhook->payload)
-            );
+            )[0] ?? null;
 
-            if (! $resultado->isActionable()) {
+            if ($resultado === null || ! $resultado->isActionable()) {
                 $this->encerrar($webhook, SituacaoWebhook::Ignorado, 'Aviso sem cobranca ou sem situacao reconhecivel.');
 
                 return;
@@ -64,6 +69,8 @@ class ProcessarWebhookPagamento implements ShouldQueue
 
                 return;
             }
+
+            $this->guardarIdentificadorDaTransferencia($pagamento, $resultado);
 
             $situacao = SituacaoPagamento::deStatusExterno((string) $resultado->status);
 
@@ -85,6 +92,38 @@ class ProcessarWebhookPagamento implements ShouldQueue
 
             throw $erro;
         }
+    }
+
+    /**
+     * Guarda o identificador que o sistema de pagamentos instantaneos da a
+     * transferencia, quando o aviso trouxer um.
+     *
+     * Ele nao serve para nada hoje, e e exatamente por isso que precisa ser
+     * guardado hoje: uma devolucao, no dia em que houver, e pedida por esse
+     * identificador e nao pelo da cobranca. Ele chega uma unica vez, no aviso.
+     * Se nao for gravado agora, some — e reencontra-lo depois significa varrer
+     * a API do provedor pagamento a pagamento.
+     *
+     * A chave vive em metadados, que ja e uma coluna jsonb: nao ha coluna nova
+     * nem migracao para uma informacao que ainda nao tem consulta.
+     */
+    private function guardarIdentificadorDaTransferencia(Pagamento $pagamento, WebhookResult $resultado): void
+    {
+        $identificador = $resultado->raw['end_to_end_id'] ?? null;
+
+        if (! is_string($identificador) || $identificador === '') {
+            return;
+        }
+
+        $metadados = (array) ($pagamento->metadados ?? []);
+
+        if (($metadados['end_to_end_id'] ?? null) === $identificador) {
+            return;
+        }
+
+        $metadados['end_to_end_id'] = $identificador;
+
+        $pagamento->forceFill(['metadados' => $metadados])->save();
     }
 
     /**

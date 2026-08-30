@@ -61,6 +61,11 @@ return [
             // ],
         ],
 
+        // O transporte de producao (decisao DA-29). Entrega por API HTTPS, entao
+        // nao depende de porta SMTP liberada no servidor — porta 25 e 587 saem
+        // bloqueadas por padrao na maioria dos provedores de nuvem, e essa e a
+        // razao pratica de nao usar SMTP aqui. A chave vive em RESEND_API_KEY
+        // (config/services.php) e nunca no repositorio.
         'resend' => [
             'transport' => 'resend',
         ],

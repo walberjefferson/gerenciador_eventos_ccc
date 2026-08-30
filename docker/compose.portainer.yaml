@@ -1,0 +1,301 @@
+# ===========================================================================
+# Stack de producao para o Portainer — Gestao de Eventos (CCC)
+#
+# A imagem vem do GHCR, publicada pelo workflow .github/workflows/docker-publish.yml.
+# As variaveis (APP_KEY, APP_DOMAIN, DB_PASSWORD, RESEND_API_KEY...) sao
+# preenchidas na aba "Environment variables" do stack. A lista completa, com o
+# que cada uma significa e como gerar, esta em env.docker.example e no roteiro
+# docs/DEPLOY.md.
+#
+# Cinco servicos, tres deles da MESMA imagem:
+#
+#   app        FrankenPHP na :80  — atende as pessoas          (Traefik)
+#   worker     queue:work         — envia os e-mails           (interno)
+#   scheduler  schedule:work      — expira, lembra, reconcilia (interno)
+#   pgsql      PostgreSQL 18                                   (interno)
+#   redis      Redis — fila e cache                            (interno)
+#
+# Nenhum dos quatro internos publica porta no host. O unico caminho de fora
+# para dentro passa pelo Traefik, e so ate o "app".
+# ===========================================================================
+
+# Ambiente compartilhado pelos tres processos PHP. Um bloco so, de proposito:
+# worker e scheduler precisam enxergar o mundo exatamente como o web enxerga —
+# mesma APP_URL (senao o link do e-mail sai com o endereco errado), mesmo fuso
+# (senao o prazo de pagamento expira na hora errada) e mesma fila.
+x-app-env: &app-env
+  APP_NAME: "${APP_NAME:-Gestao de Eventos}"
+
+  # APP_ENV e APP_DEBUG sao FIXOS, e nao variaveis do stack. Com APP_DEBUG=true
+  # qualquer erro devolveria ao visitante a pilha de chamadas, os caminhos do
+  # servidor e as variaveis de ambiente da requisicao — inclusive a credencial
+  # da Efi e a chave da Resend. Isso nao pode depender de ninguem digitar certo
+  # num formulario (ARCHITECTURE.md, secao 11.4).
+  APP_ENV: production
+  APP_DEBUG: "false"
+
+  APP_KEY: "${APP_KEY}"
+  APP_URL: "https://${APP_DOMAIN}"
+  ASSET_URL: "https://${APP_DOMAIN}"
+
+  # Fuso da aplicacao. O banco guarda em UTC e a aplicacao converte (decisao
+  # D-10). Errar aqui e mostrar o prazo de pagamento tres horas deslocado — e
+  # vaga perdida por conta disso nao volta.
+  APP_TIMEZONE: "${APP_TIMEZONE:-America/Sao_Paulo}"
+  APP_LOCALE: "${APP_LOCALE:-pt_BR}"
+  APP_FALLBACK_LOCALE: "${APP_FALLBACK_LOCALE:-en}"
+
+  LOG_CHANNEL: stack
+  LOG_STACK: single
+  LOG_LEVEL: "${LOG_LEVEL:-warning}"
+
+  # --- Banco ---------------------------------------------------------------
+  # 5432 pela rede interna. A porta 55432 do .env.example e um arranjo da
+  # maquina de quem desenvolve (decisao D-19) e nao tem eco aqui.
+  DB_CONNECTION: pgsql
+  DB_HOST: pgsql
+  DB_PORT: "5432"
+  DB_DATABASE: "${DB_DATABASE:-gestao_eventos}"
+  DB_USERNAME: "${DB_USERNAME:-eventos}"
+  DB_PASSWORD: "${DB_PASSWORD}"
+
+  # --- Redis: fila e cache -------------------------------------------------
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: "null"
+
+  # A sessao continua no banco: sessao e o unico dos tres que nao pode evaporar
+  # num reinicio do Redis sem incomodar quem esta usando o painel.
+  SESSION_DRIVER: database
+  SESSION_LIFETIME: "120"
+  QUEUE_CONNECTION: redis
+  CACHE_STORE: redis
+
+  BROADCAST_CONNECTION: log
+  FILESYSTEM_DISK: local
+
+  # --- E-mail (decisao DA-29) ----------------------------------------------
+  # Entrega por API HTTPS. SMTP nao serviria: porta 25 e 587 saem bloqueadas na
+  # maioria dos servidores de nuvem, e a falha seria silenciosa.
+  MAIL_MAILER: resend
+  RESEND_API_KEY: "${RESEND_API_KEY}"
+  MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS}"
+  MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Gestao de Eventos}"
+
+  # A fila com nome. O worker so consome esta (fase 7).
+  COMUNICACAO_FILA: emails
+  COMUNICACAO_TENTATIVAS: "3"
+
+  # --- Pagamentos ----------------------------------------------------------
+  # O provedor real. As credenciais NAO vem por variavel: desde a fase 8b elas
+  # moram cifradas no banco e sao cadastradas na tela "Credenciais de
+  # pagamento" (decisao DA-26). As EFI_* continuam existindo no codigo apenas
+  # como reserva, e ficam vazias aqui.
+  PAYMENT_GATEWAY: "${PAYMENT_GATEWAY:-efi}"
+  # O provedor simulado nao pode emitir cobranca de mentira em producao. Ele ja
+  # e barrado pelo ambiente, mas a trava explicita custa uma linha.
+  PAYMENT_FAKE_SIMULATION_ENABLED: "false"
+
+  # Segredo que gera a impressao digital do CPF usada para detectar inscricao
+  # duplicada. Definido UMA VEZ, na criacao do stack, e nunca mais alterado:
+  # trocar este valor faz o sistema deixar de reconhecer como duplicadas as
+  # inscricoes ja gravadas.
+  DOCUMENTO_HASH_PEPPER: "${DOCUMENTO_HASH_PEPPER}"
+
+services:
+  # -------------------------------------------------------------------------
+  # web — a aplicacao que as pessoas acessam
+  # -------------------------------------------------------------------------
+  app:
+    image: "${APP_IMAGE:-ghcr.io/walberjefferson/gerenciador_eventos_ccc:latest}"
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      # Este e o unico papel que aplica migrations e roda o seeder de papeis.
+      # Ver docker/entrypoint.sh: tres conteineres migrando o mesmo banco ao
+      # mesmo tempo e corrida garantida.
+      CONTAINER_ROLE: web
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Arquivos publicos enviados pela administracao (banner do evento). O
+      # resto do storage e descartavel: log vai para o stdout do conteiner e o
+      # certificado da Efi e reescrito do banco quando falta (decisao DA-25).
+      - eventos-publico:/app/storage/app/public
+    networks:
+      - proxy
+      - backend
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fopen('http://127.0.0.1:80/up','r') ? 0 : 1);"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy}"
+
+      # --- Router do site ---------------------------------------------------
+      # priority explicito nos dois routers. Sem isso o Traefik ordena pelo
+      # tamanho da regra, e a regra de Host — que casa com TUDO no dominio —
+      # poderia capturar o aviso da Efi antes do router do webhook.
+      - "traefik.http.routers.eventos-app.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.eventos-app.priority=1"
+      - "traefik.http.routers.eventos-app.entrypoints=websecure"
+      - "traefik.http.routers.eventos-app.tls=true"
+      - "traefik.http.routers.eventos-app.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}"
+      - "traefik.http.routers.eventos-app.service=eventos-app"
+
+      # --- Router do webhook da Efi ----------------------------------------
+      # PathPrefix cobre os DOIS caminhos: a Efi registra
+      # /webhooks/pagamentos e notifica em /webhooks/pagamentos/pix, com o
+      # sufixo acrescentado por ela (colisao C-6 da fase 8a).
+      #
+      # A lista de IP e a segunda camada de defesa do aviso (decisao DA-28); a
+      # primeira e o HMAC que a propria aplicacao confere. Ela vale SO neste
+      # router: a inscricao publica continua aberta a qualquer pessoa, de
+      # qualquer lugar.
+      - "traefik.http.routers.eventos-webhook.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/webhooks/pagamentos`)"
+      - "traefik.http.routers.eventos-webhook.priority=100"
+      - "traefik.http.routers.eventos-webhook.entrypoints=websecure"
+      - "traefik.http.routers.eventos-webhook.tls=true"
+      - "traefik.http.routers.eventos-webhook.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}"
+      - "traefik.http.routers.eventos-webhook.service=eventos-app"
+      - "traefik.http.routers.eventos-webhook.middlewares=eventos-efi-ips@docker"
+
+      # O IP publico de onde a Efi notifica. Em Traefik 2.9 ou anterior o nome
+      # do middleware e "ipwhitelist" — ver docs/DEPLOY.md.
+      - "traefik.http.middlewares.eventos-efi-ips.ipallowlist.sourcerange=${EFI_IP_PERMITIDO:-34.193.116.226/32}"
+
+      - "traefik.http.services.eventos-app.loadbalancer.server.port=80"
+
+  # -------------------------------------------------------------------------
+  # worker — o trabalhador da fila de e-mails
+  #
+  # Sem ele nenhum e-mail sai, e o sistema nao reclama: a fila apenas cresce
+  # (ARCHITECTURE.md, secao 9.1). A fila tem nome desde a fase 7, e o worker
+  # consome exatamente essa.
+  # -------------------------------------------------------------------------
+  worker:
+    image: "${APP_IMAGE:-ghcr.io/walberjefferson/gerenciador_eventos_ccc:latest}"
+    restart: unless-stopped
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=emails
+      - --sleep=1
+      - --tries=3
+      - --max-time=3600
+    environment:
+      <<: *app-env
+      CONTAINER_ROLE: worker
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    # Processo de segundo plano, sem porta HTTP: o healthcheck da imagem base
+    # bateria numa porta que nao existe aqui e o conteiner ficaria "unhealthy"
+    # para sempre.
+    healthcheck:
+      disable: true
+
+  # -------------------------------------------------------------------------
+  # scheduler — o agendador
+  #
+  # Roda as tres rotinas de routes/console.php: expiracao de inscricao (a cada
+  # minuto), reconciliacao de pagamento (a cada cinco) e lembrete de prazo (a
+  # cada quinze). Sem ele, vaga vencida nao volta para a fila e pagamento pago
+  # nao e reconhecido quando o aviso se perde.
+  #
+  # UMA replica, sempre. Duas rodariam o mesmo agendamento em paralelo, e duas
+  # rodadas do lembrete sao dois e-mails para a mesma pessoa.
+  # -------------------------------------------------------------------------
+  scheduler:
+    image: "${APP_IMAGE:-ghcr.io/walberjefferson/gerenciador_eventos_ccc:latest}"
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      <<: *app-env
+      CONTAINER_ROLE: scheduler
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+    healthcheck:
+      disable: true
+
+  # -------------------------------------------------------------------------
+  # pgsql — o banco
+  # -------------------------------------------------------------------------
+  pgsql:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${DB_DATABASE:-gestao_eventos}"
+      POSTGRES_USER: "${DB_USERNAME:-eventos}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      # O postgres:18 usa PGDATA em /var/lib/postgresql/18/docker — montar a
+      # raiz e o que persiste de verdade (mesmo arranjo do compose de dev).
+      - eventos-pgsql:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE:-gestao_eventos}", "-U", "${DB_USERNAME:-eventos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # redis — fila e cache
+  #
+  # appendonly ligado de proposito: aqui dentro esperam os e-mails que ainda
+  # nao sairam. Um reinicio do conteiner nao pode apagar a confirmacao de
+  # inscricao de ninguem.
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - eventos-redis:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  # Rede do Traefik, criada por outro stack neste servidor. Aqui ela e sempre
+  # external: apenas nos conectamos a ela.
+  proxy:
+    external: true
+    name: "${TRAEFIK_NETWORK:-proxy}"
+  # Rede interna do stack. Banco, Redis, worker e scheduler vivem so aqui, sem
+  # nenhuma porta publicada no host.
+  backend:
+    driver: bridge
+
+volumes:
+  eventos-pgsql:
+    driver: local
+  eventos-redis:
+    driver: local
+  eventos-publico:
+    driver: local

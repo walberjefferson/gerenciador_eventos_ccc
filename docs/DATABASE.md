@@ -510,6 +510,35 @@ Registro cru de cada aviso recebido do provedor de pagamento.
 - **A unicidade é a proteção principal contra o aviso repetido.** Se o mesmo identificador chegar de novo, a gravação falha e o sistema sabe, sem consultar nada, que já tratou daquele aviso.
 - **O aviso é guardado sem dado sensível desnecessário.** Se o provedor mandar dados que não usamos e que são pessoais, eles são removidos antes de gravar.
 
+### 3.12 `comunicacoes_enviadas` → Model `ComunicacaoEnviada`
+
+Registro de cada mensagem enviada ao participante. Criada na Fase 7.
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+|--------|------|------|--------|-----------|
+| `id` | bigserial | não | — | — |
+| `inscricao_id` | bigint FK → `inscricoes` (restrict) | não | — | De quem é a mensagem |
+| `tipo` | varchar(40) | não | — | Qual mensagem (Enum `TipoComunicacao`) |
+| `canal` | varchar(20) | não | `'email'` | Por onde saiu |
+| `destino` | varchar(190) | não | — | O endereço de fato usado |
+| `enviada_em` | timestamptz | não | — | Quando saiu |
+| `created_at` / `updated_at` | timestamptz | sim | — | — |
+
+**Índices e restrições:**
+
+- **Unicidade** `comunicacoes_enviadas_inscricao_id_tipo_canal_unique`: `UNIQUE (inscricao_id, tipo, canal)`
+- `index(tipo, enviada_em)`
+- Chave estrangeira **`restrict`**
+
+**Por quê:**
+
+- **A unicidade é a única proteção contra o e-mail repetido**, e é de propósito que ela esteja no banco. Perguntar "já mandei?" em PHP não protege nada: dois trabalhadores da fila perguntam ao mesmo tempo, ouvem "ainda não" os dois, e a pessoa recebe duas cópias. O registro é gravado **antes** do envio, na mesma transação; se o banco recusar, alguém chegou primeiro e o trabalho encerra em silêncio. Se o envio falhar, a transação volta atrás e o registro some junto, deixando o caminho livre para a próxima tentativa (decisão **D-66**).
+- **`destino` guarda o endereço usado na hora**, e não o atual da inscrição. Quando alguém disser "não recebi", é essa coluna que responde para onde a mensagem foi — o e-mail da inscrição pode ter sido corrigido depois.
+- **`canal` nasce com um valor só (`email`)** para que um segundo meio de aviso entre um dia sem migração e sem reescrever a regra de "uma vez só". Não há contrato nem adaptador de canal: isso seria abstração sem uso (decisão **D-70**).
+- **A chave é `restrict`** pelo mesmo motivo da de `pagamentos`: prova de comunicação com uma pessoa não pode sumir junto com um apagamento acidental.
+
+---
+
 ---
 
 ## 4. Enums (listas fechadas de situação)
@@ -523,6 +552,7 @@ Guardados como texto em português. A aplicação controla os valores por Enum d
 | `SituacaoPagamento` | `pendente`, `pago`, `falhou`, `expirado`, `cancelado`, `estornado` | `pagamentos.situacao` |
 | `MetodoPagamento` | `pix`, `cartao_credito` | `pagamentos.metodo` |
 | `SituacaoWebhook` | `recebido`, `processado`, `ignorado`, `falhou` | `webhooks_pagamento.situacao` |
+| `TipoComunicacao` | `inscricao_recebida`, `lembrete_prazo`, `pagamento_confirmado`, `prazo_vencido`, `inscricao_cancelada` | `comunicacoes_enviadas.tipo` |
 
 Todo Enum expõe `rotulo()`, que devolve o texto amigável para exibição ("Aguardando pagamento"). `SituacaoInscricao` expõe também `estaAtiva()`, verdadeiro para `aguardando_pagamento` e `confirmada` — exatamente as duas situações que ocupam vaga e que participam das unicidades parciais.
 

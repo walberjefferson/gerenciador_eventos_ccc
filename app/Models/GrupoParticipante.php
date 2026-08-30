@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Grupo de participantes vinculado a uma cidade.
@@ -34,6 +35,19 @@ class GrupoParticipante extends Model
     public function cidade(): BelongsTo
     {
         return $this->belongsTo(Cidade::class);
+    }
+
+    /**
+     * As inscricoes feitas por gente deste grupo.
+     *
+     * Existe para que a tela do catalogo saiba, antes de oferecer o botao de
+     * excluir, se apagar o grupo apagaria a resposta de alguem.
+     *
+     * @return HasMany<Inscricao, $this>
+     */
+    public function inscricoes(): HasMany
+    {
+        return $this->hasMany(Inscricao::class);
     }
 
     /**

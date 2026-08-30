@@ -38,6 +38,8 @@ export interface DiaEventoPublico {
     descricao: string | null;
     data: string;
     data_rotulo: string;
+    /** "Sábado · 17/10", ja escrito pelo servidor. */
+    quando: string;
     posicao: number;
     grupos: GrupoAtividadePublico[];
 }
@@ -51,8 +53,22 @@ export interface EventoPublico {
     data_inicio: string;
     data_fim: string;
     periodo_rotulo: string;
+    /** O nome curto do lugar, ou null enquanto ninguem o cadastrou. */
+    /** "17 e 18 de outubro" — a data como alguem a fala. */
+    quando_rotulo: string;
+    /** "Sábado e domingo, 2026". */
+    quando_nota: string;
+    local: string | null;
+    /** Como chegar: distancia, referencia, estacionamento. */
+    local_detalhe: string | null;
+    /** O que a inscricao inclui. Lista vazia quando ninguem preencheu. */
+    itens_incluidos: string[];
+    /** As duvidas que a organizacao responde toda semana no WhatsApp. */
+    perguntas_frequentes: Array<{ pergunta: string; resposta: string }>;
     inscricoes_abrem_em: string;
     inscricoes_fecham_em: string;
+    /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */
+    prazo_rotulo: string | null;
     valor_centavos: number;
     moeda: string;
     capacidade: number | null;

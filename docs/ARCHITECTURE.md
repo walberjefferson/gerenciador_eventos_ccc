@@ -1,6 +1,6 @@
 # Arquitetura
 
-> **Versão:** 1.0 · **Data:** 2026-08-20
+> **Versão:** 1.7 · **Data:** 2026-08-27 (a **seção 14 foi reescrita**: as duas armadilhas do `components.json` deixaram de existir. O projeto migrou de `radix-vue` para **`reka-ui` 2** (§14.2) e o alias do gerador foi corrigido para minúsculo (§14.1) — o gerador oficial do shadcn voltou a servir, e `radix-vue` saiu do `package.json`. Versão 1.6: a seção 14 ganhou a §14.3: o projeto passou a **Tailwind 4** e a vestir o **tema do shadcn studio** — não há mais `tailwind.config.js`, a configuração é o próprio `resources/css/app.css`, e o botão principal deixou de ser vermelho. Versão 1.5: seção 14 nova: de onde vêm os componentes de interface — não há pacote a instalar, o código é do repositório. Versão 1.4: seção 13 nova: como o sistema é publicado — uma imagem Docker, três containers da mesma imagem, o que muda atrás de um proxy reverso e onde a lista de IP do aviso da Efí vive. A §9.1 deixou de dizer que o trabalhador da fila não roda: agora ele é um container próprio)
 > Escrito para ser entendido também por quem não programa. Termos técnicos são explicados na primeira vez que aparecem e estão reunidos no glossário do `PRD.md`.
 
 ---
@@ -288,7 +288,8 @@ Dois testes obrigatórios:
 |-------|-----------------|
 | Envio duplicado do formulário | O formulário gera uma `chave_idempotencia`. Existe uma regra de unicidade `(evento_id, chave_idempotencia)` no banco. Se a chave repetir, devolvemos a inscrição já criada, sem reservar de novo |
 | Aviso do provedor repetido | Regra de unicidade `(gateway, id_evento_externo)` na tabela de avisos. O segundo aviso idêntico é registrado como ignorado e não altera contador |
-| Rotinas agendadas | Expiração e reconciliação atualizam apenas registros na situação de origem esperada. Rodar duas vezes seguidas não muda nada na segunda |
+| Rotinas agendadas | Expiração, reconciliação e lembrete de prazo atualizam apenas registros na situação de origem esperada. Rodar duas vezes seguidas não muda nada na segunda |
+| E-mail enviado duas vezes | Regra de unicidade `(inscricao_id, tipo, canal)` na tabela `comunicacoes_enviadas`. O registro é gravado antes do envio; se o banco recusar, alguém já mandou e o trabalho encerra em silêncio (ver 9.2) |
 
 ---
 
@@ -309,16 +310,19 @@ sequenceDiagram
     participant CP as ConfirmarPagamento (Action)
 
     G->>WC: POST /webhooks/pagamentos (payload + assinatura)
+    WC->>WC: webhookRequest() - o provedor diz onde mora a assinatura
     WC->>WC: verifyWebhookSignature()
     alt assinatura inválida
         WC->>DB: grava aviso com assinatura_valida = false
         WC-->>G: 200 (não revelamos detalhe do erro)
     else assinatura válida
-        WC->>DB: grava em webhooks_pagamento (unique protege repetição)
+        WC->>WC: parseWebhook() traduz e desdobra o aviso em N eventos
+        loop um por evento do aviso
+            WC->>DB: grava em webhooks_pagamento (unique protege repetição)
+            WC->>Q: enfileira ProcessarWebhookPagamento
+        end
         WC-->>G: 200 recebido
-        WC->>Q: enfileira ProcessarWebhookPagamento
-        Q->>JB: executa em segundo plano
-        JB->>JB: parseWebhook() traduz para formato neutro
+        Q->>JB: executa em segundo plano (um evento por vez)
         JB->>CP: confirma o pagamento
         CP->>DB: pagamento -> pago
         CP->>DB: inscricao -> confirmada
@@ -329,9 +333,15 @@ sequenceDiagram
     end
 ```
 
+**Um aviso pode trazer vários pagamentos.** A Efí notifica com uma **lista**: um único POST pode carregar dois, três, dez pagamentos. Por isso o controller **desdobra** o aviso em um registro e um trabalho por pagamento, cada um guardando só o seu pedaço do conteúdo. Tratar o aviso como um evento só perderia os demais **em silêncio** — ninguém reclamaria, e as pessoas ficariam pagas e sem vaga. O trabalho em segundo plano continua processando **um** evento por vez, com a idempotência de três camadas intacta.
+
+**Quando a falha é nossa, respondemos erro de propósito.** Assinatura inválida recebe 200 (ver abaixo). Mas banco fora do ar, ou qualquer erro inesperado do nosso lado, **propaga** e vira 5xx. A diferença importa: a Efí reentrega o aviso até nove vezes ao longo de cerca de cinco horas quando não recebe uma resposta de sucesso. Responder 200 numa falha nossa jogaria fora, de graça, a única chance de receber o aviso de novo.
+
 **Por que respondemos 200 mesmo com assinatura inválida.** Responder 401 informa a quem está tentando forjar avisos que ele acertou o endereço mas errou a assinatura. Guardamos o aviso marcado como inválido, não produzimos nenhum efeito, e respondemos de forma neutra.
 
 **Por que `parseWebhook` e não `handleWebhook`.** O rascunho sugeria `handleWebhook`, o que colocaria o provedor no comando de alterar nossas inscrições. `parseWebhook` apenas **traduz** o payload do provedor em um resultado neutro; quem decide o que fazer é a Action da aplicação. A regra fica de um lado só da fronteira.
+
+**Por que o controller não sabe onde fica a assinatura.** Até a Fase 8a ele sabia, e citava o provedor simulado pelo nome para descobrir o cabeçalho. A Efí manda a assinatura **no endereço**, não em cabeçalho — e o acoplamento apareceu. Hoje quem recorta a requisição é o próprio provedor, por `webhookRequest()`. O controller recebe, entrega e não sabe onde a assinatura viajava.
 
 ---
 
@@ -341,8 +351,8 @@ sequenceDiagram
 flowchart LR
     DOM[Regras de inscrição] -->|conhece apenas| CT[interface PaymentGateway]
     CT -.implementado por.-> FK[FakePaymentGateway]
-    CT -.futuramente.-> EF[EfiPaymentGateway]
-    CT -.futuramente.-> PM[PagarMePaymentGateway]
+    CT -.implementado por.-> EF[EfiPaymentGateway]
+    CT -.futuramente.-> PM[outro provedor]
     CFG[config/payments.php ← PAYMENT_GATEWAY] -->|escolhe em tempo de execução| CT
 ```
 
@@ -353,8 +363,10 @@ interface PaymentGateway
     public function getPayment(string $externalId): PaymentStatusResult;
     public function cancelPayment(string $externalId): void;
     public function refundPayment(string $externalId, ?int $amountCents = null): RefundResult;
+    public function webhookRequest(Request $request): WebhookRequestData;
     public function verifyWebhookSignature(WebhookRequestData $request): bool;
-    public function parseWebhook(WebhookRequestData $request): WebhookResult;
+    /** @return list<WebhookResult> */
+    public function parseWebhook(WebhookRequestData $request): array;
 }
 ```
 
@@ -365,11 +377,13 @@ Regras que sustentam essa fronteira:
 - **A escolha vem de configuração**, resolvida no contêiner de serviços do Laravel:
 
 ```php
-$this->app->singleton(PaymentGateway::class, fn () => match (config('payments.default')) {
-    // 'efi' => new EfiPaymentGateway(...),   // fase 8
-    default => new FakePaymentGateway(...),
+$this->app->singleton(PaymentGateway::class, fn () => match ($escolhido) {
+    'fake' => new FakePaymentGateway(...),
+    'efi'  => new EfiPaymentGateway(...),
 });
 ```
+
+Um valor desconhecido em `PAYMENT_GATEWAY` **não** cai no simulado por descuido: o provedor reclama. Cobrar de mentira achando que se está cobrando de verdade seria o pior desfecho possível — todo mundo com inscrição confirmada e nenhum centavo na conta.
 
 - **Nenhuma taxa comercial no código.** Taxas mudam; ficam apenas documentadas em `PAYMENTS.md`, com a data da consulta.
 
@@ -384,6 +398,108 @@ Fora disso, respondem "não encontrado" (404). Existe teste automatizado que pro
 
 ---
 
+### 8.2 A Efí — o provedor real (fase 8a)
+
+`EfiPaymentGateway` cumpre o mesmo contrato do simulado. Ele vive em `app/Services/Payments/Efi/` junto com três companheiros, e **nada fora dessa pasta** sabe o nome do fornecedor — exceto o braço `'efi'` no `PaymentServiceProvider` e o comando de diagnóstico.
+
+```mermaid
+flowchart LR
+    GW[EfiPaymentGateway] -->|le configuracao| CFG[ConfiguracaoEfi]
+    GW -->|fala com a Efi| CLI[EfiClient]
+    GW -->|traduz situacao| TR[TraducaoDeStatus]
+    CLI -->|unico ponto que usa| SDK[SDK oficial da Efi]
+    CFG -->|primeiro| BD[(cadastro da tela, cifrado no banco)]
+    CFG -->|so se o cadastro estiver vazio| ENV[variaveis de ambiente]
+```
+
+**Duas fronteiras dentro da fronteira**, e cada uma existe por um motivo concreto:
+
+- **`ConfiguracaoEfi` é o único lugar que lê configuração da Efí.** Credencial, certificado, chave Pix, segredo do aviso e ambiente — tudo passa por ela. Se o gateway, o cliente ou o comando lessem configuração por conta própria, trocar a fonte exigiria reescrever os quatro. Existe teste automatizado que percorre `app/` inteiro e falha se um segundo arquivo aparecer lendo esse bloco de configuração. **A fase 8b cobrou essa aposta**: a fonte mudou do arquivo de ambiente para o banco e **um único arquivo do provedor foi alterado** — este. `EfiPaymentGateway`, `EfiClient` e `TraducaoDeStatus` não mudaram uma linha.
+- **`EfiClient` é o único lugar que instancia o SDK.** Isso vale por si (se o SDK sair um dia, muda um arquivo), mas o motivo imediato é a suíte: o SDK usa cliente HTTP próprio, que as ferramentas de teste do Laravel **não** interceptam. Sem esse embrulho, provar a emissão de cobrança exigiria credencial, certificado e rede — a suíte deixaria de rodar no computador de quem desenvolve.
+
+**O que o gateway não faz:** ele não toca em `Inscricao` nem em `Pagamento`. Ele traduz — de centavos para texto decimal na ida, do vocabulário da Efí para o do domínio na volta. Quem decide o efeito continua sendo a Action da aplicação.
+
+---
+
+### 8.3 O que a Efí exige do servidor (roteiro de implantação)
+
+Nada nesta seção é código, e nada disso pode ser garantido por teste. São as condições que precisam estar certas no ambiente antes de o sistema cobrar de verdade. **Enquanto elas não estiverem, `PAYMENT_GATEWAY` deve continuar em `fake`.**
+
+> **Para executar:** o passo a passo desta seção, na ordem real e já dentro do stack de produção, está nas seções **7 e 8 de `docs/DEPLOY.md`** — inclusive os **cinco escopos** que a aplicação da Efí precisa ter marcados (`cob.write`, `cob.read`, `pix.read`, `webhook.write`, `webhook.read`). A falta de `cob.write` já custou uma sessão inteira de diagnóstico neste projeto: a autenticação funciona, o token é emitido, o "Testar conexão" passa — e a emissão da cobrança falha com um erro genérico de autorização.
+
+#### 8.3.1 O certificado da aplicação (mTLS)
+
+A Efí não aceita apenas usuário e senha: **as duas pontas se identificam por certificado**. O painel da Efí entrega um certificado por ambiente; ele é convertido para o formato que o cliente HTTP lê.
+
+Desde a fase 8b, **o caminho normal é enviar esse arquivo pela tela** (§8.4): o conteúdo vai cifrado para o banco e o sistema o escreve em disco, com permissão restrita, só na hora de usar. Colocar o arquivo no servidor à mão e apontar `EFI_CERT_PATH` continua funcionando, e é a reserva para quem ainda não cadastrou nada.
+
+Regras que não admitem exceção:
+
+- **O arquivo nunca entra no repositório.** O `.gitignore` cobre a pasta de certificados, mas isso é a segunda linha de defesa, não a primeira.
+- **Permissão restrita**: legível apenas pelo usuário que roda a aplicação. Quem lê o arquivo pode cobrar em nome do evento.
+- **Um certificado por ambiente.** Homologação e produção têm certificados e credenciais diferentes. Misturá-los é emitir cobrança de teste contra dinheiro de verdade — e o sistema não tem como perceber sozinho.
+- **Vencimento tem data.** O certificado expira. No dia em que expirar, toda cobrança nova para de funcionar de uma vez. Anote a data e crie um lembrete com folga de semanas.
+
+Se o arquivo estiver ausente ou ilegível, o provedor **recusa operar** com erro claro, em vez de tentar e falhar no meio de uma inscrição. Falhar cedo é a única forma segura de falhar aqui.
+
+#### 8.3.2 O endereço que recebe o aviso (webhook)
+
+A Efí chama nosso servidor quando o Pix cai. Para essa chamada acontecer:
+
+- **HTTPS válido e público.** Não serve certificado autoassinado nem endereço interno: a Efí precisa alcançar o servidor pela internet e confiar no certificado dele.
+- **A cadeia de certificados da Efí instalada no servidor web.** Quando a Efí nos chama, ela também se identifica por certificado. O servidor web precisa ter a cadeia da Efí instalada para reconhecê-lo. Sem ela, ou o aviso é recusado, ou — pior — é aceito sem verificação nenhuma.
+- **A verificação do certificado do cliente configurada como opcional no servidor web**, e não obrigatória, com o resultado repassado à aplicação. Obrigatória, o servidor web derruba a conexão antes de a aplicação ver o pedido; e é a aplicação quem sabe responder com a delicadeza que a decisão D-18 exige.
+
+> **Por que "opcional" e não "obrigatória".** Parece o contrário do seguro, e não é. A aplicação **já** confere a assinatura do aviso e recusa o que não bate. Deixar o servidor web cortar a conexão apenas troca uma recusa educada por uma porta batida — e, no caminho, tira da aplicação a chance de registrar a tentativa. Segurança que apaga o rastro da tentativa é meia segurança.
+
+#### 8.3.3 Registrar o aviso na Efí
+
+O endereço precisa ser cadastrado uma vez, no painel ou pela API da Efí, **terminando em `?ignorar=`**. Esse detalhe existe porque a Efí acrescenta `/pix` ao fim do endereço registrado quando vai notificar; o `?ignorar=` faz o sufixo cair na parte descartável do endereço.
+
+Como o comportamento é documentado das duas formas, **a aplicação aceita as duas**: a rota do aviso responde tanto no caminho configurado quanto no mesmo caminho com `/pix` no fim. Custa uma linha; descobrir o engano custaria pagamentos perdidos em silêncio.
+
+Junto com o endereço vai o parâmetro de assinatura (`?hmac=`), cujo valor é o mesmo de `EFI_WEBHOOK_HMAC`. **Sem esse valor configurado, todo aviso é recusado** — de novo, a falha para o lado seguro.
+
+Registrar o endereço é **tarefa de implantação**, como manter o trabalhador da fila de pé (§9.1). Não acontece sozinho quando o código sobe, e nada no sistema avisa que faltou: as cobranças serão criadas normalmente e nenhuma será confirmada. O sinal de que faltou é a reconciliação (§9) confirmando **todos** os pagamentos cinco minutos depois — ela é a rede de segurança, não o caminho normal.
+
+#### 8.3.4 A ordem de ligar
+
+1. Credenciais e certificado do ambiente **de homologação** cadastrados na tela **Credenciais de pagamento** (§8.4) — ou, na falta dela, no ambiente da aplicação.
+2. **Testar conexão** na própria tela, que percorre os mesmos passos do `php artisan efi:diagnostico` — certificado que abre e não venceu, e token aceito pela Efí — dizendo qual falhou. O comando de terminal continua existindo e vai um passo além: emite uma cobrança de teste.
+3. Endereço do aviso registrado na Efí de homologação, copiado pronto da própria tela, já com o `?hmac=` e o `?ignorar=`.
+4. **Usar este ambiente** em homologação, e uma inscrição inteira à mão, do formulário ao e-mail de confirmação.
+5. Só então repetir de 1 a 4 com as credenciais de produção — e a troca para produção, que a tela só aceita depois de a palavra de confirmação ser digitada.
+
+---
+
+### 8.4 Onde a configuração da Efí mora (fase 8b)
+
+Até a fase 8a, a credencial da Efí vivia no arquivo de ambiente do servidor. Isso obriga quem administra o evento a pedir ajuda técnica para trocar uma chave, e um arquivo de ambiente não entra no backup do banco: um redeploy ou um contêiner recriado leva a configuração junto.
+
+Desde a fase 8b existe a tela **Credenciais de pagamento** (`/admin/pagamentos/credenciais`), e a regra de precedência é uma só:
+
+> **O cadastro da tela vence. O arquivo de ambiente é a reserva** — usado apenas quando não há nenhum ambiente ativo cadastrado (decisão **DA-26**). Sem essa reserva, a suíte de testes e a máquina de quem desenvolve precisariam de um banco semeado com segredo para rodar qualquer coisa.
+
+**A precedência não se mistura.** Quando há cadastro ativo, ele responde por tudo — credencial, certificado, chave Pix e segredo do aviso. O arquivo de ambiente **não completa o que falta no cadastro**: um cadastro pela metade falha dizendo o que falta, em vez de cobrar com meia credencial da tela e meia do servidor.
+
+**Dois ambientes, um ativo** (decisão **DA-27**). Homologação e produção são dois cadastros independentes, e um indicador diz qual o sistema está usando. Quem garante que só existe um ativo é o **PostgreSQL**, por índice único parcial (`WHERE ativo = true`) — não uma verificação em PHP, que duas requisições simultâneas furam.
+
+**O que protege a tela**, ponto a ponto:
+
+| Risco | O que o sistema faz |
+|---|---|
+| Alguém com acesso ao banco lê a credencial | Os cinco campos sigilosos vão **cifrados** para o banco, pelo mesmo mecanismo que já protege o CPF (**D-08**). Na linha crua não há nada legível |
+| A tela devolve o segredo para o navegador | **Nenhum valor guardado volta** — nem mascarado. A tela recebe apenas "existe um valor guardado". Por isso **campo em branco mantém o que está lá**, e nunca apaga |
+| Quem não deveria abre a tela | Permissão própria, `pagamentos.credenciais`, **exclusiva do administrador**. O organizador recebe 403 e não vê o item no menu |
+| A troca some sem deixar rastro | Toda alteração e toda troca de ambiente viram registro em `logs_auditoria` (**D-77/D-78**), com **quais campos** mudaram — jamais os valores |
+| Alguém liga produção sem querer | A virada exige **digitar uma palavra de confirmação**, e a exigência é cobrada no servidor, não só na tela |
+| O certificado vaza pelo repositório | Ele nunca é gravado em pasta versionada: o conteúdo mora cifrado no banco (**DA-25**) e é materializado em `storage/certificados`, com permissão `0600`, apenas na hora do uso. O `.gitignore` cobre a pasta e as extensões `.p12`, `.pem` e `.pfx` |
+| A credencial troca e o sistema segue usando a antiga | Salvar **joga fora o token guardado** dos dois ambientes. Sem isso, a credencial antiga continuaria valendo por até uma hora |
+
+O arquivo materializado do certificado é **cache, não fonte da verdade**: pode ser apagado a qualquer momento, e o sistema o reescreve na chamada seguinte.
+
+---
+
 ## 9. Trabalho em segundo plano
 
 | Rotina | Quando roda | O que faz |
@@ -391,8 +507,77 @@ Fora disso, respondem "não encontrado" (404). Existe teste automatizado que pro
 | `ProcessarWebhookPagamento` (job) | Assim que um aviso é recebido | Traduz o aviso e aplica o efeito no pagamento e na inscrição |
 | `inscricoes:expirar-vencidas` (comando) | A cada minuto | Expira inscrições com prazo vencido e devolve as vagas |
 | `pagamentos:reconciliar` (comando) | A cada 5 minutos | Consulta o provedor para pagamentos pendentes e confirma o que já foi pago |
+| `inscricoes:lembrar-prazo` (comando) | A cada 15 minutos | Avisa quem está a menos de 24 horas do fim do prazo de pagamento |
+| Envio de e-mail (ouvintes e mensagens) | Assim que o domínio anuncia um fato | Monta e entrega os cinco e-mails do participante, na fila `emails` |
 
 A expiração processa em lotes com `chunkById` (percorre por faixas de identificador), para funcionar bem mesmo com muitos registros.
+
+### 9.1 O trabalhador da fila — sem ele, nenhum e-mail sai
+
+Nenhum e-mail é enviado durante o pedido da pessoa. O sistema apenas **deixa o
+trabalho na fila** e responde. Quem tira o trabalho da fila e entrega de fato é
+um processo à parte, o **trabalhador** (*worker*).
+
+Isso é deliberado: um servidor de e-mail lento pode levar segundos para
+responder, e nenhuma inscrição pode esperar por isso. Mas tem uma consequência
+que precisa ser dita sem rodeio: **enquanto ninguém subir o trabalhador, os
+e-mails ficam parados na fila e não chegam a ninguém.** O sistema não avisa,
+não dá erro e não reclama — a fila simplesmente cresce.
+
+Em desenvolvimento, com o Sail de pé, o comando é este:
+
+```bash
+./vendor/bin/sail artisan queue:work redis --queue=emails
+```
+
+Sem o Sail (PHP no próprio computador):
+
+```bash
+php artisan queue:work redis --queue=emails
+```
+
+**Em produção, o trabalhador é um container próprio, e isso deixou de ser tarefa
+de alguém lembrar.** O stack de `docker/compose.portainer.yaml` sobe três
+processos da mesma imagem — `app`, `worker` e `scheduler` —, e o `worker` roda
+exatamente `queue:work redis --queue=emails`, com `restart: unless-stopped`: se
+o processo cair, o Docker o levanta de novo. O agendador é o terceiro container,
+rodando `schedule:work`; é ele que dispara a expiração, a reconciliação e o
+lembrete de prazo, e **ele nunca pode ter duas réplicas**, porque duas rodadas do
+mesmo agendamento são dois lembretes para a mesma pessoa.
+
+O desenho está na **§13 deste documento**, e o roteiro para executá-lo — publicar
+a imagem, criar o stack e conferir que os e-mails saíram de verdade — está em
+**`docs/DEPLOY.md`**. Fora desse arranjo, o trabalhador continua precisando ser um
+serviço supervisionado (`supervisord`, `systemd` ou equivalente).
+
+**Quando um e-mail não é entregue:** o trabalhador tenta 3 vezes, esperando
+1 minuto, 5 minutos e 15 minutos entre as tentativas — servidor de e-mail fora
+do ar costuma ser problema de minutos. Se as três falharem, o trabalho vai para
+a tabela `failed_jobs`, com o erro completo, e **nada acontece com a inscrição,
+a vaga ou o pagamento**. O prejuízo máximo de uma falha de e-mail é um e-mail
+que não chegou.
+
+```bash
+php artisan queue:failed         # o que falhou e por quê
+php artisan queue:retry all      # tentar de novo depois de resolver a causa
+```
+
+### 9.2 A mesma mensagem nunca chega duas vezes
+
+Antes de enviar, o sistema grava uma linha em `comunicacoes_enviadas` com
+`(inscricao, tipo de mensagem, canal)`. Existe uma **regra de unicidade no
+banco** sobre essas três colunas, e é ela — não uma verificação no código — que
+impede a segunda cópia.
+
+A diferença importa: dois trabalhadores rodando ao mesmo tempo podem pegar o
+mesmo trabalho e passar juntos por qualquer "já mandei?" escrito em PHP. O
+banco, não: o segundo esbarra na regra e desiste em silêncio. A gravação e o
+envio acontecem na mesma transação, então um envio que falha não deixa registro
+para trás e a próxima tentativa encontra o caminho livre.
+
+A coluna `canal` guarda hoje sempre `email`. Ela existe para que um segundo
+meio de aviso (WhatsApp, por exemplo) entre um dia sem migração e sem reescrever
+a regra de "uma vez só".
 
 ---
 
@@ -417,6 +602,97 @@ Assim, comparar "esta atividade começa antes daquela terminar" funciona mesmo e
 | Enumeração de inscrições | Identificadores públicos ULID, não sequenciais |
 | Endereços de simulação em produção | Middleware que exige ambiente e configuração, respondendo 404 |
 | Regra burlada pelo navegador | Toda regra revalidada no servidor dentro da transação |
+| Insistência numa porta pública | Limite de requisições por endereço de internet em inscrição, login, webhook e recuperação de acesso (§11.1) |
+| Script injetado numa tela | Cabeçalhos de segurança em toda resposta, com CSP por número de uso único (§11.2) |
+| Rastro de quem fez o quê | `logs_auditoria`, que o model recusa alterar ou apagar (§11.3) |
+| Mensagem de erro revelando o sistema | `APP_DEBUG=false` obrigatório em produção (§11.4) |
+
+### 11.1 Limites de requisição
+
+Porta pública sem limite é porta que um programa consegue bater milhares de vezes por
+minuto. Cada limite é contado por **endereço de internet (IP)** — não há nada melhor
+disponível numa porta que não exige login, e pedir login para se inscrever seria inverter o
+produto para resolver um problema de infraestrutura. Os números ficam em
+`config/inscricoes.php`, cada um com a conta que o justifica escrita ao lado.
+
+| Porta | Limite | Observação |
+|-------|--------|------------|
+| `POST /inscricoes` | **dois ao mesmo tempo**: um por minuto (folgado) e um por hora (apertado) | O do minuto não pune a família que sai pela mesma conexão; o da hora é o que segura um programa automatizado. A recusa é uma frase **em português**, não a página crua do framework |
+| `POST /login` | por IP, **por cima** do limite por e-mail que o Laravel já traz | Sem ele, quem varre uma lista de e-mails diferentes do mesmo lugar nunca esbarraria em limite nenhum |
+| `POST /webhooks/pagamentos` | alto, por IP | Quem chama é um servidor; várias confirmações juntas são dia movimentado, não ataque. A recusa por excesso acontece **antes** de o aviso ser lido, então continua sem contar nada sobre a assinatura: aviso com assinatura inválida segue recebendo 200 |
+| `POST /acesso` | já existia, contado dentro do controller | Fica no controller de propósito, para preservar a resposta neutra: a tela responde sempre a mesma frase, no mesmo tempo, exista ou não inscrição para aquele e-mail |
+
+### 11.2 Cabeçalhos de segurança e a CSP
+
+Cabeçalho de segurança é instrução dada ao navegador da pessoa, obedecida **antes** de
+qualquer código nosso rodar: "não adivinhe o tipo deste arquivo", "não deixe ninguém
+colocar esta página dentro de um quadro", "só execute script que veio daqui". São baratos
+de ligar e caros de esquecer — a maioria dos ataques que eles impedem só aparece depois que
+a aplicação está na internet.
+
+O middleware `CabecalhosDeSeguranca` é registrado **globalmente**, e não no grupo `web`: a
+rota do webhook fica fora desse grupo de propósito, e cabeçalho que depende de a rota estar
+no grupo certo é cabeçalho que um dia vai faltar justamente na rota esquecida.
+
+| Cabeçalho | Valor | Quando |
+|-----------|-------|--------|
+| `X-Content-Type-Options` | `nosniff` | sempre |
+| `X-Frame-Options` | `DENY` | sempre |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | sempre |
+| `X-Permitted-Cross-Domain-Policies` | `none` | sempre |
+| `Strict-Transport-Security` | um ano, com subdomínios | **só em HTTPS** — mandá-lo em desenvolvimento faria o navegador guardar por um ano que o endereço é sempre seguro, e quem desenvolve passaria dias sem abrir o próprio ambiente |
+| `Content-Security-Policy` | ver abaixo | **só em resposta HTML** — num CSV baixado ou num JSON de webhook ela não protege nada |
+
+A **Content-Security-Policy** é a peça central: ela diz de onde o navegador pode carregar
+cada coisa e, se um dia alguém conseguir injetar um `<script>` numa tela, é ela que impede
+o script de rodar. Os scripts legítimos são liberados por **número de uso único (nonce)**
+sorteado a cada resposta, que vai no cabeçalho e nas poucas tags de script que o servidor
+escreve na página — a tabela de rotas do Ziggy e os arquivos do Vite. Script injetado por
+terceiro não tem como adivinhar o número da vez. **Não existe `unsafe-inline` em
+`script-src`**, e é esse o ponto de toda a defesa.
+
+**Uma concessão, escrita para ninguém confundir com descuido:** `style-src` **tem**
+`'unsafe-inline'`. A interface é Vue com Tailwind, e componente Vue escreve `style="..."`
+direto no elemento (barra de progresso, altura calculada, cor de estado); sem essa
+permissão, as telas quebrariam visualmente em produção. CSS injetado permite disfarce
+visual, o que é ruim; JavaScript injetado permite roubar sessão e enviar formulário no
+lugar da pessoa, o que é muito pior. A defesa fica onde o estrago é maior.
+
+Dois pontos que costumam assustar e não são problema: o **QR Code do Pix** é SVG que chega
+pronto do servidor e é inserido no HTML — SVG embutido não é script, e a CSP não o bloqueia;
+e os **dados do Inertia** viajam num atributo `data-page` do HTML, não num `<script>`, e
+atributo não é script. Em `local`, enquanto o servidor do Vite estiver no ar, o endereço
+dele entra na política — a exceção some sozinha em qualquer outro caso.
+
+CSP é o tipo de mudança que funciona na máquina de quem desenvolve e quebra depois do
+deploy. Por isso ela é verificada **em navegador de verdade**, em
+`tests/e2e/seguranca-csp.spec.ts`: a tela de pagamento tem que mostrar o QR Code e a
+recuperação de acesso tem que continuar funcionando, com a CSP ligada.
+
+### 11.3 O rastro das ações administrativas
+
+Toda ação administrativa que mexe em vaga, dinheiro ou cadastro grava uma linha em
+`logs_auditoria`: quem fez, o quê, sobre qual registro, com qual motivo, de qual endereço e
+quando. O model **recusa `update` e `delete`**, sempre, lançando exceção — registro que
+pode ser corrigido depois não prova nada. A gravação nunca derruba a ação: se o log falhar,
+o erro vai para o log da aplicação e a ação segue, porque auditoria é testemunha, não
+porteiro. E o campo `dados` guarda **o nome do campo que mudou, nunca o conteúdo sensível**.
+
+### 11.4 O que precisa estar certo no servidor
+
+Estas coisas não são código e não têm como ser garantidas por teste — precisam estar certas
+no ambiente onde o sistema roda. **O stack da §13 resolve as três primeiras por desenho**;
+elas continuam listadas aqui porque quem publicar fora dele precisa resolvê-las à mão.
+
+- **`APP_DEBUG=false` em produção.** Com `true`, qualquer erro devolve à pessoa a pilha de
+  chamadas, o caminho dos arquivos no servidor e as variáveis de ambiente da requisição —
+  inclusive segredos. O `.env.example` traz `true` porque é arquivo de desenvolvimento;
+  em produção esse valor tem que mudar, junto com `APP_ENV=production`.
+  No `docker/compose.portainer.yaml` os dois vão **fixos**, e não como variável do stack:
+  ninguém liga depuração em produção por engano de digitação.
+- **HTTPS de verdade**, porque o `Strict-Transport-Security` só sai em resposta segura — e porque a Efí não chama endereço sem certificado válido (§8.3.2). Atrás de um proxy reverso isso exige mais um cuidado, tratado na §13.2: sem confiar nos cabeçalhos do proxy, o framework julga que toda requisição é `http` e **as URLs assinadas do participante param de validar**.
+- **O trabalhador da fila de pé** (§9.1), sem o qual nenhum e-mail sai. No stack ele é o container `worker`, com reinício automático.
+- **O certificado da Efí no lugar certo, com permissão restrita, e o endereço do aviso registrado** (§8.3). Sem o certificado, nenhuma cobrança nasce; sem o endereço registrado, nenhuma se confirma sozinha — e nada no sistema avisa que faltou. **Nem o certificado nem o endereço são criados pela implantação**: são passos manuais, descritos na ordem certa em `docs/DEPLOY.md`.
 
 ---
 
@@ -430,5 +706,371 @@ Ferramenta: **Pest 4**. Banco de teste: PostgreSQL real, o mesmo motor de produ�
 | Inscrição | As 13 regras de negócio, cada uma com o seu teste |
 | Concorrência | Um teste determinístico e um com processos paralelos disputando a última vaga |
 | Pagamento | Criação da cobrança, confirmação, aviso repetido, expiração, reconciliação e bloqueio do provedor simulado |
+| Fronteira com a Efí | Formato do identificador, conversão de centavos, nova tentativa no identificador repetido, tradução de erro, assinatura no endereço, aviso com dois pagamentos e o identificador da transferência guardado — tudo **sem credencial, sem certificado e sem rede** |
 
 O mapeamento entre os testes exigidos no briefing e os arquivos criados está em `BUSINESS_RULES.md`.
+
+---
+
+## 13. Implantação
+
+> **O passo a passo está em `docs/DEPLOY.md`.** Esta seção explica o desenho e o
+> porquê de cada decisão; o roteiro para executar — publicar a imagem, criar o
+> stack, criar o primeiro administrador, cadastrar a credencial da Efí e
+> registrar o aviso — está lá, escrito para quem não acompanhou a construção.
+
+### 13.1 Uma imagem, três processos
+
+O sistema é publicado como **uma imagem Docker** (`Dockerfile`, três estágios:
+assets do Vite → `vendor` sem dependências de desenvolvimento → FrankenPHP com
+PHP 8.4), publicada no GHCR por GitHub Actions a cada push na `main`
+(decisão **DA-31**). O Portainer sobe o `docker/compose.portainer.yaml` atrás de
+um Traefik que já existe no servidor (**DA-33**).
+
+Dessa única imagem saem **três containers** (**DA-32**), distinguidos pela
+variável `CONTAINER_ROLE` e pelo comando:
+
+| Container | Comando | Por que existe separado |
+|---|---|---|
+| `app` | `frankenphp run` | Atende as pessoas. É o único que o Traefik alcança |
+| `worker` | `queue:work redis --queue=emails` | Entrega os e-mails (§9.1). Enfileirar é barato; entregar demora, e nenhuma inscrição pode esperar por um servidor de e-mail lento |
+| `scheduler` | `schedule:work` | Expira inscrição vencida, lembra do prazo e reconcilia pagamento (§9). **Uma réplica, sempre** |
+
+Mais `pgsql` (PostgreSQL 18) e `redis` (fila e cache), ambos dentro do stack, em
+rede interna, **sem publicar porta no host** (**DA-30**). O único caminho de fora
+para dentro passa pelo Traefik e para no `app`.
+
+Separar em três containers, em vez de um só com supervisor, tem uma consequência
+prática que compensa a aparente complexidade: **cada processo cai e reinicia
+sozinho, sem derrubar os outros**, e o log de cada um é o log de uma coisa só.
+
+### 13.2 O que muda quando existe um proxy na frente
+
+O Traefik termina o TLS e conversa com o container em **HTTP simples**, pela rede
+interna. Sem configuração, o framework acredita nisso e passa a tratar toda
+requisição como `http`. O estrago aparece longe da causa, e é grave:
+
+1. **As URLs assinadas param de validar.** É assim que o participante acessa a
+   inscrição, vê a linha do tempo e pede a segunda via do Pix. O link é gerado
+   com `https` — quem gera é o trabalhador da fila, a partir de `APP_URL` — e
+   conferido numa requisição que o framework lê como `http`. A assinatura cobre a
+   URL inteira, esquema incluído: não bate, e **a pessoa recebe 403 no link que
+   acabou de chegar por e-mail**.
+2. **O `Strict-Transport-Security` não é emitido**, porque `CabecalhosDeSeguranca`
+   só o manda em resposta segura (§11.2).
+3. Todo `url()` e `route()` gerado numa requisição sai com esquema errado.
+
+Por isso `bootstrap/app.php` configura `trustProxies` com os quatro cabeçalhos
+`X-Forwarded-*`. Confiar em `'*'` é seguro **aqui** por um motivo concreto: nada
+além do Traefik alcança o container, porque a porta 80 não é publicada no host. E
+o IP do Traefik não é fixo — muda a cada recriação do container dele —, então uma
+lista de IP daria falso negativo justamente em dia de manutenção, que é o pior
+momento possível para o site quebrar.
+
+Isso é provado por teste (`tests/Feature/Producao/AtrasDeProxyTest.php`), e não
+por confiança: uma URL assinada gerada em linha de comando é conferida numa
+requisição com `X-Forwarded-Proto: https`, e o HSTS é exigido na resposta.
+
+### 13.3 O que o container faz sozinho ao subir
+
+`docker/entrypoint.sh` é o único lugar onde o papel do container vira
+comportamento. Em qualquer papel ele espera o **banco** e o **Redis** ficarem
+disponíveis — o Redis não é enfeite: fila e cache moram nele, e subir antes dele
+faria a primeira inscrição responder erro 500 por um motivo que não lembra em
+nada a causa — e roda `storage:link`, `package:discover` e `php artisan optimize`.
+
+**Só no papel `web`** ele aplica `migrate --force` e, em seguida,
+`db:seed --class=PapeisSeeder --force`.
+
+As duas restrições têm motivo:
+
+- **Migrations em um papel só**, porque os três containers sobem ao mesmo tempo e
+  três processos migrando o mesmo banco é corrida garantida.
+- **O seeder de papéis roda a cada boot**, e isso é intencional. Ele é idempotente
+  por desenho (**D-50**), e é ele que grava no banco as permissões que nasceram no
+  código. Sem esse passo, uma tela nova **não aparece para ninguém**: o item some
+  do menu e o acesso direto responde 403, sem erro nenhum no log. Não é hipótese —
+  aconteceu na fase 8b, em desenvolvimento, com a permissão `pagamentos.credenciais`.
+
+### 13.4 O aviso da Efí atrás do Traefik
+
+A rota do aviso responde em **dois caminhos** — `/webhooks/pagamentos` e
+`/webhooks/pagamentos/pix` (§8.3.3). No stack, um **router próprio do Traefik**
+cobre os dois de uma vez, com `PathPrefix`, e tem **prioridade explícita maior**
+que o router do site: sem isso, a regra genérica de `Host` — que casa com tudo no
+domínio — poderia capturar o aviso antes.
+
+Sobre esse router, e **só sobre ele**, há um middleware de **lista de IP**
+(`ipallowlist`) que deixa passar apenas o endereço de onde a Efí notifica. A
+inscrição pública continua aberta a qualquer pessoa, de qualquer lugar.
+
+**O mTLS de verdade ficou fora** (decisão **DA-28**). A Efí recomenda exigir o
+certificado do cliente na borda; aqui a defesa é dupla e diferente: o **HMAC** que
+a aplicação confere em todo aviso (§7) mais a **lista de IP**. É um desvio
+consciente da recomendação da Efí, registrado como tal para que ninguém o
+descubra por acaso.
+
+### 13.5 E-mail em produção
+
+Em produção o e-mail sai pela **Resend**, por API HTTPS (decisão **DA-29**), e não
+por SMTP. O motivo é bem concreto: as portas 25 e 587 costumam vir bloqueadas em
+servidor de nuvem, e a falha seria **silenciosa** — o trabalho ficaria na fila e
+ninguém receberia nada, que é exatamente o modo de falhar que este sistema mais
+tenta evitar.
+
+Em desenvolvimento nada muda: o e-mail continua parando no Mailpit.
+
+---
+
+## 14. Interface: os componentes e o `components.json`
+
+As telas são **Vue 3 + Inertia + TypeScript**, com **Tailwind 4** e um conjunto de
+componentes de interface (botão, etiqueta, aviso, caixa, campo, menu...) em
+`resources/js/components/ui/`. São 23 componentes, e todos eles são **código
+deste repositório**, versionados no git como qualquer outro arquivo.
+
+Isso costuma surpreender quem procura o pacote no `package.json` e não acha:
+**não existe pacote `shadcn` para instalar.** A ferramenta shadcn é um gerador —
+ela **copia o código-fonte** do componente para dentro do projeto, e a partir daí
+o componente é seu, para editar à vontade. O que aparece no `package.json` são as
+bibliotecas sobre as quais esses componentes são construídos:
+
+| Pacote | Para que serve |
+|---|---|
+| `reka-ui` | as primitivas sem estilo: comportamento de menu, diálogo, seleção |
+| `tw-animate-css` | as animações que o `tailwindcss-animate` fazia na versão 3 |
+| `class-variance-authority` | as variantes de um componente (`variant`, `size`) |
+| `tailwind-merge` + `clsx` | o utilitário `cn()`, que resolve conflito entre classes |
+| `lucide-vue-next` | os ícones |
+
+O arquivo `components.json` na raiz guarda a configuração desse gerador. **Ele
+teve, durante boa parte da vida do projeto, duas inconsistências que só apareceriam
+no dia em que alguém tentasse acrescentar um componente novo.** As duas foram
+fechadas na Etapa 22, e ficam registradas abaixo porque a lição continua valendo.
+
+### 14.1 O alias apontava para `Components`, com maiúscula — resolvido
+
+`components.json` declarava `resources/js/Components`. O diretório de verdade,
+como o git o registra, é `resources/js/components`.
+
+No macOS e no Windows isso passava despercebido, porque o sistema de arquivos não
+distingue maiúscula de minúscula. **No Linux distingue** — e é Linux que roda
+dentro da imagem Docker e no servidor. O gerador criaria um segundo diretório,
+`Components/`, ao lado do que já existe, e o componente novo simplesmente não
+seria encontrado pelos imports.
+
+**Está corrigido:** o alias e a chave `ui` apontam para `resources/js/components`
+minúsculo. Na mesma passada, a chave `tailwind.config` — que apontava para um
+`tailwind.config.js` que **não existe mais** desde a Etapa 21 (§14.3) — passou a
+ser vazia, que é o que a ferramenta espera de um projeto em Tailwind 4.
+
+Nada disso afeta o que já está pronto: os imports usam o alias `@/*` do
+`tsconfig.json`, que aponta para `resources/js/*` e sempre resolveu corretamente.
+
+### 14.2 Os componentes eram da geração `radix-vue` — resolvido na Etapa 22
+
+Durante um tempo os 23 componentes importavam de **`radix-vue`**, enquanto a
+ferramenta shadcn já gerava componentes que importam de **`reka-ui`** — é o mesmo
+projeto de primitivas, renomeado na versão 2. Quem rodasse o gerador recebia um
+componente que **não conversava** com os antigos, e o projeto passaria a carregar
+duas bibliotecas de primitivas ao mesmo tempo.
+
+**A Etapa 22 migrou o projeto inteiro para `reka-ui` 2**, e a armadilha deixou de
+existir: o gerador oficial voltou a servir. `radix-vue` **saiu do `package.json`** —
+não há duas bibliotecas de primitivas no bundle, e não pode voltar a haver.
+
+Quatro coisas mudam entre as duas versões, e **só a primeira dá erro de
+compilação**. Vale conhecê-las, porque é esse o formato de armadilha que uma troca
+de biblioteca de primitivas produz:
+
+| # | O que mudou | Como se manifesta |
+|---|---|---|
+| 1 | o nome do pacote no `import` | erro de compilação — o `vue-tsc` acusa |
+| 2 | as variáveis CSS `--radix-*` viraram `--reka-*` (e `[data-radix-*]` virou `[data-reka-*]`) | **silêncio**: o elemento perde a medida e fica do tamanho errado, sem erro nenhum |
+| 3 | `v-model:checked` virou `v-model`, e a prop `checked` virou `:model-value` | **silêncio**: a caixa de marcar deixa de responder. No projeto, isso atingia **o aceite dos termos** — a última etapa antes de enviar a inscrição |
+| 4 | Accordion, Collapsible, Tabs e NavigationMenu passaram a montar o conteúdo mesmo inativo (`forceMount`), controlando a visibilidade pelo atributo `hidden` | **silêncio**: conteúdo escondido aos olhos, mas visível ao leitor de tela — pior do que quebrado |
+
+**Os 23 componentes foram adaptados à mão, não regerados** (**DA-44**). Vários
+carregam ajuste próprio do projeto — comentários em português e correções de
+acessibilidade — que o gerador apagaria. Quem for acrescentar um componente novo
+pode rodar o gerador para **esse** componente; o que não se faz é passar o gerador
+por cima dos que já existem.
+
+### 14.3 O Tailwind é o 4, e a configuração é o próprio CSS
+
+Quem procurar `tailwind.config.js` na raiz não vai achar, e não é esquecimento:
+**o arquivo foi removido de propósito**. A versão 4 do Tailwind virou o que a
+documentação chama de *CSS-first* — o que antes era um arquivo de JavaScript
+com `theme.extend`, `content` e `plugins` agora mora em
+`resources/css/app.css`, em diretivas do próprio CSS:
+
+| Antes (v3, no `tailwind.config.js`) | Agora (v4, no `app.css`) |
+|---|---|
+| `@tailwind base/components/utilities` | `@import 'tailwindcss'` |
+| `content: [...]` | `@source '../views'`, `@source '../js'` |
+| `darkMode: ['class']` | `@custom-variant dark (&:is(.dark *))` |
+| `theme.extend.colors` | `@theme inline { --color-*: var(--token) }` |
+| `plugins: [tailwindcss-animate]` | `@import 'tw-animate-css'` |
+
+O build também mudou de lugar: **não há mais PostCSS nem autoprefixer**. O
+`vite.config.ts` carrega o plugin `@tailwindcss/vite`, e os prefixos de
+navegador a própria versão 4 resolve.
+
+**As cores são o tema do shadcn studio, e o tema é azul.** Isso tem uma
+consequência visível que não é defeito: o botão "Fazer inscrição" **deixou de
+ser vermelho**. A paleta antiga vinha da logo da CCC; a nova vem do tema
+escolhido pelo dono do produto (decisões **DA-39** e **DA-40** no
+`docs/PROGRESS.md`).
+
+**O que o studio não trazia, o projeto derivou.** O tema tem `primary`,
+`destructive`, `chart-*` e `sidebar-*`, mas não tem "sucesso" nem "atenção" — e
+o projeto usa quatro cores semânticas (`acao`, `sucesso`, `informacao`,
+`atencao`) espalhadas por dezenas de telas. Elas foram **derivadas do esquema
+azul mantendo o significado**, não apagadas (**DA-41**).
+
+**Cada cor que carrega texto tem a razão de contraste escrita ao lado dela**, no
+modo claro e no escuro, e nenhuma fica abaixo de 4.5:1 (**DA-42**). Três tons
+que o studio traz reprovariam e foram ajustados — o cinza de texto secundário,
+e os textos que vão por cima do azul e do vermelho no modo escuro. O motivo de
+cada ajuste está no comentário, ao lado do valor.
+
+**Uma armadilha para quem for mexer nas cores:** os valores estão escritos em
+**hexadecimal, não em `oklch()`**, embora o tema do studio venha em `oklch`. As
+cores são exatamente as mesmas. O motivo é que o cenário
+`tests/e2e/home.spec.ts` mede contraste lendo a cor calculada do elemento e a
+interpretando como `rgb()` — e o navegador **não converte `oklch()`**, devolve
+`oklch(...)` como está. Escrito em `oklch`, o cenário passaria a medir os três
+números do oklch como se fossem canais de cor e chegaria a um valor sem
+sentido. **Se um dia alguém trocar as cores por `oklch`, é esse cenário que
+avisa.**
+
+
+### 14.4 A sintaxe de variável CSS mudou no Tailwind 4 — e há uma vistoria vigiando
+
+Esta é a armadilha mais silenciosa que o projeto encontrou até hoje, e vale
+conhecer antes de escrever qualquer classe nova.
+
+No Tailwind 3, `w-[--sidebar-width]` queria dizer *"largura igual ao valor dessa
+variável CSS"*. **Na versão 4 a forma passou a ser `w-(--sidebar-width)`, com
+parêntese**, e a antiga passou a ser lida como valor literal. O ponto perigoso é
+que **o compilador não reclama**: ele gera a regra assim mesmo.
+
+| Escrito na classe | CSS que sai | O navegador |
+|---|---|---|
+| `w-(--sidebar-width)` | `width: var(--sidebar-width)` | aplica |
+| `w-[--sidebar-width]` | `width: --sidebar-width` | **descarta em silêncio** |
+
+Foi assim que a barra lateral do painel ficou sem largura e passou a flutuar por
+cima do conteúdo, cobrindo o próprio botão de recolher (decisão **D-86** em
+`docs/PROGRESS.md`). Nenhum erro apareceu em lugar nenhum — nem no `npm run
+build`, nem no `vue-tsc`, nem nos 44 cenários de navegador, porque todos rodavam
+em tela de celular e o trecho quebrado só existe em tela grande.
+
+**O colchete continua certo em quase tudo.** A troca vale **só** quando o
+conteúdo do colchete começa com `--` e é o valor inteiro:
+
+- `data-[state=open]`, `group-data-[collapsible=icon]`, `peer-data-[variant=inset]`
+  são **seletores de atributo** — a sintaxe deles não mudou;
+- `w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]` já usa `var(...)`
+  dentro de `calc(...)`, que sempre foi válido.
+
+Trocar um colchete que não precisava trocar quebra o que estava funcionando.
+
+**Quem vigia isso é `tests/Feature/Interface/CssConstruidoTest.php`.** Ele lê o
+CSS que o `npm run build` acabou de produzir — descobrindo quais arquivos são
+pelo `public/build/manifest.json`, e não por curinga, para que sobra de build
+antiga não acuse defeito já corrigido — e falha em qualquer declaração cujo
+valor seja um nome de variável solto. A mensagem de falha diz a propriedade, o
+valor, o seletor e o comando para achar a classe no código-fonte: quem esbarrar
+nela não precisa refazer a investigação que a originou.
+
+Ele mora no Pest, e não num script à parte, porque o `.github/workflows/tests.yml`
+roda `npm run build` **antes** dos testes — é o único momento em que o CSS
+construído existe e alguém olha para ele. Sem build, o teste se **pula com o
+motivo escrito**; em CI isso nunca acontece.
+
+> **Uma peça ainda desalinhada:** o `tailwind-merge` instalado é o **2.6.0**,
+> feito para o Tailwind 3, e ele **não reconhece** `w-(--variavel)` como classe
+> de largura. Onde um componente do shadcn traz uma classe concorrente de
+> fábrica, as duas sobrevivem e a do shadcn vence. Hoje isso acontece em **um
+> único lugar** — a gaveta da barra lateral no celular, que por isso carrega um
+> `!` com o motivo escrito ao lado. Subir para a 3.x é a pendência **P-11**.
+
+
+### 14.5 São dois temas, e o escopo mora no `<html>`
+
+O sistema tem **duas caras**, e isso é decisão de produto (**DA-51**): o lado do
+visitante usa a identidade verde-mata sobre papel; o painel administrativo
+continua no tema azul do shadcn studio. **Um componente, dois temas** — nenhum
+botão, etiqueta ou campo foi duplicado para ter "a versão verde".
+
+**Como uma tela sabe em que tema está.** O `<html>` carrega um atributo:
+
+```html
+<html lang="pt-BR" data-tema="publico">   <!-- as seis telas do visitante -->
+<html lang="pt-BR" data-tema="admin">     <!-- todo o resto -->
+```
+
+No CSS, os tokens são redeclarados dentro de `[data-tema='publico']` (e de
+`[data-tema='publico'].dark`, para o modo escuro), e existe uma variante do
+Tailwind para as formas:
+
+```css
+@custom-variant publico (&:is([data-tema='publico'] *));
+```
+
+É ela que permite `publico:rounded-full` numa classe: *"pílula, mas só do lado
+público"*. O botão do painel não muda de forma nem de altura.
+
+**Por que o atributo não pode morar no `PublicoLayout`.** Esta é a armadilha
+que custaria caro descobrir tarde. `SelectContent.vue` e `DialogContent.vue`
+usam `SelectPortal` e `DialogPortal`: o conteúdo deles é **teleportado para o
+`document.body`**, fora da subárvore da página. Um escopo posto na `div` do
+layout **não alcançaria a lista de cidades do formulário** — ela abriria com as
+cores do painel no meio de uma tela verde. No `<html>` alcança, porque o
+`document.body` também é descendente dele.
+
+Quem vigia isso é o terceiro cenário de `tests/e2e/identidade-publica.spec.ts`.
+Ele abre a lista de cidades, confirma que ela **saiu da página** (`closest('main')`
+é nulo) e exige que, mesmo assim, ela esteja sob `data-tema="publico"`. O
+cenário foi visto vermelho: com o atributo movido para a raiz do layout, ele
+falha com "a lista de cidades saiu fora do tema público".
+
+**Por que o atributo é escrito em dois lugares.** Os dois são necessários:
+
+| Onde | Quando age | O que acontece sem ele |
+|---|---|---|
+| `resources/views/app.blade.php` | primeira pintura | a tela nasce no tema errado e o JavaScript a corrige um quadro depois — a **piscada** |
+| `resources/js/app.ts` (`router.on('navigate')`) | toda navegação do Inertia | o Inertia troca só o corpo da página e **nunca reescreve o `<html>`**: sair da porta da rua para o painel manteria a tela verde |
+
+A regra que decide o tema é a **mesma nos dois**, escrita a partir do nome do
+componente Inertia — o único dado que existe dos dois lados: são públicas a
+`Home` e tudo que começa com `Eventos/` ou `Inscricoes/`. `Admin/Inscricoes/Index`
+não entra, porque a comparação é de prefixo. **Se uma das duas mudar, a outra
+tem de mudar junto**, e há teste do Pest cobrindo os dois lados.
+
+**As três famílias tipográficas vêm todas do `fonts.bunny.net`**, e isso não é
+gosto: a CSP (§11.2) libera essa origem, e só ela, em `style-src` e `font-src`.
+A Bricolage Grotesque veste os títulos e a DM Mono, os números; as duas foram
+conferidas no bunny.net antes de entrar, justamente para **não precisar
+acrescentar origem à política**. As regras que as aplicam moram no CSS
+(`[data-tema='publico'] :is(h1,h2,h3,h4)`), e não numa classe em cada `<h1>`,
+para que a etapa não precisasse tocar em nenhuma tela — e para que tela nova
+nasça certa sem ninguém lembrar.
+
+**A regra de contraste da DA-42 continua valendo, e agora ela é recalculada por
+teste.** `tests/Feature/Interface/TemaPublicoTest.php` lê o `app.css`, extrai os
+hexadecimais e **refaz a conta da WCAG 2.1** para cada par — ele não confia no
+número escrito no comentário. Três tons do protótipo reprovaram e entraram
+ajustados, com os dois valores registrados ao lado:
+
+| Tom do protótipo | Papel | Media | Entrou como | Passa a |
+|---|---|---|---|---|
+| `--sol` `#E9922B` como **texto** | atenção | 2,18:1 sobre o papel | `#8A5310` | 5,65:1 |
+| `--linha-forte` `#C7D0C6` como **borda de campo** | contorno de controle (WCAG 1.4.11) | 1,58:1 sobre o cartão | `#7C8B83` | 3,57:1 |
+| `#8A968E` na etiqueta "encerrado" | texto | 2,53:1 sobre a etiqueta | `#5B6C64` | 4,58:1 |
+
+O mesmo teste exige **paridade de tokens**: todo token do `:root` precisa ter par
+no bloco público, e todo token do `.dark` no bloco público escuro. Sem isso, um
+token esquecido continuaria valendo a cor do painel — azul num canto verde que
+ninguém abre todo dia.

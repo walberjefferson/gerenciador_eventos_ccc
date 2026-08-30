@@ -1,9 +1,9 @@
 # Plano de implementação
 
-> **Versão:** 1.2 · **Data:** 2026-08-20 · **Revisado ao final da Fase 5a**
+> **Versão:** 1.8 · **Data:** 2026-08-27 · **Revisado ao final da Fase 8b — a última fase de código do plano**
 > Divide o trabalho em dez fases. As fases 0 a 4 estão detalhadas porque são o que esta entrega cobre. As fases 5 a 9 estão em alto nível, para que a direção esteja clara sem congelar decisões que ainda vão amadurecer.
 >
-> **Estado real em 2026-08-20:** as fases 0 a 4 e a **Fase 5a** (site público, inscrição em quatro etapas e cobrança Pix) estão **concluídas e verificadas** — 205 testes Pest passando (795 asserções), 12 cenários Playwright passando num navegador que imita um celular, `pint`, `eslint` e `npm run build` limpos. Falta a **Fase 5b** (área do participante) e as fases 6 a 9 não foram iniciadas.
+> **Estado real em 2026-08-27: todo o escopo planejado está entregue.** Não há fase de código pendente. As fases 0 a 4 (núcleo transacional), a **5a** e a **5b** (todo o caminho do participante), a **6a** e a **6b** (todo o lado administrativo), a **7** (os cinco e-mails, o lembrete de prazo e o registro que impede a mensagem repetida), a **8a** (o provedor de pagamento real, a Efí, atrás do mesmo contrato), a **8b** (credenciais e certificado da Efí cadastrados pela tela, cifrados no banco) e a **9** (auditoria append-only, medição de desempenho com 10.000 inscrições, limites de requisição, cabeçalhos de segurança com CSP e teste de carga com 50 processos) estão de pé: **522 testes Pest passando (3.661 asserções)**, **36 cenários Playwright** passando num navegador que imita um celular — **os 32 anteriores sem nenhuma edição**, mais 4 novos da tela de credenciais —, `pint` e `eslint` limpos, `vue-tsc --noEmit` com **zero erros** e `composer audit` sem aviso. ⚠️ **A Efí não foi ligada contra dinheiro de verdade**: não existe ambiente publicado, e o que falta **não é código** — cadastrar as credenciais reais pela tela nova, publicar em HTTPS com a cadeia de certificados da Efí no servidor web (o mTLS do aviso automático) e registrar o endereço do aviso no painel da Efí, com roteiro na seção 8.3 de `docs/ARCHITECTURE.md` e passo a passo na seção 10 de `docs/PAYMENTS.md`. ⚠️ **A revisão de LGPD NÃO foi feita** — retenção, prazo de descarte e anonimização não existem, e dependem da **P-04** e da **P-03**. ⚠️ **Estorno não existe** e depende da **P-02**; a taxa efetiva da Efí não foi confirmada com o comercial (**P-06**). ⚠️ Os e-mails só saem com o **trabalhador da fila** de pé: `php artisan queue:work redis --queue=emails`.
 
 ---
 
@@ -17,11 +17,15 @@
 | 3 | Inscrição | ✅ | Inscrição válida com reserva de vaga à prova de concorrência |
 | 4 | Pagamento simulado | ✅ | Cobrança Pix, aviso automático, expiração e reconciliação |
 | 5a | Site público | ✅ | Página do evento, formulário de inscrição em quatro etapas e cobrança Pix |
-| 5b | Área do participante | ❌ | Acompanhamento da inscrição por link assinado |
-| 6 | Administração | ❌ | Painel com números e cadastros |
-| 7 | Comunicação | ❌ | E-mails em fila |
-| 8 | Provedor real | ❌ | Pix de verdade em produção |
-| 9 | Endurecimento | ❌ | Auditoria, desempenho, revisão de segurança e LGPD |
+| 5b | Área do participante | ✅ | Acompanhamento da inscrição por link assinado, histórico da cobrança, segunda via do Pix e recuperação do link por e-mail |
+| 6a | Acesso administrativo e painel | ✅ | Papéis e permissões, cadastro público fechado, conta por comando artisan e painel com os números de cada evento |
+| 6b | Cadastros e gestão de inscrições | ✅ | Cadastro do evento pela tela, lista de inscrições com filtros e exportação, ficha com o histórico da cobrança, cancelamento administrativo e confirmação manual de pagamento |
+| 6 | Administração (6a + 6b) | ✅ | Painel com números e cadastros — concluída nas duas metades |
+| 7 | Comunicação | ✅ | Cinco e-mails na fila, lembrete de prazo e nenhuma mensagem repetida |
+| 8a | Provedor real (Efí) | ✅ | Cobrança Pix de verdade, aviso automático em lote e confirmação — **sem uma linha alterada em Action, Model ou Enum de domínio**. Fecha a P-01 |
+| 8b | Credenciais pela interface | ✅ | Credenciais e certificado da Efí cadastrados **pela tela**, cifrados no banco, dois ambientes independentes e nenhum segredo voltando para o navegador — com **um único arquivo do provedor alterado** (decisão **DA-24** cobrada e paga) |
+| 8 | Pagamento real (8a + 8b) | ✅ | Cobrança Pix de verdade e configurável pelo painel — concluída nas duas metades |
+| 9 | Endurecimento | ✅ | Auditoria append-only, desempenho medido com 10.000 inscrições, limites e cabeçalhos com CSP, teste de carga. **A LGPD ficou de fora** (decisão D-76): depende da P-04 e da P-03 |
 
 ---
 
@@ -162,7 +166,7 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 | Tela de pagamento com QR Code, código copia e cola, botão de copiar e contador regressivo | ✅ |
 | Volta à cobrança por URL assinada com validade (decisão DA-05, agora tomada) | ✅ |
 | Testes de ponta a ponta com Playwright | ✅ 12 cenários |
-| Área do participante (linha do tempo, histórico, reenvio do link) | ❌ Fase 5b |
+| Área do participante (linha do tempo, histórico, reenvio do link) | ✅ entregue na Fase 5b |
 
 **Regra que não muda:** tudo que a tela valida é conforto. A regra continua sendo a do servidor — e o 422 dele devolve o participante ao passo do campo com problema, com o campo em foco.
 
@@ -170,59 +174,129 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 ---
 
-## Fase 5b — Área do participante ❌
+## Fase 5b — Área do participante ✅
 
 **Objetivo:** deixar o participante acompanhar a própria inscrição depois de fechar o navegador.
 
-- Linha do tempo da inscrição: criada, aguardando pagamento, confirmada ou expirada.
-- Histórico da cobrança e segunda via do Pix enquanto o prazo não venceu.
-- Reenvio do link de acesso (por enquanto o link assinado só chega no redirecionamento logo após a inscrição; e-mail é Fase 7).
-- Decidir se o participante pode cancelar a própria inscrição.
+| Entrega | Situação |
+|---------|:--------:|
+| Página `/inscricoes/{código}/acompanhar` por link assinado, com resumo da inscrição | ✅ |
+| Linha do tempo com os oito marcos, derivada dos carimbos de tempo que o domínio já grava — sem tabela nova | ✅ |
+| Histórico completo da cobrança, sem expor identificador do provedor, dados internos do aviso nem o código Pix fora da tela de pagamento | ✅ |
+| Segunda via do Pix sob demanda enquanto o prazo não venceu; vencido, a tela explica em vez de oferecer o botão | ✅ |
+| Recuperação do link de acesso por e-mail em `/acesso`, com resposta sempre neutra e link válido por sete dias | ✅ |
+| Ligação entre as telas: pagamento → acompanhamento, e página do evento → "já me inscrevi" | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 9 cenários novos, os 12 da Fase 5a intactos |
+| Cancelamento da própria inscrição pelo participante | ❌ fora do escopo (decisão D-45) — segue com o dono do produto |
+
+**Regra que não muda:** a área do participante é uma tela de leitura. A única escrita que ela faz é pedir a segunda via do Pix, que chama a Action repetível de sempre. Nenhuma Action, Enum, modelo ou migração foi criada na fase.
+
+**Acessibilidade:** a linha do tempo é uma lista ordenada de verdade, e cada passo diz por escrito em que pé está, sem depender de cor. Os títulos descem um nível de cada vez, o campo de e-mail aponta ao mesmo tempo para a ajuda e para o erro, a mensagem neutra é anunciada com `role="status"`, o foco fica sempre visível, os alvos de toque têm 44 px e nada escapa da largura de uma tela de 320 px.
 
 ---
 
-## Fase 6 — Administração ❌
+## Fase 6a — Acesso administrativo e painel ✅
 
-- Painel com capacidade, inscritos, confirmados, aguardando pagamento, expirados, cancelados, vagas restantes, valor recebido e valor pendente.
-- Cadastro de eventos, dias, grupos de atividades, atividades, cidades e grupos de participantes.
-- Busca e filtros de inscrições por evento, cidade, grupo, atividade, situação, pagamento e período.
-- Ações administrativas: cancelar, confirmar manualmente quando permitido, registrar motivo.
-- Políticas de acesso (`Policies`) por perfil.
+**Entregue.** A Fase 6 foi partida em duas: primeiro a fundação do lado de dentro (quem entra e o que pode ver), depois os cadastros e a gestão de inscrições.
 
----
+| Entrega | Estado |
+|---------|:------:|
+| Papéis `administrador` e `organizador` e nove permissões em português, com seeder idempotente | ✅ |
+| Cadastro público removido; `GET`/`POST /register` respondem 404, provado por teste | ✅ |
+| Conta administrativa pelo comando `usuario:criar-administrador`, com senha pedida de forma escondida | ✅ |
+| Conta de demonstração travada em ambiente `local`, no mesmo molde da decisão D-29 | ✅ |
+| Grupo de rotas `/admin` com autenticação, e-mail confirmado e **permissão obrigatória em cada rota** | ✅ |
+| Layout administrativo e navegação real sobre o esqueleto do pacote inicial | ✅ |
+| Painel por evento: inscrições por situação, vagas por atividade e dinheiro recebido/pendente/estornado | ✅ |
+| Números vindos de consulta agregada; vaga restante lida do contador materializado | ✅ |
+| Pendência **P-09** fechada: `vue-tsc --noEmit` com zero erros | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 4 cenários novos, os 21 anteriores intactos |
+| Cancelamento administrativo e confirmação manual de pagamento | ❌ adiados para a Fase 6b, de propósito |
 
-## Fase 7 — Comunicação ❌
-
-- Ouvintes para os anúncios já disparados: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada`.
-- E-mails: inscrição criada com link de pagamento, lembrete antes do prazo, pagamento confirmado, inscrição expirada, cancelamento.
-- Tudo em fila, para que lentidão de servidor de e-mail nunca atrase a inscrição.
-- Momento do lembrete configurável (decisão DA-08).
-- Estrutura preparada para acrescentar WhatsApp depois sem tocar no domínio.
-
-**Nenhuma regra de inscrição é alterada nesta fase.** Se for preciso alterar, o desenho de eventos de domínio falhou.
-
----
-
-## Fase 8 — Provedor de pagamento real ❌
-
-- Escolher o provedor com base na matriz de `PAYMENTS.md` e na proposta comercial (decisão DA-01).
-- Implementar a classe do provedor cumprindo o contrato existente.
-- Cadastrar credenciais e configurar o endereço de aviso no painel do provedor.
-- Homologar: cobrança, pagamento, aviso, consulta, cancelamento e estorno.
-- Rodar a suíte apontando para o provedor real em homologação.
-
-**Nenhum arquivo de domínio deve mudar.**
+**Regra que não muda:** o painel apenas **lê**. Nenhuma Action, Enum, modelo, migração de domínio ou evento foi alterado nesta fase; as únicas migrações novas são as tabelas de papéis e permissões do pacote.
 
 ---
 
-## Fase 9 — Endurecimento ❌
+## Fase 6b — Cadastros e gestão de inscrições ✅
 
-- Tabela `logs_auditoria` e registro de ações administrativas sensíveis.
-- Revisão de desempenho: consultas do painel, índices, cache dos números.
-- Revisão de segurança: limite de requisições, cabeçalhos, revisão de dependências.
-- Revisão de LGPD: política de retenção e rotina de anonimização (decisão DA-04).
-- Testes de carga no caminho de inscrição.
-- Credenciamento (check-in) e lista de espera, se o negócio priorizar.
+**Entregue.** Com ela, a **Fase 6 está concluída**: a organização passa a operar o evento inteiro pela tela.
+
+| Entrega | Estado |
+|---------|:------:|
+| Cadastro de cidades e grupos de participantes, com recusa amigável de apagar registro em uso | ✅ |
+| Cadastro de eventos, dias, grupos de atividades, atividades e conflitos, com **cada restrição do banco espelhada em português** antes de o PostgreSQL recusar | ✅ |
+| Trava para mudança de estrutura em evento com inscrição ativa — recusa com explicação e caminho alternativo | ✅ |
+| Lista de inscrições com filtros combináveis (evento, situação, cidade, grupo, atividade, pagamento e período) e paginação que preserva o filtro | ✅ |
+| Busca por nome, e-mail e código público; **CPF não filtra e não busca**, e não aparece na lista | ✅ |
+| Exportação em CSV respeitando os filtros da tela, em fluxo com cursor, `;` e BOM UTF-8, sem CPF | ✅ |
+| Ficha da inscrição com o histórico completo da cobrança | ✅ |
+| **Cancelamento administrativo** (`inscricoes.cancelar`): motivo obrigatório, devolução de vaga na ordem canônica, gravação condicional e teste de concorrência real | ✅ |
+| **Confirmação manual de pagamento** (`pagamentos.confirmar-manual`, só do administrador): observação obrigatória, origem manual registrada, nenhum identificador de provedor forjado | ✅ |
+| Anúncio de domínio `InscricaoCancelada` disparado — **sem ouvinte**, que é trabalho da Fase 7 | ✅ |
+| Testes de ponta a ponta com Playwright | ✅ 3 cenários novos, os 25 anteriores intactos |
+| Registro de auditoria das ações administrativas | ❌ adiado para a Fase 9, de propósito |
+| E-mails de aviso do cancelamento e da confirmação | ❌ na 6b — **entregues na Fase 7**, sem que uma linha da 6b precisasse mudar |
+
+**Duas decisões que dependem de pendência aberta:** cancelar inscrição já confirmada **não estorna** (a política de reembolso, **P-02**, não existe) e a confirmação manual **recusa** inscrição expirada (a vaga já voltou para a fila — **P-03** segue aberta). As duas são a leitura segura enquanto ninguém decide, e as duas dizem isso na tela em português.
+
+**Nenhuma migração e nenhuma dependência nova.** As duas Actions escrevem em colunas que já existiam desde a Fase 3.
+
+---
+
+## Fase 7 — Comunicação ✅ concluída
+
+- ✅ Ouvintes dos quatro anúncios já disparados pelo domínio: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada` e `InscricaoCancelada`. A decisão **D-12** está **encerrada** — eles finalmente têm quem os escute.
+- ✅ Cinco e-mails (decisão **D-65**): inscrição recebida com o link de pagamento, lembrete antes do prazo, pagamento confirmado, prazo vencido e cancelamento. Todos em HTML **e** em texto puro, sempre com link assinado e **nunca** com CPF, telefone, impressão digital ou código Pix inteiro (**D-68**).
+- ✅ Lembrete de prazo pelo comando agendado `inscricoes:lembrar-prazo` (a cada 15 minutos, janela configurável, padrão de 24 horas — decisão DA-08 cumprida).
+- ✅ Tudo na fila `emails`, com 3 tentativas e espera de 1, 5 e 15 minutos; falha definitiva vai para `failed_jobs` sem afetar inscrição, vaga ou pagamento (**D-67**).
+- ✅ Tabela `comunicacoes_enviadas` com unicidade `(inscricao_id, tipo, canal)`: é o **banco** que impede a segunda cópia, não uma verificação em PHP (**D-66**).
+- ✅ Estrutura pronta para um segundo canal: só a coluna `canal` e o Enum `TipoComunicacao`, sem contrato nem adaptador de WhatsApp (**D-70**).
+
+**Nenhuma regra de inscrição foi alterada nesta fase** — nenhuma Action, nenhum Enum de domínio, nenhum Model de domínio, nenhuma migração existente, e nenhum anúncio mudou de momento. O desenho de eventos de domínio se pagou.
+
+⚠️ **Pendência de infraestrutura, não de código:** nenhum trabalhador de fila roda hoje. Sem `php artisan queue:work redis --queue=emails` de pé (seção 9.1 de `ARCHITECTURE.md`), os e-mails ficam parados na fila.
+
+---
+
+## Fase 8a — Provedor de pagamento real (Efí) ✅ concluída
+
+- ✅ Provedor escolhido: **Efí**, API Pix (decisão **DA-16**). **A pendência P-01 está fechada.**
+- ✅ `EfiPaymentGateway` cumprindo o contrato que já existia desde a Fase 4, com o SDK oficial isolado atrás de um embrulho fino — o único ponto do sistema que o instancia (decisão **DA-21**).
+- ✅ **Nenhum arquivo de domínio mudou**, e isso foi verificado, não suposto: o `git diff` sobre `app/Actions/`, `app/Models/` e `app/Enums/` volta vazio na fase inteira.
+- ✅ Duas mudanças de fronteira, ambas obrigadas pela Efí e ambas sem tocar em regra: o aviso automático passou a ser tratado **em lote** (decisão **DA-17**), porque um único aviso da Efí pode trazer vários pagamentos; e a leitura da assinatura saiu do controller e entrou no provedor, porque a Efí manda a assinatura **no endereço** e não em cabeçalho.
+- ✅ Toda a configuração atrás de **um lugar só** (decisão **DA-24**) — é o que torna a Fase 8b barata.
+- ✅ **36 testes novos que rodam sem credencial, sem certificado e sem rede**, mais `php artisan efi:diagnostico` para provar à mão contra a homologação (decisão **DA-20**).
+- ❌ **Estorno fora de escopo** (decisão **DA-18**): depende da política de reembolso (**P-02**). O `endToEndId` que ele vai exigir **já está sendo guardado**.
+- ❌ **Não foi ligado contra dinheiro de verdade** (decisão **DA-19**): não há ambiente publicado. O roteiro do que o servidor precisa está na seção 8.3 de `docs/ARCHITECTURE.md`.
+
+---
+
+## Fase 8b — Credenciais da Efí pela interface ✅ concluída
+
+- ✅ Fonte da configuração trocada do arquivo de ambiente para o **banco, cifrada** — dentro de `ConfiguracaoEfi`, **e só ali**. Isso foi verificado, não suposto: `git diff --stat` sobre `app/Services/Payments/Efi/` na fase inteira mostra **um único arquivo alterado**. `EfiPaymentGateway`, `EfiClient` e `TraducaoDeStatus` não mudaram uma linha, e a suíte da 8a continuou verde **sem edição**. É a decisão **DA-24** cobrada e paga.
+- ✅ Tabela `credenciais_pagamento` com os **cinco campos sigilosos cifrados em repouso** (decisão **DA-25**), pelo mesmo mecanismo que já protege o CPF (**D-08**) — inclusive o **conteúdo** do certificado, e não o caminho dele.
+- ✅ **Um ambiente ativo por provedor garantido pelo PostgreSQL**, por índice único parcial (`WHERE ativo = true`), e não por verificação em PHP: tentar ativar o segundo devolve `SQLSTATE 23505` (mesma lição da **D-66**).
+- ✅ Tela restrita à permissão própria `pagamentos.credenciais`, **exclusiva do administrador** (**D-55**) — quem organiza o evento **recebe 403** e não vê o item no menu.
+- ✅ **Nenhum segredo volta para o navegador**, nem mascarado; por consequência, **campo em branco mantém** o valor guardado e nunca apaga. O certificado é materializado em `storage/certificados` com permissão `0600`, só no uso, e é cache descartável.
+- ✅ Toda alteração e toda troca de ambiente em `logs_auditoria` (`AcaoAuditada::AlterouCredencialPagamento`), com **quais campos** mudaram e **nunca os valores** — com teste dedicado provando o vazamento zero.
+- ✅ Arquivo de ambiente mantido como **reserva** (decisão **DA-26**), usado só quando não há ambiente ativo cadastrado — e **sem completar** o que falta num cadastro pela metade.
+- ✅ **34 testes Pest novos** e **4 cenários Playwright novos**; os **32 anteriores continuaram verdes sem edição**.
+- ❌ **Rotação automática de credencial e alerta de vencimento de certificado ficaram fora do escopo.** A tela mostra a validade quando o formato permite lê-la, e nada mais.
+- ❌ **Nenhum outro provedor além da Efí.** A coluna `gateway` existe para o dia em que houver outro, mas a tela fala de Efí.
+
+**Nenhum arquivo de domínio mudou, e nem o gateway, nem o cliente, nem o comando de diagnóstico.** Era a condição que a decisão DA-24 impunha à Fase 8a, e ela se sustentou.
+
+---
+
+## Fase 9 — Endurecimento ✅ concluída
+
+- ✅ Tabela `logs_auditoria` **append-only** — o model recusa `update` e `delete`, sempre —, sete ações administrativas registradas e a tela de auditoria somente leitura, atrás da permissão `auditoria.ver`.
+- ✅ Revisão de desempenho com **10.000 inscrições** no banco: as cinco consultas mais pesadas medidas com o plano de execução do banco. **Nenhum índice novo e nenhum cache** — a medição concluiu que mexer pioraria, e o motivo está escrito em `docs/PERFORMANCE.md`.
+- ✅ Revisão de segurança: limite de requisições em inscrição, login e webhook (sem tocar na D-18 nem na D-48); cabeçalhos em toda resposta e **CSP por número de uso único, sem `unsafe-inline` em `script-src`**, provada em navegador; `composer audit` sem aviso e `npm audit` com zero vulnerabilidades.
+- ✅ Teste de carga: **50 processos disputando 5 vagas**, capacidade nunca furada, sem impasse, com os tempos registrados.
+- ✅ Revisão de superfície: dupla trava das rotas de simulação (D-29) intacta, nenhuma rota administrativa só com login, e `APP_DEBUG=false` para produção documentado em `docs/ARCHITECTURE.md` (§11.4).
+- ❌ **Revisão de LGPD — NÃO foi feita.** Política de retenção, prazo de descarte e anonimização não existem neste sistema. Ficou fora da fase **de propósito** (decisão D-76): descarte de dado pessoal é decisão jurídica, e implementá-lo sob um prazo inventado seria o software decidindo por conta própria. Depende da **P-04** e da **P-03**, e vira plano próprio quando forem respondidas.
+- ❌ Credenciamento (check-in) e lista de espera continuam **fora do escopo** — nunca foram priorizados.
 
 ---
 
@@ -235,16 +309,18 @@ flowchart LR
     F2 --> F3[Fase 3<br/>Inscrição]
     F3 --> F4[Fase 4<br/>Pagamento]
     F4 --> F5[Fase 5a<br/>Site público]
-    F4 --> F6[Fase 6<br/>Administração]
+    F4 --> F6[Fase 6a/6b<br/>Administração]
     F4 --> F7[Fase 7<br/>Comunicação]
-    F4 --> F8[Fase 8<br/>Provedor real]
+    F4 --> F8[Fase 8a<br/>Provedor real]
+    F8 --> F8B[Fase 8b<br/>Credenciais pela tela]
     F5 --> F9[Fase 9<br/>Endurecimento]
     F6 --> F9
     F7 --> F9
-    F8 --> F9
 ```
 
 As fases 5, 6, 7 e 8 dependem apenas da fase 4 e podem ser feitas em paralelo por pessoas diferentes. Foi para isso que o domínio foi isolado das telas e do provedor de pagamento.
+
+**O plano original punha a Fase 9 depois da Fase 8, e a ordem real foi outra** — a Fase 9 foi concluída antes, com a Fase 8 ainda parada à espera de decisão comercial. **A Fase 8a mostrou que isso não deixou dívida:** o que a Fase 9 endureceu foi a aplicação (auditoria, desempenho, limites, cabeçalhos e concorrência sob carga), e nada disso precisou ser revisto quando o provedor real entrou — o limite de requisições do aviso automático, a CSP e a auditoria continuaram valendo sem uma linha alterada. O vocabulário de status também não precisou mudar: `SituacaoPagamento::deStatusExterno()` já era neutro o bastante para o da Efí. **A Fase 8 também foi partida em duas**, 8a (o provedor) e 8b (as credenciais pela tela), porque cadastrar credencial pela interface é trabalho de tela e de cifra, não de integração financeira — e misturar os dois faria a fase inteira depender de a tela ficar pronta. **A partição se justificou duas vezes:** a 8a entregou capacidade de cobrar sem esperar a tela, e a 8b provou que a aposta da 8a estava certa — trocar a fonte da configuração custou **um arquivo**, exatamente como a DA-24 previa. É o tipo de retorno que não aparece na fase em que a decisão é tomada, e sim na seguinte.
 
 ---
 

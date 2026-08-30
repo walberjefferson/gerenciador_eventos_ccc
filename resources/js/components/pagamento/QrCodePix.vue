@@ -16,13 +16,13 @@ defineProps<{
     <figure v-if="svg" class="flex flex-col items-center gap-3">
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div
-            class="w-full max-w-[16rem] rounded-lg border border-border bg-white p-3 [&>svg]:h-auto [&>svg]:w-full"
+            class="border-border w-full max-w-[16rem] rounded-lg border bg-white p-3 [&>svg]:h-auto [&>svg]:w-full"
             data-testid="qr-code-pix"
             v-html="svg"
         />
 
-        <figcaption class="text-center text-sm text-muted-foreground">Aponte a câmera do aplicativo do seu banco para este código.</figcaption>
+        <figcaption class="text-muted-foreground text-center text-sm">Aponte a câmera do aplicativo do seu banco para este código.</figcaption>
     </figure>
 
-    <p v-else class="text-sm text-muted-foreground">O QR Code não está disponível para esta cobrança. Use o código copia e cola abaixo.</p>
+    <p v-else class="text-muted-foreground text-sm">O QR Code não está disponível para esta cobrança. Use o código copia e cola abaixo.</p>
 </template>

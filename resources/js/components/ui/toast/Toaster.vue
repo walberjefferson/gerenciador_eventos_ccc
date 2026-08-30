@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ToastProvider } from 'radix-vue';
+import { ToastProvider } from 'reka-ui';
 import Toast from './Toast.vue';
 import ToastClose from './ToastClose.vue';
 import ToastDescription from './ToastDescription.vue';

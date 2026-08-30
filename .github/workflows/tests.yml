@@ -52,5 +52,10 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      # O executor e o Pest, nao o PHPUnit cru. Chamar `./vendor/bin/phpunit`
+      # aqui derrubava o passo antes do primeiro teste rodar ("Please run
+      # [./vendor/bin/pest] instead"): a suite e escrita em Pest, e o binario do
+      # PHPUnit nem consegue carregar os arquivos. Ficou assim desde o commit de
+      # bootstrap (19f8abd, 2026-08-20) e ninguem percebeu.
       - name: Tests
-        run: ./vendor/bin/phpunit
+        run: ./vendor/bin/pest

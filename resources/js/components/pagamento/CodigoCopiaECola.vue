@@ -60,23 +60,23 @@ async function copiar(): Promise<void> {
 
 <template>
     <div class="space-y-3">
-        <label class="block text-sm font-medium" for="codigo-pix">Código Pix (copia e cola)</label>
+        <label class="block text-[14.5px] font-medium" for="codigo-pix">Código Pix (copia e cola)</label>
 
         <textarea
             id="codigo-pix"
             ref="campo"
             :value="codigo"
             readonly
-            rows="3"
+            rows="5"
             data-testid="codigo-copia-e-cola"
-            class="w-full resize-none break-all rounded-md border border-input bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            class="text-muted-foreground border-input bg-muted/40 focus-visible:ring-ring focus-visible:ring-offset-background w-full resize-none rounded-[10px] border-[1.5px] px-[14px] py-3 font-mono text-[12.5px] leading-5 break-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
             @focus="campo?.select()"
         />
 
         <Button
             type="button"
             data-testid="botao-copiar-pix"
-            class="h-12 w-full bg-acao text-base text-acao-foreground hover:bg-acao/90"
+            class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base"
             @click="copiar"
         >
             <Check v-if="copied" aria-hidden="true" />
@@ -85,7 +85,7 @@ async function copiar(): Promise<void> {
         </Button>
 
         <p aria-live="polite" class="min-h-5 text-sm">
-            <span v-if="copied" class="font-medium text-sucesso-texto">Código copiado. Cole no aplicativo do seu banco.</span>
+            <span v-if="copied" class="text-sucesso-texto font-medium">Código copiado. Cole no aplicativo do seu banco.</span>
             <span v-else-if="falhou || !isSupported" class="text-muted-foreground">
                 Se o botão não funcionar no seu aparelho, toque no código acima e copie manualmente.
             </span>

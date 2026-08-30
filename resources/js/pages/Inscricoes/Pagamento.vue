@@ -5,8 +5,8 @@ import QrCodePix from '@/components/pagamento/QrCodePix.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatarDataHora, formatarValor } from '@/lib/formato';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
+import { formatarDataHora, formatarValor } from '@/lib/formato';
 import type { EstadoDaCobranca, PropsDaCobranca, SituacaoDaCobranca } from '@/types/pagamento';
 import { Head, Link } from '@inertiajs/vue3';
 import { useIntervalFn } from '@vueuse/core';
@@ -106,6 +106,23 @@ watch(estado, (agora, antes) => {
 });
 
 onBeforeUnmount(() => pararConsulta());
+
+/**
+ * As instrucoes de pagamento, como texto.
+ *
+ * Ficam aqui e nao na marcacao porque a numeracao passou a ser desenhada: em
+ * seis blocos repetidos, mudar uma palavra viraria mudar em seis lugares. O
+ * `<strong>` sobrevive porque a frase inteira e escrita aqui, e nao montada com
+ * dado de fora — nao ha o que um visitante consiga injetar.
+ */
+const passosDoPagamento = computed<string[]>(() => [
+    'Abra o aplicativo do banco onde você tem conta.',
+    'Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou <strong>Pix copia e cola</strong>.',
+    'Se escolher QR Code, aponte a câmera do celular para a imagem acima.',
+    'Se preferir, toque em <strong>Copiar código Pix</strong> aqui e cole no campo do aplicativo.',
+    `Confira o valor de ${valor.value} e conclua o pagamento.`,
+    'Volte para esta página: assim que o pagamento for reconhecido, ela muda sozinha.',
+]);
 </script>
 
 <template>
@@ -118,13 +135,13 @@ onBeforeUnmount(() => pararConsulta());
 
         <div class="space-y-6">
             <header class="space-y-1">
-                <p class="text-sm text-muted-foreground">{{ evento.nome }}</p>
-                <h1 class="text-2xl font-semibold leading-tight sm:text-3xl">
+                <p class="text-muted-foreground text-sm">{{ evento.nome }}</p>
+                <h1 class="text-2xl leading-tight font-semibold sm:text-3xl">
                     <template v-if="estado === 'confirmada'">Inscrição confirmada</template>
                     <template v-else-if="estado === 'expirada'">Prazo de pagamento vencido</template>
                     <template v-else>Pague com Pix para garantir sua vaga</template>
                 </h1>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-muted-foreground text-sm">
                     Inscrição de {{ nome_completo }} · código
                     <span class="font-mono">{{ codigo_publico }}</span>
                 </p>
@@ -132,33 +149,54 @@ onBeforeUnmount(() => pararConsulta());
 
             <!-- ESTADO 1: aguardando pagamento -->
             <template v-if="estado === 'aguardando'">
-                <Card data-testid="cobranca-aguardando">
-                    <CardHeader class="pb-2">
-                        <CardTitle class="text-base font-medium text-muted-foreground">Valor a pagar</CardTitle>
-                        <p class="text-3xl font-semibold" data-testid="valor-da-cobranca">{{ valor }}</p>
+                <!--
+                    A MESMA moldura das etapas do formulario — o `.panel` do
+                    prototipo: 28px de padding (20px no celular), raio de 14px
+                    e a sombra baixa da identidade. O `rounded-lg` do cartao ja
+                    e esse raio no tema publico; o que faltava era o respiro e
+                    a sombra. Nada do que esta dentro mudou.
+                -->
+                <Card class="p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-aguardando">
+                    <CardHeader class="p-0 pb-2">
+                        <CardTitle class="text-muted-foreground text-base font-medium">Valor a pagar</CardTitle>
+                        <!-- .pix__val — a familia dos titulos, como todo preco desta identidade -->
+                        <p class="font-titulo text-[34px] leading-none font-semibold tracking-[-0.03em] tabular-nums" data-testid="valor-da-cobranca">
+                            {{ valor }}
+                        </p>
                     </CardHeader>
 
-                    <CardContent class="space-y-6">
+                    <CardContent class="space-y-6 p-0">
                         <ContadorRegressivo :prazo="prazo" @expirou="consultarSituacao" />
 
                         <QrCodePix :svg="props.pagamento?.qr_code_svg ?? null" />
 
                         <CodigoCopiaECola v-if="copiaECola" :codigo="copiaECola" />
 
-                        <div class="rounded-lg border border-border bg-muted/40 p-4">
+                        <!-- .steps-how — o numero em circulo verde lavado, e nao
+                             o marcador do navegador: numa lista de instrucoes que
+                             a pessoa le com o celular na mao e o aplicativo do
+                             banco aberto, o numero precisa ser achado de relance. -->
+                        <div>
                             <h2 class="text-base font-semibold">Como pagar, passo a passo</h2>
-                            <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed">
-                                <li>Abra o aplicativo do banco onde você tem conta.</li>
-                                <li>Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou <strong>Pix copia e cola</strong>.</li>
-                                <li>Se escolher QR Code, aponte a câmera do celular para a imagem acima.</li>
-                                <li>Se preferir, toque em <strong>Copiar código Pix</strong> aqui e cole no campo do aplicativo.</li>
-                                <li>Confira o valor de {{ valor }} e conclua o pagamento.</li>
-                                <li>Volte para esta página: assim que o pagamento for reconhecido, ela muda sozinha.</li>
+                            <ol class="mt-[22px] grid list-none gap-3 p-0">
+                                <li
+                                    v-for="(passo, indice) in passosDoPagamento"
+                                    :key="indice"
+                                    class="text-muted-foreground flex gap-3 text-[15px] leading-relaxed"
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        class="bg-sucesso-suave text-sucesso-suave-foreground mt-[2px] grid size-[22px] flex-none place-items-center rounded-full text-xs font-bold"
+                                    >
+                                        {{ indice + 1 }}
+                                    </span>
+                                    <span v-html="passo"></span>
+                                </li>
                             </ol>
                         </div>
 
                         <div class="flex flex-col gap-2">
-                            <p aria-live="polite" class="text-sm text-muted-foreground" data-testid="estado-da-consulta">
+                            <p aria-live="polite" class="text-muted-foreground text-sm" data-testid="estado-da-consulta">
                                 <span v-if="falhaNaConsulta">
                                     Não consegui conferir o pagamento agora. Confira sua conexão e toque em “Já paguei” abaixo.
                                 </span>
@@ -191,25 +229,25 @@ onBeforeUnmount(() => pararConsulta());
 
             <!-- ESTADO 2: pagamento reconhecido pelo domínio -->
             <template v-else-if="estado === 'confirmada'">
-                <Card class="border-sucesso/40" data-testid="cobranca-confirmada">
-                    <CardContent class="space-y-4 pt-6">
+                <Card class="border-sucesso/40 p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-confirmada">
+                    <CardContent class="space-y-4 p-0">
                         <div class="flex items-start gap-3">
-                            <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-sucesso text-sucesso-foreground">
+                            <span class="bg-sucesso text-sucesso-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
                                 <CheckCircle2 class="size-6" aria-hidden="true" />
                             </span>
 
                             <div class="min-w-0 space-y-1">
                                 <h2 class="text-xl font-semibold">Recebemos seu pagamento</h2>
-                                <p class="text-sm leading-relaxed text-muted-foreground">
+                                <p class="text-muted-foreground text-sm leading-relaxed">
                                     Sua inscrição em <strong>{{ evento.nome }}</strong> está confirmada. Você já pode fechar esta página.
                                 </p>
                             </div>
                         </div>
 
-                        <dl class="grid gap-3 rounded-lg border border-border p-4 text-sm sm:grid-cols-2">
+                        <dl class="border-border grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2">
                             <div>
                                 <dt class="text-muted-foreground">Situação</dt>
-                                <dd class="font-medium text-sucesso-texto">{{ situacaoRotulo }}</dd>
+                                <dd class="text-sucesso-texto font-medium">{{ situacaoRotulo }}</dd>
                             </div>
                             <div>
                                 <dt class="text-muted-foreground">Valor pago</dt>
@@ -225,7 +263,7 @@ onBeforeUnmount(() => pararConsulta());
                             </div>
                         </dl>
 
-                        <p class="text-sm text-muted-foreground">
+                        <p class="text-muted-foreground text-sm">
                             Guarde o código da inscrição: é por ele que a organização encontra você no dia do evento.
                         </p>
 
@@ -238,16 +276,16 @@ onBeforeUnmount(() => pararConsulta());
 
             <!-- ESTADO 3: prazo vencido -->
             <template v-else>
-                <Card data-testid="cobranca-expirada">
-                    <CardContent class="space-y-4 pt-6">
+                <Card class="p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-expirada">
+                    <CardContent class="space-y-4 p-0">
                         <div class="flex items-start gap-3">
-                            <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                            <span class="bg-muted text-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
                                 <CircleAlert class="size-6" aria-hidden="true" />
                             </span>
 
                             <div class="min-w-0 space-y-1">
                                 <h2 class="text-xl font-semibold">Esta cobrança não vale mais</h2>
-                                <p class="text-sm leading-relaxed text-muted-foreground">
+                                <p class="text-muted-foreground text-sm leading-relaxed">
                                     O prazo para pagar terminou<template v-if="prazo"> em {{ formatarDataHora(prazo) }}</template
                                     >, e a vaga voltou para quem ainda quer se inscrever. Situação atual: {{ situacaoRotulo }}.
                                 </p>
@@ -263,12 +301,38 @@ onBeforeUnmount(() => pararConsulta());
                             </AlertDescription>
                         </Alert>
 
-                        <Button v-if="evento.slug" as-child class="h-12 w-full bg-acao text-base text-acao-foreground hover:bg-acao/90">
+                        <Button v-if="evento.slug" as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base">
                             <Link :href="`/eventos/${evento.slug}`">Ver o evento e tentar de novo</Link>
                         </Button>
                     </CardContent>
                 </Card>
             </template>
+
+            <!-- O caminho para a pagina do participante. Ela vale em qualquer
+                 estado: e la que ficam a linha do tempo, o historico da
+                 cobranca e a explicacao do que ja aconteceu.
+
+                 Com o prazo vencido, o link desta pagina tambem envelhece —
+                 por isso oferecemos, so nesse caso, o pedido de um link novo
+                 por e-mail. -->
+            <nav aria-label="Outras páginas da sua inscrição" class="border-border flex flex-col gap-1 border-t pt-4">
+                <Link
+                    :href="url_acompanhamento"
+                    class="text-acao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+                    data-testid="link-acompanhamento"
+                >
+                    Acompanhar minha inscrição
+                </Link>
+
+                <Link
+                    v-if="estado === 'expirada'"
+                    :href="evento.slug ? `/acesso?evento=${evento.slug}` : '/acesso'"
+                    class="text-acao-texto inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+                    data-testid="link-recuperar-acesso"
+                >
+                    Perdi o link da minha inscrição. Receber outro por e-mail
+                </Link>
+            </nav>
         </div>
     </PublicoLayout>
 </template>

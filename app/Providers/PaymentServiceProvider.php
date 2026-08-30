@@ -6,7 +6,11 @@ namespace App\Providers;
 
 use App\Contracts\Payments\PaymentGateway;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
+use App\Services\Payments\Efi\ConfiguracaoEfi;
+use App\Services\Payments\Efi\EfiClient;
+use App\Services\Payments\Efi\EfiPaymentGateway;
 use App\Services\Payments\Fake\FakePaymentGateway;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +28,18 @@ class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // O ponto unico de leitura da configuracao da Efi e o cliente que
+        // isola o SDK dela sao registrados sempre, mesmo com o provedor
+        // simulado ativo: eles nao falam com ninguem enquanto nao sao usados,
+        // e ter o cliente no container e o que permite a suite automatizada
+        // troca-lo por um duplo sem tocar no gateway.
+        $this->app->singleton(ConfiguracaoEfi::class);
+
+        $this->app->singleton(EfiClient::class, fn ($app): EfiClient => new EfiClient(
+            $app->make(ConfiguracaoEfi::class),
+            $app->make(CacheFactory::class)->store(),
+        ));
+
         $this->app->singleton(PaymentGateway::class, function ($app): PaymentGateway {
             $escolhido = (string) config('payments.default');
 
@@ -31,6 +47,10 @@ class PaymentServiceProvider extends ServiceProvider
                 'fake' => new FakePaymentGateway(
                     (array) config('payments.fake', []),
                     $app->make(FilesystemFactory::class)->disk('local'),
+                ),
+                'efi' => new EfiPaymentGateway(
+                    $app->make(EfiClient::class),
+                    $app->make(ConfiguracaoEfi::class),
                 ),
                 default => throw new InvalidArgumentException(
                     "Provedor de pagamento nao suportado: {$escolhido}."
@@ -47,10 +67,28 @@ class PaymentServiceProvider extends ServiceProvider
 
         // Quem chama e um servidor, nao um navegador: a rota fica fora do grupo
         // "web" de proposito — sem sessao, sem cookie e, portanto, sem CSRF.
-        Route::post(
-            (string) config('payments.webhook.path', 'webhooks/pagamentos'),
-            PaymentWebhookController::class
-        )->name('webhooks.pagamentos');
+        // O limite e alto e por IP. Ele NAO muda a regra de responder 200 a
+        // assinatura invalida (D-18): quem manda aviso com assinatura errada
+        // continua recebendo 200 e sendo ignorado. O limite so existe para o
+        // caso de enxurrada — e, mesmo estourado, nao revela nada sobre a
+        // assinatura, porque a recusa vem antes de o aviso ser lido.
+        $caminho = (string) config('payments.webhook.path', 'webhooks/pagamentos');
+
+        Route::post($caminho, PaymentWebhookController::class)
+            ->middleware('throttle:webhooks-pagamento')
+            ->name('webhooks.pagamentos');
+
+        // Cinto e suspensorio. Ha provedor que acrescenta um sufixo ao
+        // endereco registrado na hora de notificar de verdade — a notificacao
+        // de teste vai no endereco puro e a de verdade vai com "/pix" no fim.
+        // Existe um contorno documentado (terminar a URL registrada com um
+        // parametro vazio), mas ele depende de quem faz a implantacao acertar
+        // um detalhe que ninguem lembra. Aceitar os dois caminhos custa uma
+        // linha; descobrir o erro custa avisos de pagamento perdidos, com
+        // dinheiro ja na conta e inscricao aguardando pagamento na tela.
+        Route::post($caminho.'/pix', PaymentWebhookController::class)
+            ->middleware('throttle:webhooks-pagamento')
+            ->name('webhooks.pagamentos.pix');
 
         // As rotas de simulacao so nascem em local/testing e com a chave ligada.
         // Ainda assim, cada uma passa por um middleware que confere as duas

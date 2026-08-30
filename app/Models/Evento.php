@@ -33,6 +33,10 @@ class Evento extends Model
         'nome',
         'slug',
         'descricao',
+        'local',
+        'local_detalhe',
+        'itens_incluidos',
+        'perguntas_frequentes',
         'banner_caminho',
         'data_inicio',
         'data_fim',
@@ -63,6 +67,19 @@ class Evento extends Model
     public function diasEvento(): HasMany
     {
         return $this->hasMany(DiaEvento::class)->orderBy('posicao');
+    }
+
+    /**
+     * As inscricoes feitas neste evento, em qualquer situacao.
+     *
+     * A tela de cadastro usa isso para saber, antes de aceitar uma mudanca de
+     * estrutura, se ha gente inscrita para se preocupar.
+     *
+     * @return HasMany<Inscricao, $this>
+     */
+    public function inscricoes(): HasMany
+    {
+        return $this->hasMany(Inscricao::class);
     }
 
     /**
@@ -141,6 +158,8 @@ class Evento extends Model
             'inscricoes_abrem_em' => 'datetime',
             'inscricoes_fecham_em' => 'datetime',
             'capacidade' => 'integer',
+            'itens_incluidos' => 'array',
+            'perguntas_frequentes' => 'array',
             'valor_centavos' => 'integer',
             'prazo_pagamento_minutos' => 'integer',
             'situacao' => SituacaoEvento::class,

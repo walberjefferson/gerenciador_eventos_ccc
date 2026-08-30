@@ -44,6 +44,14 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
+                // As permissoes de quem esta logado, so os nomes. A barra
+                // lateral precisa delas para nao oferecer um item que o
+                // proprio servidor recusaria com 403 — mostrar um caminho
+                // fechado e pior do que nao mostrar caminho nenhum.
+                //
+                // Isto nao substitui a checagem no servidor: e enfeite de
+                // tela. A tranca de verdade continua no middleware da rota.
+                'permissoes' => $request->user()?->getAllPermissions()->pluck('name')->all() ?? [],
             ],
         ]);
     }

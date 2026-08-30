@@ -8,6 +8,7 @@ use App\Models\Inscricao;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Feature\Inscricoes\Cenario;
+use Tests\Feature\Inscricoes\Disputa;
 
 /**
  * Corresponde ao ConcurrencyTest exigido pelo briefing.
@@ -43,122 +44,27 @@ function reservarComGravacaoCondicional(int $eventoId): int
 }
 
 /**
- * Monta o cenario numa conexao propria, fora da transacao do teste.
- *
- * Os processos que disputam a vaga sao processos de verdade: eles so enxergam
- * o que ja foi confirmado no banco. O que o teste grava dentro da transacao
- * que o RefreshDatabase abre e invisivel para eles.
- *
- * @param  array<string, mixed>  $atributosDoEvento
+ * Os processos de verdade que disputam a vaga moram em Tests\Feature\
+ * Inscricoes\Disputa: a mesma maquinaria serve a este teste, com seis
+ * concorrentes, e ao teste de carga, com cinquenta. Os tres atalhos abaixo
+ * existem so para o texto dos cenarios continuar se lendo como antes.
  */
 function cenarioVisivelParaOutrosProcessos(array $atributosDoEvento = []): Cenario
 {
-    $padrao = config('database.default');
-
-    config(['database.connections.disputa' => config("database.connections.{$padrao}")]);
-    config(['database.default' => 'disputa']);
-
-    try {
-        return Cenario::montar($atributosDoEvento);
-    } finally {
-        config(['database.default' => $padrao]);
-    }
+    return Disputa::cenarioVisivelParaOutrosProcessos($atributosDoEvento);
 }
 
-/**
- * Apaga o que foi gravado fora da transacao do teste.
- *
- * Esta e a unica excecao a regra de nunca apagar registro: nao ha dominio
- * aqui, e sim sujeira de teste que a transacao do RefreshDatabase nao alcanca
- * e que estragaria as contagens dos testes seguintes.
- */
 function limparCenarioCommitado(Cenario $cenario): void
 {
-    $conexao = DB::connection('disputa');
-
-    // As demais tabelas saem por cascata: inscricoes_atividades vai junto com
-    // as inscricoes, e dias_evento, grupos e atividades vao junto com o evento.
-    // As cobrancas precisam sair antes das inscricoes: a chave estrangeira e
-    // "restrict" de proposito, para que nenhum pagamento suma sem querer.
-    $inscricoes = $conexao->table('inscricoes')
-        ->where('evento_id', $cenario->evento->id)
-        ->pluck('id')
-        ->all();
-
-    $conexao->table('pagamentos')->whereIn('inscricao_id', $inscricoes)->delete();
-    $conexao->table('inscricoes')->where('evento_id', $cenario->evento->id)->delete();
-    $conexao->table('eventos')->where('id', $cenario->evento->id)->delete();
-    $conexao->table('grupos_participantes')->where('id', $cenario->grupoParticipante->id)->delete();
-    $conexao->table('cidades')->where('id', $cenario->cidade->id)->delete();
+    Disputa::limparCenarioCommitado($cenario);
 }
 
 /**
- * Dispara varios processos independentes disputando a mesma vaga.
- *
- * Todos recebem o mesmo instante de largada, para que ninguem termine antes de
- * o ultimo nascer. Devolve a saida de cada um: "ok", "esgotado" ou "erro: ...".
- *
  * @return list<string>
  */
 function disputarEmParalelo(Cenario $cenario, int $quantidade, float $margemDeLargada = 2.0): array
 {
-    $raiz = base_path();
-    $script = $raiz.'/tests/Feature/Inscricoes/scripts/disputar-vaga.php';
-    $conexao = config('database.connections.pgsql');
-
-    $ambiente = array_merge(getenv(), [
-        'DB_CONNECTION' => 'pgsql',
-        'DB_HOST' => (string) $conexao['host'],
-        'DB_PORT' => (string) $conexao['port'],
-        'DB_DATABASE' => (string) $conexao['database'],
-        'DB_USERNAME' => (string) $conexao['username'],
-        'DB_PASSWORD' => (string) $conexao['password'],
-    ]);
-
-    $largada = microtime(true) + $margemDeLargada;
-    $processos = [];
-
-    for ($indice = 1; $indice <= $quantidade; $indice++) {
-        $tubos = [];
-
-        $processo = proc_open(
-            [
-                PHP_BINARY,
-                $script,
-                (string) $cenario->evento->id,
-                (string) $cenario->cidade->id,
-                (string) $cenario->grupoParticipante->id,
-                (string) $cenario->futebol->id,
-                (string) $indice,
-                sprintf('%.6F', $largada),
-            ],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $tubos,
-            $raiz,
-            $ambiente,
-        );
-
-        if (! is_resource($processo)) {
-            throw new RuntimeException("Nao foi possivel iniciar o processo {$indice} da disputa.");
-        }
-
-        $processos[] = [$processo, $tubos];
-    }
-
-    $saidas = [];
-
-    foreach ($processos as [$processo, $tubos]) {
-        $saida = trim((string) stream_get_contents($tubos[1]));
-        $erro = trim((string) stream_get_contents($tubos[2]));
-
-        fclose($tubos[1]);
-        fclose($tubos[2]);
-        proc_close($processo);
-
-        $saidas[] = $saida !== '' ? $saida : 'sem saida: '.$erro;
-    }
-
-    return $saidas;
+    return Disputa::emParalelo($cenario, $quantidade, $margemDeLargada);
 }
 
 describe('gravacao condicional', function () {

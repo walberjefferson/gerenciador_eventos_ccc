@@ -5,7 +5,7 @@ import { ref } from 'vue';
  * Pix. Nao substitui mensagem de erro dentro do formulario: erro de campo
  * continua ao lado do campo.
  *
- * Construido sobre as primitivas de Toast do radix-vue, sem dependencia nova.
+ * Construido sobre as primitivas de Toast do reka-ui, sem dependencia nova.
  */
 export type TomDoAviso = 'padrao' | 'sucesso' | 'erro';
 

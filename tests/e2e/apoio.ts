@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { ambienteDeTeste } from './ambiente';
+import { ambienteDeTeste, EVENTO_DEMO } from './ambiente';
 
 /**
  * Apoio comum dos cenarios de ponta a ponta.
@@ -36,7 +36,23 @@ export interface PessoaDeTeste {
     email: string;
     telefone: string;
     cpf: string;
+    /** Em ISO (AAAA-MM-DD), como cada cenario a escreve. */
     nascimento: string;
+}
+
+/**
+ * A data como a TELA a escreve: dd/mm/aaaa.
+ *
+ * O campo de nascimento deixou de ser o seletor nativo do navegador e passou a
+ * ser digitavel, com a mascara do desenho. Os cenarios continuam guardando a
+ * data em ISO — e o formato do dominio, e e ele que aparece nas asseveracoes —
+ * e a conversao mora aqui, num lugar so: mudar o formato da tela nao pode
+ * obrigar a reescrever dezoito arquivos de cenario.
+ */
+export function dataComoNaTela(iso: string): string {
+    const [ano, mes, dia] = iso.split('-');
+
+    return `${dia}/${mes}/${ano}`;
 }
 
 /**
@@ -47,7 +63,7 @@ export async function preencherDadosPessoais(page: Page, pessoa: PessoaDeTeste):
     await page.getByLabel('E-mail').fill(pessoa.email);
     await page.getByLabel('Telefone com DDD').fill(pessoa.telefone);
     await page.getByLabel('CPF').fill(pessoa.cpf);
-    await page.getByLabel('Data de nascimento').fill(pessoa.nascimento);
+    await page.getByLabel('Data de nascimento').fill(dataComoNaTela(pessoa.nascimento));
 
     await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
     await escolherNaLista(page, 'Grupo', 'Centro');
@@ -112,4 +128,51 @@ export function definirCapacidadeDaAtividade(nome: string, capacidade: number | 
         '--execute',
         `\\App\\Models\\Atividade::query()->where('nome', '${nome}')->update(['capacidade' => ${valor}]);`,
     ]);
+}
+
+/** O que sobra de uma inscricao recem-feita, do ponto de vista de quem a fez. */
+export interface InscricaoDeTeste {
+    /** O codigo publico, lido do endereco da cobranca. */
+    codigo: string;
+    /** O endereco assinado da tela de cobranca. */
+    urlDaCobranca: string;
+    /** O endereco assinado da pagina de acompanhamento, como a tela oferece. */
+    urlDoAcompanhamento: string;
+}
+
+/**
+ * Percorre o formulario inteiro e devolve a inscricao pronta.
+ *
+ * E o mesmo caminho dos cenarios da vitrine, feito com os mesmos gestos: os
+ * cenarios do participante comecam depois disso, e nao teriam por que
+ * repetir o preenchimento passo a passo.
+ */
+export async function inscreverPessoa(page: Page, pessoa: PessoaDeTeste, atividade: string): Promise<InscricaoDeTeste> {
+    await page.goto(`/eventos/${EVENTO_DEMO.slug}/inscricao`);
+
+    await preencherDadosPessoais(page, pessoa);
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    await escolherAtividade(page, atividade);
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    await page.getByLabel(/Li e aceito o regulamento/).check();
+    await page.getByRole('button', { name: 'Confirmar inscrição' }).click();
+
+    await page.waitForURL(/\/inscricoes\/[^/]+\/pagamento\?/);
+    await expect(page.getByTestId('cobranca-aguardando')).toBeVisible();
+
+    const urlDaCobranca = page.url();
+
+    // O link do acompanhamento nasce assinado no servidor: e assim que o
+    // participante chega a propria pagina, e e assim que o teste chega tambem.
+    const acompanhamento = await page.getByTestId('link-acompanhamento').getAttribute('href');
+
+    expect(acompanhamento, 'a tela da cobranca precisa oferecer o link do acompanhamento').toBeTruthy();
+
+    return {
+        codigo: codigoDaInscricao(urlDaCobranca),
+        urlDaCobranca,
+        urlDoAcompanhamento: acompanhamento as string,
+    };
 }

@@ -22,6 +22,16 @@ yarn-error.log
 /.vscode
 /.zed
 
+# Certificados do provedor de pagamento (mTLS da Efi). Um .p12 ou .pem
+# commitado e a chave da conta bancaria publicada — e nao ha como despublicar.
+# A pasta e a extensao ficam bloqueadas, nesta ordem, para que nem um arquivo
+# solto fora dela escape.
+/storage/certificados
+*.p12
+*.pem
+*.pfx
+*.key
+
 # Playwright: artefatos de execucao, nao vao para o repositorio
 /test-results
 /playwright-report

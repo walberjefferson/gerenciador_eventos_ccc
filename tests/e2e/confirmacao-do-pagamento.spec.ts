@@ -1,6 +1,6 @@
-import { expect, test } from './base';
 import { EVENTO_DEMO } from './ambiente';
 import { codigoDaInscricao, escolherAtividade, idExternoDaCobranca, preencherDadosPessoais, type PessoaDeTeste } from './apoio';
+import { expect, test } from './base';
 
 /**
  * O pagamento chega enquanto a pessoa esta com a tela aberta.

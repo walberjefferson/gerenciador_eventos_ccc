@@ -1,7 +1,7 @@
 # Pagamentos
 
-> **Versão:** 1.0 · **Data do documento:** 2026-08-20
-> Descreve como a plataforma cobra, como ela se mantém independente de fornecedor e como comparar os provedores brasileiros para a escolha futura.
+> **Versão:** 2.1 · **Data do documento:** 2026-08-27
+> Descreve como a plataforma cobra, como ela se mantém independente de fornecedor, como a **Efí** — o provedor escolhido — foi encaixada atrás do mesmo contrato sem que nenhuma regra de inscrição percebesse a troca, e **como configurá-la pela tela do painel** (seção 10).
 
 ---
 
@@ -23,9 +23,11 @@ Antes de fechar contrato, confirme tudo diretamente com o provedor.
 
 **Método inicial:** Pix. Cartão de crédito fica previsto na estrutura, sem implementação nesta entrega.
 
-**Provedor desta entrega:** um provedor **simulado** (`FakePaymentGateway`), que gera cobrança Pix fictícia e permite simular pagamento, expiração, falha, estorno e o envio do aviso automático. Ele existe para que toda a plataforma possa ser desenvolvida e testada sem contratar nenhuma instituição financeira.
+**Provedor real:** **Efí**, API Pix (decisão **DA-16**, do dono do produto, em 2026-08-27 — fecha a pendência **P-01**). Implementado na fase 8a em `app/Services/Payments/Efi/`.
 
-**Escolha do provedor real:** decisão de negócio, apoiada pela matriz da seção 6 deste documento. Trocar de provedor é escrever uma nova implementação do contrato e mudar uma linha de configuração — nenhuma regra de inscrição muda.
+**Provedor simulado:** `FakePaymentGateway` continua existindo e continua sendo o padrão em desenvolvimento e na suíte. Ele gera cobrança Pix fictícia e permite simular pagamento, expiração, falha, estorno e o envio do aviso automático — é o que permite trabalhar na plataforma inteira sem credencial de instituição financeira.
+
+**A troca entre os dois é uma linha de configuração** (`PAYMENT_GATEWAY`). Isso deixou de ser promessa quando a fase 8a foi escrita: a Efí entrou sem uma linha alterada em Action, Model ou Enum de domínio, e os 32 cenários de ponta a ponta passaram sem edição — a prova de que quem se inscreve não vê diferença.
 
 ---
 
@@ -36,6 +38,8 @@ Todo provedor de pagamento precisa cumprir exatamente este conjunto de operaçõ
 ```php
 interface PaymentGateway
 {
+    public function name(): string;
+
     public function createPayment(CreatePaymentData $data): PaymentResult;
 
     public function getPayment(string $externalId): PaymentStatusResult;
@@ -44,9 +48,12 @@ interface PaymentGateway
 
     public function refundPayment(string $externalId, ?int $amountCents = null): RefundResult;
 
+    public function webhookRequest(Request $request): WebhookRequestData;
+
     public function verifyWebhookSignature(WebhookRequestData $request): bool;
 
-    public function parseWebhook(WebhookRequestData $request): WebhookResult;
+    /** @return list<WebhookResult> */
+    public function parseWebhook(WebhookRequestData $request): array;
 }
 ```
 
@@ -56,12 +63,18 @@ interface PaymentGateway
 | `getPayment` | Consulta a situação atual da cobrança. Usada pela reconciliação |
 | `cancelPayment` | Cancela a cobrança. Usada quando a inscrição expira |
 | `refundPayment` | Devolve o dinheiro, total ou parcialmente |
+| `name` | Diz qual provedor é este. É o valor gravado em `pagamentos.gateway`, para que um pagamento antigo continue sabendo quem o emitiu depois de uma troca de provedor |
+| `webhookRequest` | Recorta a requisição recebida no formato que **este** provedor usa — em particular, **onde mora a assinatura dele** |
 | `verifyWebhookSignature` | Confere se o aviso recebido veio mesmo do provedor |
-| `parseWebhook` | **Traduz** o aviso do provedor para um formato neutro. Não altera nada |
+| `parseWebhook` | **Traduz** o aviso do provedor para uma **lista** de eventos neutros. Não altera nada |
 
-### 2.1 Três decisões deste contrato
+### 2.1 As decisões deste contrato
 
 **Está em inglês, de propósito.** O resto do domínio deste projeto é escrito em português. Este contrato não, porque é a fronteira com serviços externos cujas APIs são todas em inglês (`amount`, `payer`, `qr_code`). Traduzir só na nossa metade criaria um vaivém de tradução em cada campo. A fronteira fala a língua de quem está do outro lado.
+
+**A assinatura é assunto do provedor, não do controller.** Até a fase 8a, o controller do aviso automático sabia que a assinatura vinha num cabeçalho de nome específico — e citava o **provedor simulado** pelo nome para descobrir qual era. Isso parecia inofensivo enquanto só existia um provedor. A Efí mandou a assinatura **no endereço**, e o vazamento apareceu. Hoje quem recorta a requisição é `webhookRequest()`, do próprio provedor: o controller recebe o aviso, entrega ao provedor, e não sabe nem quer saber onde a assinatura viajava.
+
+**`parseWebhook` devolve uma lista, não um evento.** O aviso da Efí é uma lista de pagamentos, e um único aviso pode trazer vários. Devolver apenas o primeiro perderia dinheiro **em silêncio**, que é a pior forma de perder. O controller desdobra a lista em um registro e um trabalho por evento; o trabalho continua processando **um** evento por vez, com a idempotência intacta.
 
 **`parseWebhook`, não `handleWebhook`.** O rascunho inicial sugeria `handleWebhook`, o que colocaria o provedor no comando de alterar nossas inscrições. Aqui o provedor apenas **traduz**; quem decide o efeito é a Action da aplicação. A regra fica de um lado só da fronteira, e trocar de provedor não muda o que acontece com a inscrição.
 
@@ -75,8 +88,8 @@ interface PaymentGateway
 | `PaymentResult` | provedor → aplicação | identificador externo, situação, código Pix copia e cola, imagem do QR Code, vencimento, dados extras |
 | `PaymentStatusResult` | provedor → aplicação | identificador externo, situação, valor pago, momento do pagamento |
 | `RefundResult` | provedor → aplicação | identificador do estorno, valor estornado, situação |
-| `WebhookRequestData` | requisição → provedor | corpo cru, cabeçalhos, endereço de origem |
-| `WebhookResult` | provedor → aplicação | tipo do aviso, identificador do aviso, identificador externo do pagamento, situação, valor, momento |
+| `WebhookRequestData` | requisição → provedor | corpo cru, conteúdo já lido, cabeçalhos e a assinatura — que o provedor tanto pode ter tirado de um cabeçalho quanto do endereço |
+| `WebhookResult` | provedor → aplicação | tipo do aviso, identificador do aviso, identificador externo do pagamento, situação, valor, momento, e o recorte cru daquele evento |
 
 **Por que o valor sempre em centavos.** `R$ 120,00` vira `12000`. Número decimal aproximado (`float`) soma errado: `0.1 + 0.2` não dá exatamente `0.3` em nenhuma linguagem que use ponto flutuante. Em dinheiro isso vira diferença de centavo em fechamento. Inteiro em centavos elimina a classe inteira de problema.
 
@@ -88,16 +101,22 @@ interface PaymentGateway
 PAYMENT_GATEWAY=fake
 ```
 
+```env
+PAYMENT_GATEWAY=efi
+```
+
 ```php
 // app/Providers/PaymentServiceProvider.php
-$this->app->singleton(PaymentGateway::class, fn () => match (config('payments.default')) {
-    // 'efi'     => new EfiPaymentGateway(...),      // fase 8
-    // 'pagarme' => new PagarMePaymentGateway(...),  // fase 8
-    default => new FakePaymentGateway(...),
+$this->app->singleton(PaymentGateway::class, fn () => match ($escolhido) {
+    'fake' => new FakePaymentGateway(...),
+    'efi'  => new EfiPaymentGateway(...),   // implementado na fase 8a
+    // outros provedores entram aqui, um braço cada
 });
 ```
 
-Regra inegociável: **as palavras `FakePaymentGateway`, `Efi` ou `PagarMe` não aparecem em nenhuma Action, Model ou Service de inscrição.** O domínio conhece apenas a interface. Isso é o que torna a troca de provedor uma mudança de configuração.
+O `match` deixou de ser comentário. Um valor desconhecido em `PAYMENT_GATEWAY` **não** cai silenciosamente no simulado: o provedor reclama, porque cobrar de mentira achando que se está cobrando de verdade é o pior desfecho possível.
+
+Regra inegociável: **as palavras `FakePaymentGateway`, `Efi` ou `PagarMe` não aparecem em nenhuma Action, Model ou Service de inscrição.** O domínio conhece apenas a interface. Isso é o que torna a troca de provedor uma mudança de configuração — e é verificado por teste automatizado, não por boa vontade.
 
 ---
 
@@ -161,6 +180,8 @@ Como as duas frentes são idempotentes, um pagamento confirmado pelas duas ao me
 ---
 
 ## 6. Matriz de comparação de provedores
+
+> **A decisão já foi tomada: Efí** (DA-16, 2026-08-27). A matriz fica no documento como registro de **por que** — e para servir de ponto de partida caso um dia seja preciso trocar. A taxa Pix de **1,19% por transação** continua **pendente de confirmação com o comercial da Efí (P-06)**: é o valor público da página de tarifas, não uma proposta escrita. **Nenhuma taxa entra em código ou configuração**, então a P-06 não bloqueou a integração e não bloqueia a operação — ela bloqueia a precificação do evento.
 
 > **Data da consulta: 2026-08-20.** Fonte de cada número indicada na própria célula. Onde não houve fonte oficial acessível na data, está escrito **a validar** — nunca um valor estimado.
 
@@ -254,13 +275,98 @@ O que é sempre feito:
 
 ---
 
-## 9. O que fica para a fase 8
+## 9. A integração com a Efí (fase 8a)
 
-- Implementar a classe do provedor escolhido cumprindo o contrato da seção 2.
-- Cadastrar as credenciais no ambiente.
-- Configurar o endereço de aviso no painel do provedor.
-- Homologar na conta de testes: cobrança, pagamento, aviso, consulta, cancelamento e estorno.
-- Rodar a suíte de testes com `PAYMENT_GATEWAY` apontando para o provedor real em ambiente de homologação.
-- Registrar em `PROGRESS.md` a data da escolha e as taxas efetivamente contratadas.
+Tudo o que conhece a Efí mora em **`app/Services/Payments/Efi/`**, mais o braço `'efi'` no `PaymentServiceProvider` e o comando de diagnóstico. Fora daí, ninguém no sistema sabe o nome do fornecedor.
 
-Nenhum arquivo de domínio deve ser alterado nessa fase. Se for necessário alterar, o contrato estava errado — e isso é sinal para revisar o desenho, não para abrir exceção.
+### 9.1 As quatro peças
+
+| Peça | Responsabilidade |
+|------|------------------|
+| `ConfiguracaoEfi` | **O único lugar que lê configuração da Efí** (DA-24): ambiente, credenciais, certificado, chave Pix, HMAC e tempo limite. Hoje lê do ambiente; a fase 8b troca o corpo dela para ler do banco, **e mais nada muda** |
+| `EfiClient` | Wrapper fino sobre o SDK oficial. É o **único** ponto que instancia o SDK. Cuida do certificado, do token com cache, e traduz erro do fornecedor para `EfiException` sem vazar segredo |
+| `EfiPaymentGateway` | A implementação do contrato: cria, consulta e cancela cobrança; confere a assinatura do aviso; traduz o aviso. **Nunca toca em `Inscricao` nem em `Pagamento`** (D-17) |
+| `TraducaoDeStatus` | Traduz o vocabulário da Efí para o do domínio: `ATIVA` → pendente, `CONCLUIDA` → pago, `REMOVIDA_*` → cancelado |
+
+### 9.2 As decisões que a Efí impôs
+
+| Assunto | O que a Efí exige | O que foi feito |
+|---|---|---|
+| **Identificador da cobrança** | `txid` de 26 a 35 caracteres alfanuméricos, **sem hífen** | Um ULID gerado **por cobrança** (26 caracteres, cabe sem transformação). Não é derivado do código da inscrição de propósito: uma inscrição cancelada pode gerar uma segunda cobrança, e reusar o identificador daria recusa por duplicidade |
+| **Valor** | Texto decimal (`"123.45"`) | O domínio guarda centavos inteiros (D-06) e a conversão vive **só** na fronteira, **sem número de ponto flutuante** em ponto nenhum do caminho |
+| **Código Pix** | Vem pronto na resposta da cobrança (`pixCopiaECola`) | Nenhuma segunda viagem à rede para buscar QR Code. O desenho do QR acontece no navegador |
+| **Assinatura do aviso** | Viaja **no endereço** (`?hmac=`), não em cabeçalho | O contrato passou a deixar **o provedor** dizer onde mora a assinatura dele. O controller não sabe mais — antes, ele citava o provedor simulado pelo nome |
+| **Formato do aviso** | `{"pix": [...]}` — uma **lista**, que pode trazer vários pagamentos num aviso só | O contrato passou a devolver **uma lista** de resultados, e o controller desdobra o aviso em **um registro e um trabalho por pagamento**. Devolver só o primeiro perderia dinheiro em silêncio |
+| **Endereço do aviso** | A Efí acrescenta `/pix` ao fim do endereço registrado | A rota responde **nos dois caminhos**. Cinto e suspensório: custa uma linha, e descobrir o erro custaria pagamentos perdidos |
+| **Cobrança vencida** | **Não existe** situação de vencida: passado o prazo, a consulta continua respondendo `ATIVA` | Quem decide que venceu continua sendo o `prazo_pagamento` do domínio (D-25). Traduzir `ATIVA` para "vencida" fecharia cobrança que a Efí ainda aceita pagar |
+| **Cobrança repetida** | Recusa com 409 se o `txid` já existe | Uma nova tentativa com identificador novo. **Uma só** — insistir para sempre transformaria um erro de programação em enxurrada contra a instituição financeira |
+
+### 9.3 O identificador da transferência (`endToEndId`)
+
+O `endToEndId` é o número que identifica a transferência Pix no sistema bancário, e **só chega no aviso** — não está na cobrança. Uma devolução futura vai exigi-lo. Por isso ele é guardado em `pagamentos.metadados`, que já é `jsonb` (sem migração nova), **desde já**, mesmo com o estorno fora de escopo. Não guardar seria começar a fase de estorno com um passivo: todos os pagamentos anteriores sem como devolver.
+
+### 9.4 O que a Efí **não** faz nesta entrega
+
+- **Devolução (estorno):** `refundPayment()` lança "não suportado", em voz alta. A política de reembolso do evento (**P-02**) não foi decidida, e implementar devolução antes de existir regra de negócio é construir um botão que ninguém sabe quando apertar.
+- **Cobrança com vencimento (`cobv`):** exige endereço completo de quem paga — logradouro, cidade, UF, CEP — que o formulário de inscrição não coleta e não precisa coletar. A cobrança imediata cobre o caso inteiro.
+- **Split, Pix enviado, Pix Automático, cartão:** fora de escopo.
+
+### 9.5 Provar contra a Efí de verdade
+
+A suíte automatizada roda **sem credencial, sem certificado e sem rede**: o cliente da Efí é trocado por um duplo. Isso não é conveniência — o SDK usa cliente HTTP próprio, que o `Http::fake()` do Laravel não alcança.
+
+Mas duplo prova desenho, não prova que a credencial funciona. Para isso existe:
+
+```bash
+php artisan efi:diagnostico
+```
+
+Ele confere, contra a homologação de verdade, cada passo em ordem: certificado no lugar e legível, token obtido, cobrança criada, código Pix devolvido. **Só roda em `local` ou `testing`** — em produção, ele criaria cobrança de verdade.
+
+---
+
+## 10. Configurar a Efí pela tela (fase 8b)
+
+A fase 8b tirou a credencial do arquivo de ambiente e a colocou numa tela do painel. **Ela mudou o corpo de `ConfiguracaoEfi` e mais nada do lado do provedor** — foi exatamente para isso que essa classe existia.
+
+**Quem entra:** só quem tem a permissão `pagamentos.credenciais`, que pertence **apenas ao papel `administrador`**. Quem organiza o evento não vê o item no menu e recebe 403 se digitar o endereço.
+
+**Onde fica:** menu lateral do painel → **Credenciais de pagamento** (`/admin/pagamentos/credenciais`).
+
+### 10.1 O passo a passo
+
+1. **Escolha o bloco de homologação.** A tela tem dois blocos independentes, homologação e produção, e nada passa de um para o outro.
+2. **Cole a identificação e a chave secreta da aplicação**, as duas do painel da Efí, do **mesmo ambiente** do bloco. Misturar credencial de homologação com a de produção é mandar cobrança de teste para dinheiro de verdade, e não há como o sistema perceber sozinho.
+3. **Informe a chave Pix da conta que recebe** o dinheiro do evento.
+4. **Clique em "Gerar valor"** no campo do aviso automático. Não invente esse valor à mão: ele é conferido a cada aviso que a Efí manda, e um valor curto ou previsível deixaria alguém de fora confirmar inscrição sem pagar.
+5. **Envie o certificado** (`.p12`, `.pfx` ou `.pem`) baixado do painel da Efí. O sistema confere que o arquivo abre de verdade e, quando o formato permite, lê a data de validade e passa a mostrá-la.
+6. **Copie o endereço do aviso** que a tela monta pronto — ele já traz o `?hmac=` com o valor gerado e o `?ignorar=` no fim — e registre-o no painel da Efí.
+7. **Salve.**
+8. **Clique em "Testar conexão".** Ele percorre os mesmos passos do `php artisan efi:diagnostico` — configuração completa, certificado que abre e não venceu, token aceito pela Efí — e diz, em português, qual passo falhou. **Ele não emite cobrança**: a tela roda em produção, e uma cobrança de teste ali seria dinheiro de verdade.
+9. **Clique em "Usar este ambiente".**
+10. Repita tudo no bloco de produção quando a homologação estiver provada. **A virada para produção pede que você digite `PRODUCAO`** — a partir dali toda cobrança é real.
+
+### 10.2 Três coisas que surpreendem, e não deveriam
+
+- **Nada do que você salvou reaparece na tela.** Os campos voltam vazios de propósito, indicando apenas que existe um valor guardado. Não é falha: é a única forma de a tela não virar um lugar de onde se lê a credencial da conta bancária.
+- **Por isso, campo em branco significa "mantém", nunca "apaga".** Para corrigir só a chave Pix, preencha só a chave Pix — não há como redigitar o que a tela nunca mostrou.
+- **O endereço do aviso só aparece completo depois que você gera ou digita o valor.** Ele carrega o segredo, e o segredo não volta do servidor. Se você não o anotou, gere um novo, salve, e registre o endereço novo na Efí.
+
+### 10.3 O que a tela guarda, e como
+
+Os cinco campos sigilosos — identificação, chave secreta, chave Pix, valor do aviso e **o conteúdo do certificado** — vão **cifrados** para o banco, pelo mesmo mecanismo que já protege o CPF de quem se inscreve. O certificado é escrito em disco, com permissão restrita e fora do repositório, apenas no instante em que o SDK precisa dele; esse arquivo é cache descartável, e o sistema o reescreve quando ele some.
+
+Cada alteração e cada troca de ambiente entram em `logs_auditoria` dizendo **quais campos** mudaram — **nunca os valores**, nem antes nem depois.
+
+Enquanto não houver nenhum ambiente ativo cadastrado, o sistema continua lendo o arquivo de ambiente do servidor (decisão **DA-26**), e a própria tela avisa quando é esse o caso.
+
+### 10.4 O que continua sendo tarefa de implantação (não é código)
+
+1. Instalar a cadeia de certificados da Efí no servidor web e deixar a verificação do certificado do cliente como **opcional** — o roteiro está na seção 8.3 de `ARCHITECTURE.md`.
+2. HTTPS válido e público, sem o qual a Efí não chama o servidor.
+3. Registrar o endereço do aviso no painel da Efí, terminando em `?ignorar=`.
+4. Homologar à mão: uma inscrição inteira em homologação, do formulário ao e-mail de confirmação.
+5. Manter o **trabalhador da fila** de pé (`php artisan queue:work redis --queue=emails`), senão o comprovante não sai.
+6. Confirmar a taxa efetiva com o comercial e fechar a **P-06** aqui neste documento.
+
+Nenhum arquivo de domínio deve ser alterado em nenhuma dessas etapas. Se for necessário alterar, o contrato estava errado — e isso é sinal para revisar o desenho, não para abrir exceção.

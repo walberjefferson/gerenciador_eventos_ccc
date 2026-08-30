@@ -20,7 +20,9 @@ test('a tela avisa, antes de enviar, o CPF incompleto e o campo obrigatorio vazi
     // E-mail de proposito em branco.
     await page.getByLabel('Telefone com DDD').fill('(11) 96666-3333');
     await page.getByLabel('CPF').fill('123');
-    await page.getByLabel('Data de nascimento').fill('1975-02-20');
+    // dd/mm/aaaa: o campo de nascimento passou a ser digitavel, com a mascara
+    // do desenho, e nao mais o seletor nativo do navegador.
+    await page.getByLabel('Data de nascimento').fill('20/02/1975');
     await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
     await escolherNaLista(page, 'Grupo', 'Centro');
 
@@ -53,7 +55,7 @@ test('o servidor recusa o CPF impossivel e a tela volta ao passo do campo', asyn
     await page.getByLabel('E-mail').fill('jose.batista@example.com');
     await page.getByLabel('Telefone com DDD').fill('(11) 95555-4444');
     await page.getByLabel('CPF').fill(CPF_IMPOSSIVEL);
-    await page.getByLabel('Data de nascimento').fill('1980-11-07');
+    await page.getByLabel('Data de nascimento').fill('07/11/1980');
     await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
     await escolherNaLista(page, 'Grupo', 'Centro');
 

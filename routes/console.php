@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Console\Commands\ExpirarInscricoesVencidas;
+use App\Console\Commands\LembrarPrazoPagamento;
 use App\Console\Commands\ReconciliarPagamentosPendentes;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -17,7 +18,8 @@ Artisan::command('inspire', function () {
 | Rotinas automaticas
 |--------------------------------------------------------------------------
 |
-| Duas tarefas mantem o estoque de vagas honesto sem ninguem precisar olhar.
+| Tres tarefas rodam sozinhas: duas mantem o estoque de vagas honesto e uma
+| avisa a pessoa antes que ela perca a vaga por esquecimento.
 |
 | 1) Expiracao — de minuto em minuto. Quem nao pagou dentro do prazo perde a
 |    reserva e a vaga volta imediatamente para a fila. Um minuto e o menor
@@ -33,8 +35,14 @@ Artisan::command('inspire', function () {
 |    olha apenas cobrancas perto do vencimento (margem padrao de 15 minutos),
 |    entao o volume de consultas e pequeno.
 |
-| Ambas sao seguras para rodar duas vezes: cada mudanca exige a situacao
-| anterior, entao a segunda execucao nao encontra nada para fazer.
+| 3) Lembrete de prazo — a cada quinze minutos. Avisa quem esta aguardando
+|    pagamento com prazo vencendo dentro da janela configurada (padrao: as
+|    proximas 24 horas). Quinze minutos e precisao de sobra para um aviso de
+|    24 horas, e o volume e baixo: so entra quem ainda nao recebeu o lembrete.
+|
+| As tres sao seguras para rodar duas vezes: as duas primeiras porque cada
+| mudanca exige a situacao anterior, e o lembrete porque a unicidade de
+| comunicacoes_enviadas recusa a segunda copia da mesma mensagem.
 |
 */
 
@@ -45,5 +53,10 @@ Schedule::command(ExpirarInscricoesVencidas::class)
 
 Schedule::command(ReconciliarPagamentosPendentes::class)
     ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+Schedule::command(LembrarPrazoPagamento::class)
+    ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->runInBackground();

@@ -1,157 +1,650 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+@import 'tw-animate-css';
 
-body,
-html {
-    --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-}
+/*
+ * Onde o Tailwind procura as classes usadas. Na v3 isso vivia no `content` do
+ * `tailwind.config.js`; na v4 a configuracao e o proprio CSS. A lista repete a
+ * antiga, na mesma ordem, para que nenhuma classe deixe de ser gerada.
+ */
+@source '../views';
+@source '../js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views';
+
+/*
+ * Modo escuro por classe. Na v3 isso era `darkMode: ['class']`; na v4 e uma
+ * variante declarada aqui, e sem ela o `dark:` simplesmente para de existir.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * O lado publico tem identidade propria, e ela e escopada por atributo.
+ *
+ * `publico:rounded-full` quer dizer "arredondado so quando esta dentro do tema
+ * publico". O seletor olha para o `<html data-tema="publico">`, e NAO para uma
+ * div de layout, por um motivo concreto: `SelectContent.vue` e
+ * `DialogContent.vue` teleportam o conteudo para o `document.body` (portal).
+ * Escopo posto na subarvore da pagina nao alcanca a lista de cidades nem os
+ * dialogos — eles sairiam com as cores do painel no meio de uma tela verde.
+ * No `<html>` alcanca tudo, porque `document.body` tambem e descendente dele.
+ */
+@custom-variant publico (&:is([data-tema='publico'] *));
+
+/*
+ * =====================================================================
+ * A PALETA
+ * =====================================================================
+ *
+ * Este arquivo veste o tema do shadcn studio (DA-40). O tema e azul: o que
+ * antes era o vermelho da logo da CCC passa a ser o azul do studio, e por
+ * isso o botao "Fazer inscricao" deixa de ser vermelho. E consequencia
+ * esperada da decisao de quem encomendou, nao defeito.
+ *
+ * O que o studio NAO traz: ele tem `primary`, `destructive`, `chart-*` e
+ * `sidebar-*`, mas nao tem "sucesso" nem "atencao" — e o projeto usa quatro
+ * cores semanticas em dezenas de telas. Elas foram DERIVADAS do esquema azul
+ * mantendo o significado (DA-41), nao apagadas.
+ *
+ * A regra que manda aqui (DA-42): nenhuma cor que carrega texto fica abaixo
+ * de 4.5:1. Cada razao abaixo foi calculada pela formula da WCAG 2.1, no modo
+ * claro e no escuro, e esta escrita ao lado do valor. Onde um tom do studio
+ * reprovou, ele foi ajustado ate passar — e o ajuste esta registrado.
+ *
+ * Os fundos de referencia: no claro, branco #FFFFFF; no escuro, #09090B
+ * (`--background`) e #18181B (`--card`), que e o mais claro dos dois e
+ * portanto o caso dificil para texto claro.
+ *
+ * POR QUE HEXADECIMAL, E NAO `oklch()`
+ * O tema do studio vem escrito em `oklch()`. Aqui ele esta escrito em sRGB,
+ * com exatamente as mesmas cores. O motivo e concreto: o cenario que mede
+ * contraste no navegador (tests/e2e/home.spec.ts) le a cor calculada do
+ * elemento e a interpreta como `rgb()`. O Chromium NAO converte `oklch()` na
+ * hora de calcular — ele devolve `oklch(...)` como esta —, e o cenario passaria
+ * a medir os tres numeros do oklch como se fossem canais de cor, chegando a
+ * um valor sem sentido. Em hexadecimal a cor calculada volta a ser `rgb()` e a
+ * medicao volta a valer. Nenhum tom mudou: os valores abaixo sao a conversao
+ * exata dos do studio para sRGB, que e onde eles seriam exibidos de qualquer
+ * forma.
+ */
 
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 3.9%;
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 0 0% 92.1%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96.1%;
-        --muted-foreground: 0 0% 45.1%;
-        --accent: 0 0% 96.1%;
-        --accent-foreground: 0 0% 9%;
+        /* --- Tokens do studio, portados como vieram --- */
+        --background: #ffffff; /* #FFFFFF */
+        --foreground: #09090b; /* #09090B - 19.90:1 sobre branco */
+        --card: #ffffff;
+        --card-foreground: #09090b; /* 19.90:1 sobre o card */
+        --popover: #ffffff;
+        --popover-foreground: #09090b; /* 19.90:1 */
+
+        /* Azul do studio #155DFC. Texto `primary-foreground` (#EFF6FF) por cima: 4.82:1. */
+        --primary: #155dfc;
+        --primary-foreground: #eff6ff;
+
+        --secondary: #f4f4f5; /* #F4F4F5 */
+        --secondary-foreground: #18181b; /* #18181B - 16.12:1 sobre o secondary */
+        --muted: #f4f4f5; /* #F4F4F5 */
         /*
-         * Vermelho de erro. O tom original do starter kit (#EF4444) rende
-         * apenas 3.76:1 sobre branco e reprova em texto pequeno — e e
-         * justamente em texto pequeno que o participante le "Este CPF nao
-         * parece valido". Escurecido para #D31212, o mesmo aviso passa a
-         * 5.43:1 sobre branco — e o texto branco por cima dele fica na mesma
-         * medida. No modo escuro o tom original ja cumpre (5.24:1) sobre o
-         * fundo #0A0A0A e fica como esta.
+         * Ajuste de acessibilidade (DA-42). O cinza do studio (#71717B) rende
+         * 4.83:1 sobre branco, mas apenas 4.39:1 sobre o proprio `--muted`
+         * (#F4F4F5) — e `text-muted-foreground` sobre `bg-muted` e um par que
+         * o projeto usa. Escurecido para #6B6B75, passa a 4.79:1 sobre o
+         * muted e 5.27:1 sobre branco.
          */
-        --destructive: 0 84.2% 45%;
-        --destructive-foreground: 0 0% 100%;
-        --border: 0 0% 92.8%;
-        --input: 0 0% 89.8%;
-        --ring: 0 0% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
+        --muted-foreground: #6b6b75;
+        --accent: #f4f4f5;
+        --accent-foreground: #18181b; /* 16.12:1 sobre o accent */
 
         /*
-         * Identidade Caminhada Comunitaria com Cristo (CCC).
-         * Cores extraidas da logo (public/img/logo-ccc.png) e escritas aqui em
-         * HSL para casar com o restante do tema. Todo componente usa estes
-         * tokens; nenhum componente escreve cor literal.
+         * Vermelho de erro do studio (#E7000B). Texto branco por cima: 4.77:1,
+         * e o mesmo tom como texto sobre branco: 4.77:1. Passa em texto
+         * pequeno sem precisar de ajuste — que e onde o participante le
+         * "Este CPF nao parece valido".
+         */
+        --destructive: #e7000b;
+        --destructive-foreground: #ffffff;
+
+        --border: #e4e4e7;
+        --input: #e4e4e7;
+        --ring: #155dfc; /* o anel de foco passa a ser o azul do tema */
+
+        /* Graficos do studio. Nenhuma tela usa hoje; ficam para o proximo grafico nascer certo. */
+        --chart-1: #155dfc;
+        --chart-2: #51a2ff;
+        --chart-3: #8ec5ff;
+        --chart-4: #bedbff;
+        --chart-5: #dbeafe;
+
+        --radius: 0.625rem;
+
+        /*
+         * =============================================================
+         * AS QUATRO SEMANTICAS, DERIVADAS DO ESQUEMA AZUL (DA-41)
+         * =============================================================
          *
-         * Contraste medido sobre branco no modo claro:
-         *   vermelho #D0020D 5.68:1 (texto pequeno liberado)
-         *   verde    #019018 4.20:1 (so titulo grande e elemento de UI)
-         *   azul     #0684D5 3.99:1 (so titulo grande e elemento de UI)
-         *   amarelos #FAD119 1.48:1 e #FCF222 1.18:1 (nunca como texto)
-         * Por isso existe um par para cada papel: a cor de superficie
-         * (`--cor-*`) e a variante segura para texto pequeno (`--cor-*-texto`).
+         * Cada uma tem tres papeis, e eles nao podem ser a mesma cor:
+         *   `--cor-*`           a superficie (fundo de botao, de etiqueta)
+         *   `--cor-*-contraste` o texto que vai POR CIMA dessa superficie
+         *   `--cor-*-texto`     a mesma ideia usada COMO texto, sobre o fundo da pagina
          */
 
-        /* Acao principal - vermelho #D0020D, texto branco por cima (5.68:1). */
-        --cor-acao: 356.8 98.1% 41.2%;
-        --cor-acao-contraste: 0 0% 100%;
-        --cor-acao-texto: 356.8 98.1% 41.2%;
+        /* Acao principal - o azul do tema #155DFC. Branco por cima: 5.25:1.
+         * Como texto sobre branco: 5.25:1. */
+        --cor-acao: #155dfc;
+        --cor-acao-contraste: #ffffff;
+        --cor-acao-texto: #155dfc;
 
-        /* Sucesso e disponibilidade - verde #019018, texto preto por cima (5.00:1). */
-        --cor-sucesso: 129.7 98.6% 28.4%;
-        --cor-sucesso-contraste: 0 0% 0%;
-        /* #018917 - 4.57:1 sobre branco, liberado para texto pequeno. */
-        --cor-sucesso-texto: 129.7 98.5% 27.1%;
+        /* Sucesso e disponibilidade - verde #007A55, vizinho frio do azul.
+         * Branco por cima: 5.36:1 (preto daria 3.71:1 e reprova, por isso o
+         * texto desta superficie e branco, ao contrario do tema antigo).
+         * Como texto sobre branco: 5.36:1. */
+        --cor-sucesso: #007a55;
+        --cor-sucesso-contraste: #ffffff;
+        --cor-sucesso-texto: #007a55;
 
-        /* Informacao e navegacao - azul #0684D5, texto preto por cima (5.27:1). */
-        --cor-informacao: 203.5 94.5% 42.9%;
-        --cor-informacao-contraste: 0 0% 0%;
-        /* #0677C0 - 4.76:1 sobre branco, liberado para texto pequeno. */
-        --cor-informacao-texto: 203.5 93.9% 38.8%;
+        /*
+         * A mesma ideia como SUPERFICIE SUAVE: fundo lavado com texto escuro
+         * por cima, no lugar do bloco de cor cheia. Serve a etiqueta que diz
+         * "esta aberto" sem gritar como um botao. Texto #00593F por cima:
+         * 7.41:1. Nasceu para o tema publico e existe aqui para que o par
+         * (fundo + texto) tenha um valor correto nos dois temas.
+         */
+        --cor-sucesso-suave: #e6f4ee;
+        --cor-sucesso-suave-contraste: #00593f;
 
-        /* Atencao e contagem de tempo - amarelo sol #FAD119 (14.20:1 com preto). */
-        --cor-atencao: 49.1 95.7% 53.9%;
-        /* Amarelo raios #FCF222 (17.86:1 com preto). */
-        --cor-atencao-forte: 57.2 97.3% 56.1%;
-        --cor-atencao-contraste: 0 0% 0%;
-        /* #88710D - 4.76:1 sobre branco; o amarelo puro nunca vira texto. */
-        --cor-atencao-texto: 48.8 82.6% 29.2%;
-        --sidebar-background: 0 0% 98%;
-        --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 0 0% 10%;
-        --sidebar-primary-foreground: 0 0% 98%;
-        --sidebar-accent: 0 0% 94%;
-        --sidebar-accent-foreground: 0 0% 30%;
-        --sidebar-border: 0 0% 91%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        /* Informacao e navegacao - azul-céu #0069A8, distinguivel do azul de
+         * acao sem sair da familia. Branco por cima: 5.86:1.
+         * Como texto sobre branco: 5.86:1. */
+        --cor-informacao: #0069a8;
+        --cor-informacao-contraste: #ffffff;
+        --cor-informacao-texto: #0069a8;
+
+        /* Atencao e contagem de tempo - ambar #FE9A00. Preto por cima: 9.32:1.
+         * Como texto o ambar puro reprova (2.13:1 sobre branco), por isso o
+         * papel de texto usa o ambar escuro #973C00, que rende 7.09:1. */
+        --cor-atencao: #fe9a00;
+        /* Ambar claro #FFB900, para o realce mais forte. Preto por cima: 11.55:1. */
+        --cor-atencao-forte: #ffb900;
+        --cor-atencao-contraste: #09090b;
+        --cor-atencao-texto: #973c00;
+        /* Superficie suave da atencao: ambar lavado com o ambar escuro por
+         * cima. Texto #973C00 sobre #FFF1D9: 6.36:1. */
+        --cor-atencao-suave: #fff1d9;
+        --cor-atencao-suave-contraste: #973c00;
+
+        /* --- Barra lateral, tokens do studio --- */
+        --sidebar-background: #fafafa; /* #FAFAFA */
+        --sidebar-foreground: #09090b; /* 18.62:1 sobre a barra */
+        --sidebar-primary: #155dfc;
+        --sidebar-primary-foreground: #eff6ff; /* 4.82:1 */
+        --sidebar-accent: #f4f4f5;
+        --sidebar-accent-foreground: #18181b; /* 16.12:1 */
+        --sidebar-border: #e4e4e7;
+        --sidebar-ring: #155dfc;
+
+        /* --- Sombras do studio --- */
+        --sombra-2xs: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
+        --sombra-xs: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
+        --sombra-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+        --sombra-md: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+        --sombra-lg: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+        --sombra-xl: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+        --sombra-2xl: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
     }
 
     .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 6.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 84% 60%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-        --sidebar-background: 0 0% 7%;
-        --sidebar-foreground: 0 0% 95.9%;
-        --sidebar-primary: 360, 100%, 100%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 0 0% 15.9%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 0 0% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        /*
+         * Modo escuro. Os dois fundos de referencia sao #09090B (a pagina) e
+         * #18181B (o card); as razoes abaixo trazem os dois quando o valor
+         * serve de texto, porque o card e o caso dificil.
+         */
+        --background: #09090b; /* #09090B */
+        --foreground: #fafafa; /* #FAFAFA - 19.06:1 sobre a pagina */
+        --card: #18181b; /* #18181B */
+        --card-foreground: #fafafa; /* 16.97:1 sobre o card */
+        --popover: #18181b;
+        --popover-foreground: #fafafa; /* 16.97:1 */
 
         /*
-         * Modo escuro (fundo #0A0A0A). Verde (4.69:1), azul (4.94:1) e os
-         * amarelos (13:1 e 16:1) passam sem alteracao. So o vermelho precisa
-         * clarear para #DB3F47 (4.51:1); o #D0020D puro daria 3.46:1 e reprova.
-         * Sobre o #DB3F47 o texto passa a ser preto (4.81:1), porque branco
-         * sobre ele fica em 4.36:1.
+         * Azul claro do studio #2B7FFF. Ajuste de acessibilidade (DA-42): o
+         * `--primary-foreground` que o studio traz para o escuro e um azul
+         * escuro (#1C398E) que rende apenas 2.76:1 sobre este azul e reprova
+         * em qualquer tamanho de texto. Trocado pelo quase-preto #09090B, que
+         * rende 5.29:1. Branco por cima daria 3.76:1 e tambem reprovaria.
          */
-        --cor-acao: 356.9 68.4% 55.3%;
-        --cor-acao-contraste: 0 0% 0%;
-        --cor-acao-texto: 356.9 68.4% 55.3%;
+        --primary: #2b7fff;
+        --primary-foreground: #09090b;
 
-        --cor-sucesso: 129.7 98.6% 28.4%;
-        --cor-sucesso-contraste: 0 0% 0%;
-        --cor-sucesso-texto: 129.7 98.6% 28.4%;
+        --secondary: #27272a; /* #27272A */
+        --secondary-foreground: #fafafa; /* 14.11:1 sobre o secondary */
+        --muted: #27272a;
+        --muted-foreground: #9f9fa9; /* #9F9FA9 - 7.59:1 na pagina, 5.68:1 sobre o muted */
+        --accent: #27272a;
+        --accent-foreground: #fafafa; /* 14.11:1 */
 
-        --cor-informacao: 203.5 94.5% 42.9%;
-        --cor-informacao-contraste: 0 0% 0%;
-        --cor-informacao-texto: 203.5 94.5% 42.9%;
+        /*
+         * Vermelho de erro no escuro (#FF6467). Ajuste de acessibilidade
+         * (DA-42): branco por cima rende 2.89:1 e reprova; o quase-preto
+         * #09090B rende 6.89:1. O mesmo tom como texto na pagina: 6.89:1.
+         */
+        --destructive: #ff6467;
+        --destructive-foreground: #09090b;
 
-        --cor-atencao: 49.1 95.7% 53.9%;
-        --cor-atencao-forte: 57.2 97.3% 56.1%;
-        --cor-atencao-contraste: 0 0% 0%;
-        --cor-atencao-texto: 49.1 95.7% 53.9%;
+        /*
+         * O studio traz estes dois translucidos (branco a 10% e a 15%). Aqui
+         * eles sao o equivalente opaco sobre o fundo, porque o projeto usa
+         * `bg-border` como superficie de verdade (o fio da linha do tempo, o
+         * separador) e porque uma cor translucida confunde a busca de fundo
+         * feita pelo cenario que mede contraste.
+         */
+        --border: #27272a;
+        --input: #2e2e33;
+        --ring: #2b7fff;
+
+        --chart-1: #155dfc;
+        --chart-2: #1447e6;
+        --chart-3: #193cb8;
+        --chart-4: #1c398e;
+        --chart-5: #162456;
+
+        /* Acao - azul #2B7FFF. Preto por cima: 5.29:1 (branco daria 3.76:1 e
+         * reprova). Como texto: 5.29:1 na pagina e 4.71:1 sobre o card. */
+        --cor-acao: #2b7fff;
+        --cor-acao-contraste: #09090b;
+        --cor-acao-texto: #2b7fff;
+
+        /* Sucesso - verde #00BC7D. Preto por cima: 8.04:1.
+         * Como texto: 8.04:1 na pagina e 7.16:1 sobre o card. */
+        --cor-sucesso: #00bc7d;
+        --cor-sucesso-contraste: #09090b;
+        --cor-sucesso-texto: #00bc7d;
+        /* Superficie suave no escuro: verde quase preto com o verde claro por
+         * cima. Texto #00BC7D sobre #0B2E22: 5.94:1. */
+        --cor-sucesso-suave: #0b2e22;
+        --cor-sucesso-suave-contraste: #00bc7d;
+
+        /* Informacao - azul-céu #00BCFF. Preto por cima: 9.13:1.
+         * Como texto: 9.13:1 na pagina e 8.13:1 sobre o card. */
+        --cor-informacao: #00bcff;
+        --cor-informacao-contraste: #09090b;
+        --cor-informacao-texto: #00bcff;
+
+        /* Atencao - ambar #FFB900. Preto por cima: 11.55:1. No escuro o ambar
+         * pode servir de texto: 11.55:1 na pagina e 10.29:1 sobre o card. */
+        --cor-atencao: #ffb900;
+        /* Ambar #FFD230, o realce mais forte. Preto por cima: 13.75:1. */
+        --cor-atencao-forte: #ffd230;
+        --cor-atencao-contraste: #09090b;
+        --cor-atencao-texto: #ffb900;
+        /* Superficie suave no escuro. Texto #FFB900 sobre #3A2A05: 8.06:1. */
+        --cor-atencao-suave: #3a2a05;
+        --cor-atencao-suave-contraste: #ffb900;
+
+        --sidebar-background: #18181b; /* #18181B */
+        --sidebar-foreground: #fafafa; /* 16.97:1 sobre a barra */
+        --sidebar-primary: #155dfc;
+        --sidebar-primary-foreground: #eff6ff; /* 4.82:1 */
+        --sidebar-accent: #27272a;
+        --sidebar-accent-foreground: #fafafa; /* 14.11:1 */
+        --sidebar-border: #27272a;
+        --sidebar-ring: #71717b;
     }
+
+    /*
+     * =====================================================================
+     * O TEMA DO LADO PUBLICO — verde-mata sobre papel
+     * =====================================================================
+     *
+     * O que muda aqui e SO a aparencia das seis telas publicas: a porta da
+     * rua, a vitrine do evento, o formulario, a cobranca, o acompanhamento e a
+     * recuperacao de acesso. O painel administrativo continua no tema azul do
+     * studio, e essa separacao e a razao de o escopo existir (DA-51).
+     *
+     * COMO O ESCOPO FUNCIONA
+     * O atributo mora no `<html>`, escrito em dois lugares: no
+     * `resources/views/app.blade.php`, para a primeira pintura sair ja no tema
+     * certo, e no `resources/js/app.ts`, para o Inertia atualiza-lo a cada
+     * troca de pagina (o Inertia troca so o corpo, nunca o `<html>`). Um dos
+     * dois sozinho nao basta: so o servidor erra toda navegacao seguinte, so o
+     * cliente pisca o tema errado no primeiro quadro.
+     *
+     * POR QUE NAO NO `PublicoLayout`
+     * Porque `SelectContent.vue` e `DialogContent.vue` teleportam o conteudo
+     * para o `document.body`. A lista de cidades do formulario sairia com as
+     * cores do painel no meio de uma tela verde. No `<html>` isso nao acontece.
+     *
+     * A REGRA DE CONTRASTE CONTINUA VALENDO (DA-42)
+     * Cada tom abaixo tem a razao calculada pela formula da WCAG 2.1 e escrita
+     * ao lado. Os fundos de referencia sao dois: o papel (#F1F3EE), que e a
+     * pagina, e o branco (#FFFFFF), que e o cartao. Dois tons do prototipo
+     * REPROVARAM e entraram escurecidos, com o valor original registrado.
+     * Quem vigia isto e tests/Feature/Interface/TemaPublicoTest.php, que le
+     * este arquivo e recalcula as razoes — nao confia no comentario.
+     */
+    [data-tema='publico'] {
+        --background: #f1f3ee; /* papel */
+        --foreground: #10231c; /* tinta - 14.69:1 sobre o papel */
+        --card: #ffffff;
+        --card-foreground: #10231c; /* 16.42:1 sobre o cartao */
+        --popover: #ffffff;
+        --popover-foreground: #10231c; /* 16.42:1 */
+
+        /* Verde-mata #0F6B4E, a cor da marca. Branco por cima: 6.49:1.
+         * O mesmo tom como texto sobre o papel: 5.81:1. */
+        --primary: #0f6b4e;
+        --primary-foreground: #ffffff;
+
+        --secondary: #e7eae3;
+        --secondary-foreground: #10231c; /* 13.51:1 sobre o secondary */
+        --muted: #e7eae3;
+        /*
+         * O cinza-verde de texto secundario do prototipo (#5B6C64) foi medido
+         * nos tres fundos em que ele aparece e passa em todos: 4.98:1 sobre o
+         * papel, 5.56:1 sobre o cartao e 4.58:1 sobre o proprio `--muted`,
+         * que e o caso mais dificil. Entra como esta.
+         */
+        --muted-foreground: #5b6c64;
+        --accent: #e7eae3;
+        --accent-foreground: #10231c; /* 13.51:1 sobre o accent */
+
+        /* Vermelho de erro do prototipo #A93425. Branco por cima: 6.55:1.
+         * O mesmo tom como texto sobre o papel: 5.86:1 — e em texto pequeno
+         * que o participante le "Este CPF nao parece valido". */
+        --destructive: #a93425;
+        --destructive-foreground: #ffffff;
+
+        /* Fio de separacao, decorativo: nao carrega texto nem delimita
+         * controle, entao a WCAG nao lhe cobra contraste. */
+        --border: #dee3db;
+        /*
+         * AJUSTE DE ACESSIBILIDADE (DA-42). A borda de campo do prototipo e
+         * `--linha-forte` (#C7D0C6), que rende 1.58:1 sobre o cartao e 1.42:1
+         * sobre o papel. Borda de campo NAO e decoracao: e o contorno de um
+         * controle, e a WCAG 2.1 pede 3:1 (criterio 1.4.11). Escurecida para
+         * #7C8B83, passa a 3.57:1 sobre o cartao e 3.20:1 sobre o papel.
+         */
+        --input: #7c8b83;
+        --ring: #0f6b4e; /* 5.81:1 sobre o papel — o anel de foco precisa ser visto */
+
+        /* Verdes da familia, para o dia em que nascer um grafico no lado
+         * publico. Nenhuma tela usa hoje. */
+        --chart-1: #0f6b4e;
+        --chart-2: #2e8f6d;
+        --chart-3: #58b08c;
+        --chart-4: #8fcbaf;
+        --chart-5: #c6e4d4;
+
+        /* O raio de 14px do prototipo (`--r`). Os demais saem dele por calculo
+         * no `@theme inline`: `rounded-md` vira 12px e `rounded-sm`, 10px —
+         * que e o `--r-sm` do prototipo. */
+        --radius: 0.875rem;
+
+        /*
+         * AS QUATRO SEMANTICAS NESTA IDENTIDADE (DA-41 e DA-52)
+         *
+         * A identidade do prototipo tem tres cores e o projeto precisa de
+         * quatro papeis. O mapeamento e decidido aqui, uma vez, e nao
+         * improvisado tela a tela.
+         */
+
+        /* Acao - o verde-mata. Branco por cima: 6.49:1. Como texto: 5.81:1. */
+        --cor-acao: #0f6b4e;
+        --cor-acao-contraste: #ffffff;
+        --cor-acao-texto: #0f6b4e;
+
+        /*
+         * Sucesso - o MESMO verde da acao, de proposito: a identidade nao tem
+         * um verde para "clique aqui" e outro para "esta disponivel". O que
+         * distingue os dois nao e a cor, e a SUPERFICIE — quem diz "clique
+         * aqui" e cheio de cor, quem diz "esta disponivel" usa a superficie
+         * suave abaixo.
+         */
+        --cor-sucesso: #0f6b4e;
+        --cor-sucesso-contraste: #ffffff; /* 6.49:1 */
+        --cor-sucesso-texto: #0f6b4e; /* 5.81:1 sobre o papel */
+        /* A etiqueta "Inscricoes abertas": verde lavado com o verde escuro por
+         * cima. #0A4E39 sobre #E3EFE9: 8.23:1. */
+        --cor-sucesso-suave: #e3efe9;
+        --cor-sucesso-suave-contraste: #0a4e39;
+
+        /*
+         * Informacao - DERIVADA, porque a identidade nao a tem (DA-53). Usar o
+         * mesmo verde da acao faria "clique aqui" e "isto e um aviso" ficarem
+         * identicos, e o projeto usa `informacao` para navegacao e aviso
+         * neutro em dezenas de lugares. E um azul-petroleo frio da mesma
+         * familia: branco por cima 7.68:1, e como texto 6.87:1 sobre o papel.
+         */
+        --cor-informacao: #0c5a75;
+        --cor-informacao-contraste: #ffffff;
+        --cor-informacao-texto: #0c5a75;
+
+        /*
+         * Atencao - o `--sol` do prototipo (#E9922B) como SUPERFICIE, com a
+         * tinta por cima: 6.73:1.
+         * AJUSTE DE ACESSIBILIDADE (DA-42): o mesmo ambar como TEXTO rende
+         * 2.18:1 sobre o papel e reprova em qualquer tamanho. O papel de texto
+         * usa o ambar escuro #8A5310 — que e o proprio tom que o prototipo
+         * escolheu para a etiqueta de prazo —, com 5.65:1 sobre o papel.
+         */
+        --cor-atencao: #e9922b;
+        --cor-atencao-contraste: #10231c;
+        /* Ambar claro, para o realce mais forte. Tinta por cima: 9.35:1. */
+        --cor-atencao-forte: #f7b85c;
+        --cor-atencao-texto: #8a5310;
+        /* A etiqueta de prazo: ambar lavado com o ambar escuro por cima.
+         * #8A5310 sobre #FBEDDA: 5.48:1. */
+        --cor-atencao-suave: #fbedda;
+        --cor-atencao-suave-contraste: #8a5310;
+
+        /*
+         * Barra lateral: nenhuma tela publica tem uma. Os tokens existem
+         * mesmo assim para que nada do tema azul vaze por heranca — e o teste
+         * do Pest exige que todo token do `:root` tenha par aqui.
+         */
+        --sidebar-background: #e9ece6;
+        --sidebar-foreground: #10231c; /* 13.76:1 sobre a barra */
+        --sidebar-primary: #0f6b4e;
+        --sidebar-primary-foreground: #ffffff; /* 6.49:1 */
+        --sidebar-accent: #e7eae3;
+        --sidebar-accent-foreground: #10231c; /* 13.51:1 */
+        --sidebar-border: #dee3db;
+        --sidebar-ring: #0f6b4e;
+
+        /* A sombra do prototipo (`--sombra`): baixa, esverdeada, sem o cinza
+         * neutro do studio. Nao carrega texto, entao nao ha razao a medir. */
+        --sombra-2xs: 0 1px 2px rgb(16 35 28 / 0.04);
+        --sombra-xs: 0 1px 2px rgb(16 35 28 / 0.04);
+        --sombra-sm: 0 1px 2px rgb(16 35 28 / 0.04), 0 10px 30px -18px rgb(16 35 28 / 0.35);
+        --sombra-md: 0 1px 2px rgb(16 35 28 / 0.05), 0 12px 32px -18px rgb(16 35 28 / 0.4);
+        --sombra-lg: 0 1px 2px rgb(16 35 28 / 0.05), 0 16px 40px -20px rgb(16 35 28 / 0.45);
+        --sombra-xl: 0 2px 4px rgb(16 35 28 / 0.06), 0 22px 50px -22px rgb(16 35 28 / 0.5);
+        --sombra-2xl: 0 2px 6px rgb(16 35 28 / 0.08), 0 30px 60px -24px rgb(16 35 28 / 0.55);
+    }
+
+    /*
+     * O lado publico no modo escuro — DERIVADO (DA-54).
+     *
+     * O prototipo e so claro. Tirar o escuro daqui seria regressao para quem o
+     * usa por necessidade, e vai contra a linha da Etapa 23, que passou a
+     * respeitar "reduzir movimento". Entao a variante escura foi derivada da
+     * mesma identidade: o papel vira mata quase preta, o verde clareia o
+     * bastante para carregar texto, e cada par foi medido contra os DOIS
+     * fundos escuros — a pagina (#0C1A15) e o cartao (#152B23), que e o caso
+     * dificil para texto claro.
+     *
+     * O seletor precisa dos dois — atributo e classe — porque os dois moram no
+     * mesmo `<html>`: e `[data-tema='publico'].dark`, nao um dentro do outro.
+     */
+    [data-tema='publico'].dark {
+        --background: #0c1a15;
+        --foreground: #ecf1ee; /* 15.66:1 na pagina */
+        --card: #152b23;
+        --card-foreground: #ecf1ee; /* 13.11:1 sobre o cartao */
+        --popover: #152b23;
+        --popover-foreground: #ecf1ee; /* 13.11:1 */
+
+        /* Verde claro #3FCB94. O quase-preto verde #08130F por cima: 9.17:1
+         * (branco daria 2.06:1 e reprovaria). Como texto: 8.67:1 na pagina e
+         * 7.26:1 sobre o cartao. */
+        --primary: #3fcb94;
+        --primary-foreground: #08130f;
+
+        --secondary: #24382f;
+        --secondary-foreground: #ecf1ee; /* 10.93:1 sobre o secondary */
+        --muted: #24382f;
+        --muted-foreground: #a9bcb2; /* 8.96:1 na pagina, 7.51:1 no cartao, 6.26:1 sobre o muted */
+        --accent: #24382f;
+        --accent-foreground: #ecf1ee; /* 10.93:1 */
+
+        /* Coral #F98E7D. Quase-preto por cima: 8.28:1. Como texto: 7.83:1 na
+         * pagina e 6.56:1 sobre o cartao. */
+        --destructive: #f98e7d;
+        --destructive-foreground: #08130f;
+
+        --border: #24382f; /* fio decorativo, como no claro */
+        /* Borda de campo, com a mesma regra do claro (1.4.11): 4.05:1 na
+         * pagina e 3.40:1 sobre o cartao. */
+        --input: #647e70;
+        --ring: #3fcb94; /* 8.67:1 na pagina */
+
+        --chart-1: #3fcb94;
+        --chart-2: #2fa97a;
+        --chart-3: #23855f;
+        --chart-4: #186546;
+        --chart-5: #0f4630;
+
+        --radius: 0.875rem;
+
+        --cor-acao: #3fcb94;
+        --cor-acao-contraste: #08130f; /* 9.17:1 */
+        --cor-acao-texto: #3fcb94; /* 8.67:1 na pagina, 7.26:1 no cartao */
+
+        --cor-sucesso: #3fcb94;
+        --cor-sucesso-contraste: #08130f; /* 9.17:1 */
+        --cor-sucesso-texto: #3fcb94; /* 8.67:1 na pagina */
+        --cor-sucesso-suave: #123528;
+        --cor-sucesso-suave-contraste: #3fcb94; /* 6.50:1 */
+
+        --cor-informacao: #5fc6e8;
+        --cor-informacao-contraste: #08130f; /* 9.66:1 */
+        --cor-informacao-texto: #5fc6e8; /* 9.14:1 na pagina, 7.65:1 no cartao */
+
+        /* No escuro o ambar clareia e passa a poder carregar texto sozinho:
+         * 8.96:1 na pagina e 7.51:1 sobre o cartao. */
+        --cor-atencao: #f2a93f;
+        --cor-atencao-forte: #ffc768; /* quase-preto por cima: 12.27:1 */
+        --cor-atencao-contraste: #08130f; /* 9.48:1 */
+        --cor-atencao-texto: #f2a93f;
+        --cor-atencao-suave: #3a2a10;
+        --cor-atencao-suave-contraste: #f2a93f; /* 6.93:1 */
+
+        --sidebar-background: #152b23;
+        --sidebar-foreground: #ecf1ee; /* 13.11:1 sobre a barra */
+        --sidebar-primary: #3fcb94;
+        --sidebar-primary-foreground: #08130f; /* 9.17:1 */
+        --sidebar-accent: #24382f;
+        --sidebar-accent-foreground: #ecf1ee; /* 10.93:1 */
+        --sidebar-border: #24382f;
+        --sidebar-ring: #3fcb94;
+
+        --sombra-2xs: 0 1px 2px rgb(0 0 0 / 0.3);
+        --sombra-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+        --sombra-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 30px -18px rgb(0 0 0 / 0.7);
+        --sombra-md: 0 1px 3px rgb(0 0 0 / 0.4), 0 12px 32px -18px rgb(0 0 0 / 0.75);
+        --sombra-lg: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -20px rgb(0 0 0 / 0.8);
+        --sombra-xl: 0 2px 4px rgb(0 0 0 / 0.45), 0 22px 50px -22px rgb(0 0 0 / 0.85);
+        --sombra-2xl: 0 2px 6px rgb(0 0 0 / 0.5), 0 30px 60px -24px rgb(0 0 0 / 0.9);
+    }
+}
+
+/*
+ * O que na v3 vivia em `theme.extend` do `tailwind.config.js`. O `inline`
+ * manda o Tailwind resolver a variavel na hora de gerar a classe, que e o que
+ * permite `bg-primary/90` continuar funcionando.
+ */
+@theme inline {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /*
+     * As duas familias que a identidade publica trouxe. Elas so sao aplicadas
+     * dentro de `[data-tema='publico']` (regras no fim deste arquivo): o painel
+     * administrativo continua inteiro na Instrument Sans.
+     *
+     * A Instrument Sans esta declarada como reserva imediata das duas — se a
+     * rede cair, ou se a suite de navegador cortar o acesso externo (ela corta,
+     * de proposito), a tela continua legivel e so a familia muda.
+     */
+    --font-titulo: 'Bricolage Grotesque', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-numero: 'DM Mono', 'Instrument Sans', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+
+    --shadow-2xs: var(--sombra-2xs);
+    --shadow-xs: var(--sombra-xs);
+    --shadow-sm: var(--sombra-sm);
+    --shadow-md: var(--sombra-md);
+    --shadow-lg: var(--sombra-lg);
+    --shadow-xl: var(--sombra-xl);
+    --shadow-2xl: var(--sombra-2xl);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-acao: var(--cor-acao);
+    --color-acao-foreground: var(--cor-acao-contraste);
+    --color-acao-texto: var(--cor-acao-texto);
+
+    --color-sucesso: var(--cor-sucesso);
+    --color-sucesso-foreground: var(--cor-sucesso-contraste);
+    --color-sucesso-texto: var(--cor-sucesso-texto);
+    --color-sucesso-suave: var(--cor-sucesso-suave);
+    --color-sucesso-suave-foreground: var(--cor-sucesso-suave-contraste);
+
+    --color-informacao: var(--cor-informacao);
+    --color-informacao-foreground: var(--cor-informacao-contraste);
+    --color-informacao-texto: var(--cor-informacao-texto);
+
+    --color-atencao: var(--cor-atencao);
+    --color-atencao-forte: var(--cor-atencao-forte);
+    --color-atencao-foreground: var(--cor-atencao-contraste);
+    --color-atencao-texto: var(--cor-atencao-texto);
+    --color-atencao-suave: var(--cor-atencao-suave);
+    --color-atencao-suave-foreground: var(--cor-atencao-suave-contraste);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {
@@ -161,5 +654,88 @@ html {
 
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/*
+ * =====================================================================
+ * AS FORMAS E A TIPOGRAFIA DO LADO PUBLICO
+ * =====================================================================
+ *
+ * Estas regras moram no CSS, e nao nas telas, por uma razao de escopo: esta
+ * etapa jurou nao mudar conteudo nem estrutura de nenhuma pagina (DA-51). Um
+ * `class="font-titulo"` acrescentado em cada `<h1>` seria mudanca de tela, e
+ * teria de ser repetido em toda tela nova. Aqui e uma regra so, e ela vale
+ * para o que ja existe e para o que vier.
+ */
+@layer base {
+    /*
+     * Os titulos da identidade sao Bricolage Grotesque, com o espacamento
+     * negativo do prototipo. A regra e do lado publico e so dele.
+     */
+    [data-tema='publico'] :is(h1, h2, h3, h4) {
+        font-family: var(--font-titulo);
+        letter-spacing: -0.02em;
+    }
+}
+
+/*
+ * A familia dos numeros mora em `utilities`, e nao em `base`, por um motivo
+ * que custou um defeito para aparecer.
+ *
+ * `font-mono` e um UTILITARIO do Tailwind, e utilitario vence base na ordem
+ * das camadas. Com a regra na camada base, todo elemento que pedia `font-mono`
+ * continuava caindo na monoespacada do sistema: a DM Mono nunca chegava
+ * justamente onde alguem a tinha pedido. Aqui, na mesma camada e com
+ * especificidade maior, ela chega.
+ */
+@layer utilities {
+    /*
+     * A DM Mono e pedida, nunca deduzida.
+     *
+     * Houve aqui uma versao que ligava a familia monoespacada a classe
+     * `tabular-nums`, e ela estava errada: `tabular-nums` quer dizer
+     * "algarismos de largura fixa", que e um recurso tipografico que fontes
+     * proporcionais tambem tem. Nao quer dizer "monoespacada". Com o atalho, o
+     * PRECO — que no prototipo e Bricolage Grotesque — saia monoespacado, e
+     * junto com ele toda contagem e todo prazo da interface.
+     *
+     * O prototipo usa a monoespacada em tres lugares, e sao tres lugares onde
+     * os caracteres precisam alinhar em coluna uns sob os outros: o horario da
+     * programacao, a opcao de horario do formulario e o codigo Pix. Quem quer
+     * essa familia pede por ela, com `font-mono` ou `font-numero`.
+     */
+    [data-tema='publico'] .font-mono,
+    [data-tema='publico'] .font-numero {
+        font-family: var(--font-numero);
+    }
+}
+
+/*
+ * Movimento reduzido.
+ *
+ * Quem tem sensibilidade vestibular — enxaqueca, vertigem, transtorno de
+ * movimento — pede ao sistema operacional para reduzir animacao. Ate aqui o
+ * sistema ignorava esse pedido: menu deslizando, dialogo dando zoom e
+ * transicao de estado saiam igual. Para essas pessoas isso nao e enfeite, e
+ * sintoma.
+ *
+ * A duracao vai para 0.01ms, e NAO para "none". A diferenca importa: o
+ * reka-ui desmonta conteudo escutando o evento "animationend". Com
+ * "animation: none" o evento nunca dispara, e o elemento que devia sumir
+ * fica montado para sempre — a correcao de acessibilidade viraria defeito de
+ * funcionamento. Com 0.01ms a animacao termina imediatamente e o evento
+ * continua acontecendo.
+ */
+@layer utilities {
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
     }
 }

@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { Progress } from '@/components/ui/progress';
 import type { PassoDaInscricao } from '@/types/inscricao';
 import { computed } from 'vue';
 
 /**
- * Mostra onde a pessoa esta dentro do formulario. Azul e a cor de informacao
- * e de navegacao — por isso ela aparece aqui, e nao o vermelho de acao.
+ * Onde a pessoa esta dentro do formulario — o `.steps` do prototipo.
+ *
+ * Circulos numerados ligados por uma linha PONTILHADA, que e a mesma linha da
+ * trilha dos dias: e o elemento que costura a identidade de uma tela a outra.
+ *
+ * A etapa atual recebe um halo verde ao redor do circulo; a concluida troca o
+ * numero por um "check". Sao duas marcas diferentes de proposito — distinguir
+ * "ja fiz" de "estou aqui" so pela cor deixaria de fora quem nao as separa
+ * (WCAG 1.4.1).
  */
 const props = defineProps<{
     passoAtual: PassoDaInscricao;
@@ -24,29 +30,67 @@ const posicao = computed<number>(() => {
     return indice === -1 ? 1 : indice + 1;
 });
 
-const percentual = computed<number>(() => (posicao.value / passos.length) * 100);
-
 const tituloAtual = computed<string>(() => passos[posicao.value - 1]?.titulo ?? '');
 </script>
 
 <template>
-    <nav aria-label="Etapas da inscrição" class="space-y-3">
-        <Progress :model-value="percentual" :aria-label="`Etapa ${posicao} de ${passos.length}: ${tituloAtual}`" />
-
-        <ol class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+    <!-- .steps — 26px acima, 38px abaixo -->
+    <nav :aria-label="`Etapas da inscrição — etapa ${posicao} de ${passos.length}: ${tituloAtual}`" class="mt-[26px] mb-[38px]">
+        <ol class="flex items-center">
             <li
                 v-for="(passo, indice) in passos"
                 :key="passo.chave"
                 :aria-current="passo.chave === props.passoAtual ? 'step' : undefined"
-                :class="[
-                    'flex items-center gap-1.5',
-                    passo.chave === props.passoAtual ? 'font-semibold text-informacao-texto' : 'text-muted-foreground',
-                    indice + 1 < posicao ? 'text-sucesso-texto' : '',
-                ]"
+                class="flex min-w-0 items-center gap-[10px]"
+                :class="indice + 1 < passos.length ? 'flex-1' : 'flex-none'"
             >
-                <span aria-hidden="true">{{ indice + 1 }}.</span>
-                <span>{{ passo.titulo }}</span>
-                <span v-if="indice + 1 < posicao" class="sr-only">(concluída)</span>
+                <!-- .step__n — 26px, borda de 1.5px, fundo papel -->
+                <!--
+                    UM ternario decide fundo, borda e cor de texto ao mesmo
+                    tempo — e nao uma classe estatica mais um ajuste.
+
+                    Havia aqui um `bg-background` fixo com um `bg-acao`
+                    condicional por cima: as duas classes chegavam juntas ao
+                    elemento e quem decidia era a ORDEM no arquivo de estilo, e
+                    nao a intencao de quem escreveu. O papel venceu o verde, e o
+                    circulo da etapa atual ficava cor de fundo com texto branco
+                    por cima — invisivel.
+                -->
+                <span
+                    aria-hidden="true"
+                    class="grid size-[26px] flex-none place-items-center rounded-full border-[1.5px] text-[13px] font-semibold"
+                    :class="
+                        passo.chave === props.passoAtual
+                            ? 'border-acao bg-acao text-acao-foreground ring-sucesso-suave ring-4'
+                            : indice + 1 < posicao
+                              ? 'border-acao bg-acao text-acao-foreground'
+                              : 'border-input bg-background text-muted-foreground'
+                    "
+                >
+                    <template v-if="indice + 1 < posicao">✓</template>
+                    <template v-else>{{ indice + 1 }}</template>
+                </span>
+
+                <!-- .step__l — 14px; a etapa atual ganha peso e cor de tinta -->
+                <span
+                    class="truncate text-sm whitespace-nowrap"
+                    :class="[
+                        passo.chave === props.passoAtual ? 'text-foreground font-semibold' : '',
+                        indice + 1 < posicao ? 'text-foreground' : '',
+                        indice + 1 > posicao ? 'text-muted-foreground' : '',
+                        passo.chave === props.passoAtual ? '' : 'hidden sm:inline',
+                    ]"
+                >
+                    {{ passo.titulo }}
+                    <span v-if="indice + 1 < posicao" class="sr-only">(concluída)</span>
+                </span>
+
+                <!-- .step__line — a mesma linha pontilhada da trilha dos dias -->
+                <span
+                    v-if="indice + 1 < passos.length"
+                    aria-hidden="true"
+                    class="border-input mx-3 hidden h-px min-w-4 flex-1 border-t border-dashed sm:block"
+                ></span>
             </li>
         </ol>
     </nav>

@@ -11,8 +11,14 @@ declare(strict_types=1);
  * precisa ser provado e que duas conexoes de verdade nao conseguem vender a
  * mesma vaga.
  *
- * Uso: php disputar-vaga.php <evento_id> <cidade_id> <grupo_id> <atividades> <indice> <comeco>
+ * Uso: php disputar-vaga.php <evento_id> <cidade_id> <grupo_id> <atividades> <indice> <comeco> [formato]
  * Escreve na saida: "ok", "esgotado" ou "erro: ...".
+ *
+ * Com o formato "com-tempo", a saida vira "ok|0.412": o mesmo resultado de
+ * sempre, mais quantos segundos a inscricao levou de ponta a ponta. Serve ao
+ * teste de carga, que precisa dizer no relatorio quanto tempo o caminho da
+ * inscricao leva sob disputa. O formato padrao continua sendo o de antes, para
+ * nao mexer em quem ja usa este script.
  */
 
 use App\Actions\Inscricoes\CriarInscricao;
@@ -32,6 +38,8 @@ $app = require $raiz.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 [$eventoId, $cidadeId, $grupoId, $atividades, $indice, $comeco] = array_slice($argv, 1, 6);
+
+$comTempo = ($argv[7] ?? 'simples') === 'com-tempo';
 
 $atividadeIds = array_map('intval', array_filter(explode(',', (string) $atividades)));
 
@@ -57,14 +65,23 @@ $dados = new DadosNovaInscricao(
     chaveIdempotencia: (string) Str::uuid(),
 );
 
+// O relogio comeca aqui, e nao no inicio do processo: o que interessa medir e
+// o caminho da inscricao, nao o tempo de o PHP subir a aplicacao — que num
+// servidor de verdade acontece uma vez so, e nao a cada pedido.
+$relogio = microtime(true);
+
 try {
     $app->make(CriarInscricao::class)($dados);
-    echo 'ok';
+    $resultado = 'ok';
 } catch (VagasEsgotadasException) {
-    echo 'esgotado';
+    $resultado = 'esgotado';
 } catch (Throwable $erro) {
-    echo 'erro: '.$erro::class.': '.$erro->getMessage();
+    $resultado = 'erro: '.$erro::class.': '.$erro->getMessage();
 }
+
+$segundos = microtime(true) - $relogio;
+
+echo $comTempo ? sprintf('%s|%.4F', $resultado, $segundos) : $resultado;
 
 function cpfDeTeste(int $semente): string
 {

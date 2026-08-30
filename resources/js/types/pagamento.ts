@@ -38,6 +38,8 @@ export interface PropsDaCobranca {
     pagamento: CobrancaPix | null;
     /** URL assinada que responde a situacao atual, para a tela nao pedir F5. */
     url_situacao: string;
+    /** URL assinada da pagina de acompanhamento da inscricao. */
+    url_acompanhamento: string;
 }
 
 /** A resposta curta de PagamentoController@situacao. */

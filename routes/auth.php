@@ -6,20 +6,21 @@ use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
+// O cadastro publico nao existe mais (DA-11): conta administrativa nasce pelo
+// comando "usuario:criar-administrador". As rotas de registro sairam do ar de
+// proposito, e "GET /register" responde 404.
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    // O Laravel ja limita por e-mail (cinco tentativas, dentro do LoginRequest).
+    // Este teto por IP vem POR CIMA daquele: sem ele, quem varre uma lista de
+    // e-mails diferentes nunca esbarraria em limite nenhum.
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])
+        ->middleware('throttle:login-administrativo');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
