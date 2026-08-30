@@ -95,6 +95,43 @@ it('fecha a tela dos avisos do provedor para quem organiza o evento', function (
         ->assertOk();
 });
 
+it('fecha a tela de usuarios e a de papeis para quem organiza o evento', function (): void {
+    Cenario::semearPapeis();
+
+    // "usuarios.gerenciar" existia desde a Fase 6a sem nenhuma rota que a
+    // exigisse. A partir daqui ela e a porta destas duas telas — e continua
+    // fora do alcance de quem organiza o evento.
+    $organizador = Cenario::usuarioCom('organizador');
+
+    $this->actingAs($organizador)->get('/admin/usuarios')->assertForbidden();
+    $this->actingAs($organizador)->get('/admin/papeis')->assertForbidden();
+
+    $administrador = Cenario::usuarioCom('administrador');
+
+    $this->actingAs($administrador)->get('/admin/usuarios')->assertOk();
+    $this->actingAs($administrador)->get('/admin/papeis')->assertOk();
+});
+
+it('nao cria permissao nenhuma ao ganhar a tela de usuarios', function (): void {
+    Cenario::semearPapeis();
+
+    // A tela de usuarios NAO trouxe permissao nova: ela passou a usar uma que
+    // ja existia. Se este numero mudar por causa desta feature, algo saiu
+    // errado — e a resposta certa e voltar atras, nao ajustar o numero.
+    expect(Permission::count())->toBe(TOTAL_DE_PERMISSOES)
+        ->and(Role::findByName('administrador')->permissions()->count())->toBe(TOTAL_DE_PERMISSOES)
+        ->and(Permission::query()->where('name', 'usuarios.gerenciar')->exists())->toBeTrue();
+});
+
+it('exige a permissao de gerenciar usuarios nas quatro rotas novas', function (): void {
+    foreach (['admin.usuarios.index', 'admin.usuarios.papel', 'admin.usuarios.situacao', 'admin.papeis'] as $nome) {
+        $rota = Route::getRoutes()->getByName($nome);
+
+        expect($rota)->not->toBeNull("a rota {$nome} precisa existir")
+            ->and($rota->gatherMiddleware())->toContain('permission:usuarios.gerenciar');
+    }
+});
+
 it('manda o visitante para o login antes de mostrar o painel', function (): void {
     Cenario::semearPapeis();
 

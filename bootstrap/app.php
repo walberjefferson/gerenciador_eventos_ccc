@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CabecalhosDeSeguranca;
+use App\Http\Middleware\GarantirContaAtiva;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -63,6 +64,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
+
+            // O "auth" do framework passa a ser o nosso: ele autentica igual
+            // (a classe estende a do Laravel) e, logo depois, confere se a
+            // conta ainda esta ativa. Trocar o apelido, em vez de acrescentar
+            // um middleware ao lado, e o que garante que NENHUMA rota
+            // autenticada fique de fora — inclusive as que nascerem depois.
+            // Ver App\Http\Middleware\GarantirContaAtiva.
+            'auth' => GarantirContaAtiva::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

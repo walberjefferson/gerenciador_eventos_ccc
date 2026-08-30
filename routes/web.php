@@ -16,6 +16,8 @@ use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
 use App\Http\Controllers\Admin\PainelController;
+use App\Http\Controllers\Admin\PapelController;
+use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InscricaoController;
@@ -191,6 +193,35 @@ Route::middleware(['auth', 'verified'])
                     ->middleware('permission:pagamentos.confirmar-manual')
                     ->name('confirmar-pagamento');
             });
+
+        // Quem entra no painel, com que papel, e ate quando. A permissao
+        // "usuarios.gerenciar" existe desde a Fase 6a e ate aqui nenhuma rota a
+        // cobrava: ela nasceu junto com o papel de administrador e ficou orfa
+        // enquanto promover alguem so acontecia por comando no servidor.
+        //
+        // NAO HA ROTA DE CADASTRO NEM DE EXCLUSAO, e as duas ausencias sao
+        // decisao: conta administrativa nasce por
+        // `php artisan usuario:criar-administrador` (D-51), e usuario nao se
+        // apaga, porque a auditoria guarda `usuario_id`.
+        Route::middleware('permission:usuarios.gerenciar')
+            ->prefix('usuarios')
+            ->name('usuarios.')
+            ->group(function (): void {
+                Route::get('/', [UsuarioController::class, 'index'])->name('index');
+
+                Route::put('{usuario}/papel', [UsuarioController::class, 'atualizarPapel'])->name('papel');
+
+                // Situacao vai em rota propria, e nao junto do papel: sao duas
+                // decisoes diferentes, e desativar alguem nao pode acontecer de
+                // carona numa troca de papel.
+                Route::put('{usuario}/situacao', [UsuarioController::class, 'atualizarSituacao'])->name('situacao');
+            });
+
+        // O que cada papel alcanca. So leitura: papel e permissao nascem no
+        // PapeisSeeder, nao na tela (D-50).
+        Route::get('papeis', [PapelController::class, 'index'])
+            ->middleware('permission:usuarios.gerenciar')
+            ->name('papeis');
 
         // O rastro das acoes administrativas. So leitura, e so administrador:
         // nao existe rota para criar, alterar nem apagar registro de auditoria.

@@ -347,3 +347,68 @@ export interface UltimoAvisoDoProvedor {
 export interface AvisosDoProvedorNoPainel {
     ultimo: UltimoAvisoDoProvedor | null;
 }
+
+/**
+ * Uma conta administrativa, como a lista de usuários a recebe.
+ *
+ * Nenhum campo de senha aparece aqui, e não é esquecimento: a tela mostra
+ * quem entra e com que papel; hash de senha não é assunto de tela nenhuma.
+ */
+export interface UsuarioAdministrativo {
+    id: number;
+    nome: string;
+    email: string;
+    /** O nome do papel, como o `PapeisSeeder` o escreve. Nulo = conta sem papel. */
+    papel: string | null;
+    ativo: boolean;
+    /** Quando a conta nasceu, já formatado como "dd/mm/aaaa". */
+    entrou_em: string | null;
+    /** Verdadeiro na linha de quem está olhando a tela. */
+    sou_eu: boolean;
+}
+
+/** Uma página da lista de usuários. */
+export interface PaginaDeUsuarios {
+    dados: UsuarioAdministrativo[];
+    pagina_atual: number;
+    ultima_pagina: number;
+    total: number;
+    por_pagina: number;
+    links: {
+        anterior: string | null;
+        proxima: string | null;
+    };
+}
+
+/** Os filtros da lista de usuários, do jeito que vieram do endereço. */
+export interface FiltrosDeUsuarios {
+    busca: string | null;
+    papel: string | null;
+    /** "ativos", "desativados" ou nulo — nulo quer dizer "tanto faz". */
+    situacao: string | null;
+}
+
+/** Um papel oferecido no seletor da lista. */
+export interface OpcaoDePapel {
+    valor: string;
+    rotulo: string;
+}
+
+/** O que o seletor de papel oferece. */
+export interface OpcoesDeUsuarios {
+    papeis: OpcaoDePapel[];
+}
+
+/** Um papel na tela de consulta, com as permissões que ele alcança. */
+export interface PapelDaMatriz {
+    nome: string;
+    rotulo: string;
+    permissoes: string[];
+    quantas: number;
+}
+
+/** Uma permissão, com a frase em português que diz o que ela alcança. */
+export interface PermissaoDaMatriz {
+    nome: string;
+    explicacao: string;
+}

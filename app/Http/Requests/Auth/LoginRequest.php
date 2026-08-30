@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -36,6 +37,18 @@ class LoginRequest extends FormRequest
     /**
      * Attempt to authenticate the request's credentials.
      *
+     * Conta desativada não entra — e a recusa é **indistinguível** da recusa
+     * por senha errada: mesma mensagem, mesmo código, mesma contagem no
+     * `RateLimiter`. Dizer "sua conta foi desativada" contaria a quem tenta
+     * adivinhar senha que aquele e-mail existe e está cadastrado aqui, o que
+     * transforma a tela de login num verificador de e-mails.
+     *
+     * A conferência acontece **depois** do `Auth::attempt`, e não como mais uma
+     * condição da consulta, de propósito: assim a senha é conferida (o hash é
+     * calculado) nos dois caminhos, e o tempo de resposta não denuncia qual dos
+     * dois motivos recusou. A sessão que o `attempt` abriu é desfeita na linha
+     * seguinte, antes de qualquer redirecionamento.
+     *
      * @throws ValidationException
      */
     public function authenticate(): void
@@ -43,14 +56,32 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+            $this->recusar();
+        }
 
-            throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
-            ]);
+        $usuario = Auth::user();
+
+        if ($usuario instanceof User && ! $usuario->ativo) {
+            Auth::guard('web')->logout();
+
+            $this->recusar();
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * A única recusa que existe nesta tela.
+     *
+     * @throws ValidationException
+     */
+    private function recusar(): never
+    {
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'email' => trans('auth.failed'),
+        ]);
     }
 
     /**

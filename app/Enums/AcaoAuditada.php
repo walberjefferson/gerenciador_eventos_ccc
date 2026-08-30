@@ -29,6 +29,17 @@ enum AcaoAuditada: string
     case CriouUsuarioAdministrativo = 'criou-usuario-administrativo';
 
     /**
+     * Alguem ativou ou desativou uma conta administrativa.
+     *
+     * Tem verbo proprio, e nao o "alterou" generico, porque desativar uma
+     * conta e tirar o acesso de alguem ao sistema — e quem revisa procura
+     * exatamente por isso. Com o verbo generico, a acao apareceria na tela de
+     * auditoria com o mesmo rotulo de uma edicao de cadastro qualquer e
+     * ficaria de fora do filtro de acoes sensiveis.
+     */
+    case MudouSituacaoDoUsuario = 'mudou-situacao-do-usuario';
+
+    /**
      * Mexer na credencial do provedor de pagamento — ou trocar qual ambiente
      * esta valendo.
      *
@@ -48,6 +59,7 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual => 'Confirmou pagamento na mão',
             self::PromoveuUsuario => 'Mudou o papel de um usuário',
             self::CriouUsuarioAdministrativo => 'Criou conta administrativa',
+            self::MudouSituacaoDoUsuario => 'Ativou ou desativou uma conta',
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
         };
     }
@@ -65,6 +77,7 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual,
             self::PromoveuUsuario,
             self::CriouUsuarioAdministrativo,
+            self::MudouSituacaoDoUsuario,
             self::AlterouCredencialPagamento,
         ];
     }
