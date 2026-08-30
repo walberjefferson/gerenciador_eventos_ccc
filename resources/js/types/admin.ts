@@ -271,3 +271,79 @@ export interface CobrancaDaFicha {
     observacao: string | null;
     responsavel: string | null;
 }
+
+/**
+ * Um aviso automático recebido do provedor de pagamento.
+ *
+ * O `payload` já vem limpo do banco: o que costuma carregar segredo foi
+ * trocado por "[removido]" antes de virar linha, então não há nada aqui que a
+ * tela precise esconder de novo.
+ */
+export interface AvisoDoProvedor {
+    id: number;
+    gateway: string;
+    /** O identificador que o provedor deu ao aviso. Nulo quando ele não mandou. */
+    id_evento_externo: string | null;
+    tipo_evento: string | null;
+    /** Falso é informação de segurança: alguém bateu na porta com a chave errada. */
+    assinatura_valida: boolean;
+    /** Data e hora já formatadas como "dd/mm/aaaa hh:mm:ss". */
+    recebido_em: string | null;
+    processado_em: string | null;
+    situacao: string;
+    situacao_rotulo: string;
+    /** O motivo, quando o aviso foi ignorado ou falhou. */
+    erro: string | null;
+    payload: Record<string, unknown> | null;
+}
+
+/** Uma página de avisos, do mais recente para o mais antigo. */
+export interface PaginaDeAvisos {
+    dados: AvisoDoProvedor[];
+    pagina_atual: number;
+    ultima_pagina: number;
+    total: number;
+    por_pagina: number;
+    links: {
+        anterior: string | null;
+        proxima: string | null;
+    };
+}
+
+/** Os filtros que estão valendo, do jeito que vieram do endereço. */
+export interface FiltrosDeAvisos {
+    de: string | null;
+    ate: string | null;
+    situacao: string | null;
+    gateway: string | null;
+    /** "sim", "nao" ou nulo — nulo quer dizer "tanto faz". */
+    assinatura_valida: string | null;
+}
+
+/** O que os seletores de filtro dos avisos oferecem. */
+export interface OpcoesDeAvisos {
+    situacoes: OpcaoDeSituacao[];
+    /** Só os provedores que já mandaram algum aviso. */
+    gateways: string[];
+}
+
+/** O aviso mais recente, como o cartão do painel o recebe. */
+export interface UltimoAvisoDoProvedor {
+    recebido_em: string | null;
+    /** Quantos minutos atrás ele chegou. A frase é escrita na tela. */
+    minutos_atras: number | null;
+    situacao: string;
+    situacao_rotulo: string;
+    gateway: string;
+}
+
+/**
+ * O bloco de avisos do painel.
+ *
+ * Nulo inteiro quer dizer "esta pessoa não pode ver os avisos"; `ultimo` nulo
+ * quer dizer "nenhum aviso chegou ainda". São coisas diferentes, e a tela
+ * responde diferente a cada uma.
+ */
+export interface AvisosDoProvedorNoPainel {
+    ultimo: UltimoAvisoDoProvedor | null;
+}

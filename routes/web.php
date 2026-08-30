@@ -5,6 +5,7 @@ use App\Http\Controllers\AcompanhamentoController;
 use App\Http\Controllers\Admin\AcaoInscricaoController;
 use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\AuditoriaController;
+use App\Http\Controllers\Admin\AvisosPagamentoController;
 use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
 use App\Http\Controllers\Admin\CredenciaisPagamentoController;
@@ -187,6 +188,17 @@ Route::middleware(['auth', 'verified'])
         Route::get('auditoria', [AuditoriaController::class, 'index'])
             ->middleware('permission:auditoria.ver')
             ->name('auditoria');
+
+        // Os avisos que o provedor de pagamento mandou. So leitura, e so
+        // administrador: nao ha rota de escrita nenhuma aqui — nem para
+        // reprocessar. Esta tela le o que o webhook ja gravou.
+        //
+        // Vem antes do grupo de credenciais so por leitura: as duas comecam
+        // com "pagamentos/", e ler as duas juntas mostra que sao portas
+        // diferentes, com permissoes diferentes.
+        Route::get('pagamentos/avisos', [AvisosPagamentoController::class, 'index'])
+            ->middleware('permission:pagamentos.avisos-ver')
+            ->name('pagamentos.avisos');
 
         // A credencial do provedor de pagamento. E a porta mais estreita do
         // painel: "pagamentos.credenciais" so existe no papel administrador,

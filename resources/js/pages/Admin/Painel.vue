@@ -3,8 +3,9 @@ import CartaoDeNumero from '@/components/admin/CartaoDeNumero.vue';
 import TabelaDeVagas from '@/components/admin/TabelaDeVagas.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { formatarValor } from '@/lib/formato';
+import type { AvisosDoProvedorNoPainel } from '@/types/admin';
 import type { InscricoesPorSituacao, NumerosDoEvento, ResumoDoEvento } from '@/types/painel';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
 /**
@@ -17,6 +18,8 @@ const props = defineProps<{
     eventos: ResumoDoEvento[];
     evento: ResumoDoEvento | null;
     numeros: NumerosDoEvento | null;
+    /** Nulo para quem não pode abrir a tela dos avisos — o cartão simplesmente não existe para essa pessoa. */
+    avisos_do_provedor: AvisosDoProvedorNoPainel | null;
 }>();
 
 const eventoSelecionado = ref<number | null>(props.evento?.id ?? null);
@@ -78,6 +81,45 @@ const totalDeInscricoes = computed<number>(() => props.numeros?.inscricoes.total
 const eventoAindaSemInscricao = computed<boolean>(() => props.numeros !== null && totalDeInscricoes.value === 0);
 
 const dinheiro = computed(() => props.numeros?.dinheiro ?? null);
+
+/**
+ * O último aviso do provedor de pagamento.
+ *
+ * Ele é global, e não do evento escolhido no seletor: aviso de provedor fala de
+ * uma cobrança, não de um evento. A pergunta que este cartão responde — "o
+ * provedor ainda está chamando?" — não muda quando se troca o evento.
+ */
+const ultimoAviso = computed(() => props.avisos_do_provedor?.ultimo ?? null);
+
+/**
+ * O intervalo em português, escrito aqui e não no servidor.
+ *
+ * O servidor manda o número de minutos justamente para que a frase não dependa
+ * do idioma configurado no PHP.
+ */
+function haQuantoTempo(minutos: number | null): string {
+    if (minutos === null) {
+        return 'em data desconhecida';
+    }
+
+    if (minutos < 1) {
+        return 'há menos de um minuto';
+    }
+
+    if (minutos < 60) {
+        return `há ${minutos} minuto${minutos === 1 ? '' : 's'}`;
+    }
+
+    const horas = Math.floor(minutos / 60);
+
+    if (horas < 48) {
+        return `há ${horas} hora${horas === 1 ? '' : 's'}`;
+    }
+
+    const dias = Math.floor(horas / 24);
+
+    return `há ${dias} dias`;
+}
 </script>
 
 <template>
@@ -176,5 +218,47 @@ const dinheiro = computed(() => props.numeros?.dinheiro ?? null);
                 </section>
             </div>
         </template>
+
+        <!--
+            O provedor de pagamento. Fica fora do bloco do evento de propósito:
+            aviso de provedor fala de uma cobrança, não de um evento, e trocar o
+            evento no seletor não muda esta resposta.
+        -->
+        <section
+            v-if="props.avisos_do_provedor"
+            aria-labelledby="titulo-avisos-do-provedor"
+            class="flex flex-col gap-3"
+            data-testid="painel-avisos-do-provedor"
+        >
+            <h2 id="titulo-avisos-do-provedor" class="text-lg font-semibold">Provedor de pagamento</h2>
+
+            <div class="rounded-lg border border-border p-4">
+                <template v-if="ultimoAviso">
+                    <p class="text-sm text-muted-foreground">Último aviso recebido</p>
+                    <p class="text-2xl font-semibold tracking-tight" data-testid="painel-ultimo-aviso">
+                        {{ haQuantoTempo(ultimoAviso.minutos_atras) }}
+                    </p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        {{ ultimoAviso.recebido_em ?? 'sem data' }} · {{ ultimoAviso.gateway }} · {{ ultimoAviso.situacao_rotulo }}
+                    </p>
+                </template>
+
+                <!-- Sem nenhum aviso não se calcula intervalo nenhum: um "há — dias" assustaria à toa em sistema recém-publicado ou com o provedor simulado. -->
+                <template v-else>
+                    <p class="text-base font-semibold" data-testid="painel-sem-aviso">Nenhum aviso ainda</p>
+                    <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
+                        O provedor de pagamento nunca chamou este sistema. Com a cobrança simulada isso é o esperado; com a cobrança real ligada,
+                        costuma significar que o endereço de aviso não foi registrado no painel da Efí.
+                    </p>
+                </template>
+
+                <Link
+                    :href="route('admin.pagamentos.avisos')"
+                    class="mt-3 inline-flex h-11 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    Ver os avisos do provedor
+                </Link>
+            </div>
+        </section>
     </AdminLayout>
 </template>
