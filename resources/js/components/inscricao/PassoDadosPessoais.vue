@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import CampoMascarado from '@/components/inscricao/CampoMascarado.vue';
 import { DateField } from '@/components/ui/date-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { apenasDigitos, mascararCpf, mascararTelefone } from '@/lib/formato';
 import type { CidadePublica, FormularioInscricao, GrupoParticipantePublico } from '@/types/inscricao';
 import { computed } from 'vue';
 
@@ -34,6 +36,31 @@ const props = defineProps<{
 }>();
 
 const formulario = defineModel<FormularioInscricao>({ required: true });
+
+/**
+ * Telefone e CPF escrevem sozinhos a pontuacao enquanto a pessoa digita.
+ *
+ * Os dois sao numeros longos que ninguem confere de cabeca: em bloco, "11988881111"
+ * e "11122233396" nao denunciam um digito trocado de lugar. Pontuados, sim.
+ *
+ * O QUE CADA UM GUARDA E DIFERENTE, e isso e de proposito:
+ *
+ * - O TELEFONE guarda o texto pontuado, que ja e o que este formulario grava
+ *   hoje quando alguem digita com parenteses. E um recado para uma pessoa ler
+ *   e ligar de volta — o formato faz parte do dado.
+ *
+ * - O CPF guarda SO OS DIGITOS. Ele nao e recado, e identificador: e dele que
+ *   sai o `documento_hash`, e e por esse hash que o sistema reconhece
+ *   inscricao repetida. Deixar a pontuacao entrar tambem mudaria o formato da
+ *   coluna em relacao a tudo o que ja foi gravado ate hoje. A mascara e so o
+ *   que aparece na caixa; o que viaja continua igual ao de antes.
+ *
+ * A pontuacao e escrita pelo `CampoMascarado`, que reescreve a caixa a cada
+ * tecla — e por isso que letra e caractere especial nao entram: eles nao
+ * sobrevivem a mascara, e o elemento e reescrito mesmo quando o valor
+ * resultante nao mudou.
+ */
+const cpfParaOModelo = (mascarado: string): string => apenasDigitos(mascarado);
 
 /** O Select do reka trabalha com texto; os identificadores sao numeros. */
 const cidadeSelecionada = computed<string>({
@@ -124,14 +151,16 @@ function sair(campo: string): void {
 
         <div class="space-y-[7px]">
             <Label for="telefone" class="text-[14.5px] font-medium">Telefone com DDD</Label>
-            <Input
+            <CampoMascarado
                 id="telefone"
                 v-model="formulario.telefone"
+                :mascara="mascararTelefone"
                 name="telefone"
                 type="tel"
                 autocomplete="tel"
                 inputmode="tel"
                 placeholder="(00) 00000-0000"
+                maxlength="15"
                 class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
                 :aria-invalid="erro('telefone') ? 'true' : undefined"
                 :aria-describedby="erro('telefone') ? 'erro-telefone' : 'ajuda-telefone'"
@@ -145,14 +174,17 @@ function sair(campo: string): void {
 
         <div class="space-y-[7px]">
             <Label for="documento" class="text-[14.5px] font-medium">CPF</Label>
-            <Input
+            <CampoMascarado
                 id="documento"
                 v-model="formulario.documento"
+                :mascara="mascararCpf"
+                :para-o-modelo="cpfParaOModelo"
                 name="documento"
                 type="text"
                 inputmode="numeric"
                 autocomplete="off"
                 placeholder="000.000.000-00"
+                maxlength="14"
                 class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
                 :aria-invalid="erro('documento') ? 'true' : undefined"
                 :aria-describedby="erro('documento') ? 'erro-documento' : 'ajuda-documento'"

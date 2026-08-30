@@ -181,14 +181,34 @@ const prazoEmPalavras = 'Depois de confirmar, você verá o código Pix e o praz
 
         <!-- .actions — 30px acima, 24px de respiro, linha em cima -->
         <div class="border-border mt-[30px] border-t pt-6">
+            <!--
+                O botao so liga depois do aceite.
+
+                Antes ele estava sempre ligado, e quem clicava sem marcar a
+                caixa era recusado pelo servidor e voltava para esta mesma tela
+                — sem sair do lugar e sem entender por que. O caminho continua
+                existindo no servidor, que e quem decide de verdade
+                (`aceite_termos` => `accepted`); o que mudou e que a tela para
+                de convidar para um clique que ja se sabe que nao vai passar.
+
+                A frase abaixo do botao existe por causa do efeito colateral
+                disso: botao desligado nao explica por que esta desligado, e
+                sem ela a pessoa trocaria uma frustracao por outra. Ela some
+                assim que o aceite e marcado.
+            -->
             <Button
                 type="button"
                 class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base"
-                :disabled="enviando"
+                :disabled="enviando || !aceite"
+                :aria-describedby="!aceite ? 'aviso-aceite-pendente' : undefined"
                 @click="emit('enviar')"
             >
                 {{ enviando ? 'Enviando…' : 'Confirmar inscrição' }}
             </Button>
+
+            <p v-if="!aceite" id="aviso-aceite-pendente" class="text-muted-foreground mt-3 text-center text-[13.5px]">
+                Marque o aceite do regulamento, acima, para confirmar.
+            </p>
 
             <p v-if="enviando" role="status" aria-live="polite" class="text-muted-foreground mt-3 text-center text-[13.5px]">
                 Estamos guardando a sua inscrição. Não feche esta página.

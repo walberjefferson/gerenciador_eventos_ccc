@@ -86,7 +86,7 @@ const links: Array<{ rotulo: string; destino: string; atual: (caminho: string) =
 
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm leading-tight font-semibold sm:text-base">Caminhada Comunitária com Cristo</p>
-                    <p class="text-muted-foreground truncate text-xs">Inscrições da comunidade</p>
+                    <p class="text-muted-foreground truncate text-xs">Inscrições para eventos</p>
                 </div>
 
                 <!--

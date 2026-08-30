@@ -255,7 +255,7 @@ const vagasEmPalavras = computed<string | null>(() => {
                         </div>
                     </div>
 
-                    <p class="mt-4 text-sm">
+                    <p class="mt-4 text-sm text-center">
                         <Link
                             :href="`/acesso?evento=${evento.slug}`"
                             class="text-acao-texto inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline"

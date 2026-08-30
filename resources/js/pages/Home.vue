@@ -224,7 +224,7 @@ const enderecoDoAcesso = computed<string>(() => (destaque.value ? `/acesso?event
                             <div class="mt-6 grid gap-3">
                                 <Button as-child class="bg-acao text-acao-foreground hover:bg-acao/90 h-12 w-full text-base">
                                     <Link :href="`/eventos/${destaque.slug}`" data-testid="botao-fazer-inscricao">
-                                        Fazer inscrição — {{ formatarValor(destaque.valor_centavos) }}
+                                        Fazer inscrição
                                     </Link>
                                 </Button>
 
