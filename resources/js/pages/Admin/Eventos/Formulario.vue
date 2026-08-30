@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import CampoDeDataHora from '@/components/admin/CampoDeDataHora.vue';
+import { DateField } from '@/components/ui/date-field';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { EventoEmEdicao, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
+import { Plus, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick } from 'vue';
 
 /**
@@ -187,7 +190,7 @@ function gravar(): void {
                     <select
                         id="evento-situacao"
                         v-model="formulario.situacao"
-                        class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                     >
                         <option v-for="situacao in props.situacoes" :key="situacao.valor" :value="situacao.valor">
                             {{ situacao.rotulo }}
@@ -203,12 +206,11 @@ function gravar(): void {
                 <div class="grid gap-4 md:grid-cols-2">
                     <div class="flex flex-col gap-1">
                         <label for="evento-data-inicio" class="text-sm font-medium">Data inicial</label>
-                        <input
+                        <DateField
                             id="evento-data-inicio"
                             v-model="formulario.data_inicio"
-                            type="date"
-                            required
-                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            rotulo-do-calendario="Escolher a data inicial no calendário"
+                            :aria-invalid="formulario.errors.data_inicio ? true : undefined"
                         />
                         <p v-if="formulario.errors.data_inicio" role="alert" class="text-destructive text-sm">
                             {{ formulario.errors.data_inicio }}
@@ -217,14 +219,13 @@ function gravar(): void {
 
                     <div class="flex flex-col gap-1">
                         <label for="evento-data-fim" class="text-sm font-medium">Data final</label>
-                        <input
+                        <DateField
                             id="evento-data-fim"
                             v-model="formulario.data_fim"
-                            type="date"
-                            required
+                            :min="formulario.data_inicio || undefined"
+                            rotulo-do-calendario="Escolher a data final no calendário"
                             :aria-describedby="formulario.errors.data_fim ? 'erro-evento-data-fim' : undefined"
                             :aria-invalid="formulario.errors.data_fim ? true : undefined"
-                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
                         <p v-if="formulario.errors.data_fim" id="erro-evento-data-fim" role="alert" class="text-destructive text-sm">
                             {{ formulario.errors.data_fim }}
@@ -233,13 +234,7 @@ function gravar(): void {
 
                     <div class="flex flex-col gap-1">
                         <label for="evento-abrem" class="text-sm font-medium">Inscrições abrem em</label>
-                        <input
-                            id="evento-abrem"
-                            v-model="formulario.inscricoes_abrem_em"
-                            type="datetime-local"
-                            required
-                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                        />
+                        <CampoDeDataHora id="evento-abrem" v-model="formulario.inscricoes_abrem_em" />
                         <p v-if="formulario.errors.inscricoes_abrem_em" role="alert" class="text-destructive text-sm">
                             {{ formulario.errors.inscricoes_abrem_em }}
                         </p>
@@ -247,14 +242,11 @@ function gravar(): void {
 
                     <div class="flex flex-col gap-1">
                         <label for="evento-fecham" class="text-sm font-medium">Inscrições fecham em</label>
-                        <input
+                        <CampoDeDataHora
                             id="evento-fecham"
                             v-model="formulario.inscricoes_fecham_em"
-                            type="datetime-local"
-                            required
                             :aria-describedby="formulario.errors.inscricoes_fecham_em ? 'erro-evento-fecham' : undefined"
                             :aria-invalid="formulario.errors.inscricoes_fecham_em ? true : undefined"
-                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
                         <p v-if="formulario.errors.inscricoes_fecham_em" id="erro-evento-fecham" role="alert" class="text-destructive text-sm">
                             {{ formulario.errors.inscricoes_fecham_em }}
@@ -414,68 +406,129 @@ function gravar(): void {
             <!-- O conteudo que a pagina do evento mostra alem da programacao.
                  Sao as duvidas que hoje a organizacao responde no WhatsApp toda
                  semana, e que fazem a pessoa adiar a inscricao. -->
-            <section aria-labelledby="titulo-conteudo" class="grid gap-4">
-                <h2 id="titulo-conteudo" class="text-lg font-semibold">Conteúdo da página do evento</h2>
+            <!-- As duas listas da pagina publica moram em cartoes SEPARADOS.
+                 Juntas num cartao so, chamado "Conteudo da pagina do evento",
+                 nada dizia onde uma terminava e a outra comecava: a linha
+                 divisoria no meio parecia parte da primeira. Sao duas coisas
+                 diferentes, com regras diferentes, e cada uma some sozinha da
+                 pagina publica quando fica vazia (DA-64). -->
+            <section aria-labelledby="titulo-incluido" class="border-border grid gap-4 rounded-lg border p-4">
+                <div>
+                    <div class="flex flex-wrap items-baseline gap-x-3">
+                        <h2 id="titulo-incluido" class="text-lg font-semibold">O que está incluído</h2>
+                        <span v-if="formulario.itens_incluidos.length > 0" class="text-muted-foreground text-sm">
+                            {{ formulario.itens_incluidos.length === 1 ? '1 item' : `${formulario.itens_incluidos.length} itens` }}
+                        </span>
+                    </div>
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        Camiseta, alimentação, seguro — um item por linha, na ordem em que aparecem na página do evento.
+                    </p>
+                </div>
 
                 <div class="grid gap-3">
-                    <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <p class="text-sm font-medium">O que está incluído</p>
-                        <p class="text-muted-foreground text-sm">Camiseta, alimentação, seguro — um item por linha.</p>
-                    </div>
-
                     <div v-for="(item, indice) in formulario.itens_incluidos" :key="`incluido-${indice}`" class="flex items-center gap-2">
+                        <!-- O numero da linha e visivel: sem ele, a lista vira
+                             uma pilha de caixas iguais e ninguem sabe em que
+                             ordem elas vao sair na pagina. -->
+                        <span class="text-muted-foreground w-6 shrink-0 text-right text-sm tabular-nums">{{ indice + 1 }}</span>
+
                         <label :for="`evento-incluido-${indice}`" class="sr-only">Item {{ indice + 1 }} do que está incluído</label>
                         <input
                             :id="`evento-incluido-${indice}`"
                             v-model="formulario.itens_incluidos[indice]"
                             type="text"
-                            class="border-input bg-background focus-visible:ring-ring h-10 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            placeholder="Camiseta oficial"
+                            class="border-input bg-background focus-visible:ring-ring h-11 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
-                        <Button type="button" variant="ghost" class="h-10" @click="removerItem(indice)">
-                            Remover<span class="sr-only"> o item {{ indice + 1 }}</span>
-                        </Button>
+
+                        <!-- Icone no lugar da palavra "Remover": repetida em cada
+                             linha, ela competia com o proprio campo. O nome da
+                             acao continua existindo para o leitor de tela. -->
+                        <button
+                            type="button"
+                            class="text-muted-foreground hover:text-destructive focus-visible:ring-ring inline-flex size-11 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-hidden"
+                            @click="removerItem(indice)"
+                        >
+                            <Trash2 class="size-4" aria-hidden="true" />
+                            <span class="sr-only">Remover o item {{ indice + 1 }}</span>
+                        </button>
                     </div>
 
                     <p v-if="formulario.itens_incluidos.length === 0" class="text-muted-foreground text-sm">
                         Nenhum item. A seção não aparece na página do evento enquanto a lista estiver vazia.
                     </p>
 
-                    <div>
-                        <Button type="button" variant="outline" class="h-10" @click="acrescentarItem">Acrescentar item</Button>
+                    <!-- O botao ocupa a largura da lista e fica no fim dela, que
+                         e exatamente onde o item novo aparece. Antes era um
+                         botao pequeno solto a esquerda, sem relacao visual com
+                         as linhas de cima. O tracejado e o "+" dizem, sem
+                         precisar ler, que ali se acrescenta. -->
+                    <button
+                        type="button"
+                        class="border-input text-muted-foreground hover:border-acao hover:text-acao-texto focus-visible:ring-ring flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
+                        @click="acrescentarItem"
+                    >
+                        <Plus class="size-4" aria-hidden="true" />
+                        Acrescentar item
+                    </button>
+                </div>
+            </section>
+
+            <section aria-labelledby="titulo-faq" class="border-border grid gap-4 rounded-lg border p-4">
+                <div>
+                    <div class="flex flex-wrap items-baseline gap-x-3">
+                        <h2 id="titulo-faq" class="text-lg font-semibold">Perguntas frequentes</h2>
+                        <span v-if="formulario.perguntas_frequentes.length > 0" class="text-muted-foreground text-sm">
+                            {{ formulario.perguntas_frequentes.length === 1 ? '1 pergunta' : `${formulario.perguntas_frequentes.length} perguntas` }}
+                        </span>
                     </div>
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        As dúvidas que a organização responde toda semana no WhatsApp. Pergunta sem resposta não é gravada.
+                    </p>
                 </div>
 
-                <div class="border-border grid gap-3 border-t pt-4">
-                    <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <p class="text-sm font-medium">Perguntas frequentes</p>
-                        <p class="text-muted-foreground text-sm">Pergunta sem resposta não é gravada.</p>
-                    </div>
-
+                <div class="grid gap-3">
                     <div
                         v-for="(pergunta, indice) in formulario.perguntas_frequentes"
                         :key="`pergunta-${indice}`"
-                        class="border-border grid gap-2 rounded-md border p-3"
+                        class="border-border bg-muted/20 grid gap-3 rounded-md border p-3"
                     >
-                        <label :for="`evento-pergunta-${indice}`" class="text-sm font-medium">Pergunta {{ indice + 1 }}</label>
-                        <input
-                            :id="`evento-pergunta-${indice}`"
-                            v-model="pergunta.pergunta"
-                            type="text"
-                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                        />
+                        <!-- O "Remover" fica no cabecalho do bloco: embaixo, ele
+                             ficava mais perto da pergunta SEGUINTE do que da que
+                             ele apaga. -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-muted-foreground text-sm font-medium">Pergunta {{ indice + 1 }}</span>
 
-                        <label :for="`evento-resposta-${indice}`" class="text-sm font-medium">Resposta</label>
-                        <textarea
-                            :id="`evento-resposta-${indice}`"
-                            v-model="pergunta.resposta"
-                            rows="3"
-                            class="border-input bg-background focus-visible:ring-ring rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                        ></textarea>
+                            <button
+                                type="button"
+                                class="text-muted-foreground hover:text-destructive focus-visible:ring-ring ml-auto inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-hidden"
+                                @click="removerPergunta(indice)"
+                            >
+                                <Trash2 class="size-4" aria-hidden="true" />
+                                <span class="sr-only">Remover a pergunta {{ indice + 1 }}</span>
+                            </button>
+                        </div>
 
-                        <div>
-                            <Button type="button" variant="ghost" class="h-10" @click="removerPergunta(indice)">
-                                Remover<span class="sr-only"> a pergunta {{ indice + 1 }}</span>
-                            </Button>
+                        <div class="grid gap-1">
+                            <label :for="`evento-pergunta-${indice}`" class="text-sm font-medium">Pergunta</label>
+                            <input
+                                :id="`evento-pergunta-${indice}`"
+                                v-model="pergunta.pergunta"
+                                type="text"
+                                placeholder="Posso me inscrever para a família toda?"
+                                class="border-input bg-background focus-visible:ring-ring h-11 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            />
+                        </div>
+
+                        <div class="grid gap-1">
+                            <label :for="`evento-resposta-${indice}`" class="text-sm font-medium">Resposta</label>
+                            <textarea
+                                :id="`evento-resposta-${indice}`"
+                                v-model="pergunta.resposta"
+                                rows="3"
+                                placeholder="Cada pessoa precisa de uma inscrição, porque as vagas por atividade são individuais."
+                                class="border-input bg-background focus-visible:ring-ring rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            ></textarea>
                         </div>
                     </div>
 
@@ -483,9 +536,14 @@ function gravar(): void {
                         Nenhuma pergunta. A seção não aparece na página do evento enquanto a lista estiver vazia.
                     </p>
 
-                    <div>
-                        <Button type="button" variant="outline" class="h-10" @click="acrescentarPergunta">Acrescentar pergunta</Button>
-                    </div>
+                    <button
+                        type="button"
+                        class="border-input text-muted-foreground hover:border-acao hover:text-acao-texto focus-visible:ring-ring flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
+                        @click="acrescentarPergunta"
+                    >
+                        <Plus class="size-4" aria-hidden="true" />
+                        Acrescentar pergunta
+                    </button>
                 </div>
             </section>
         </form>

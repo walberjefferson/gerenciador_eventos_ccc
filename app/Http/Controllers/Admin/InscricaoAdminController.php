@@ -22,7 +22,7 @@ use Inertia\Response;
 /**
  * A lista de inscricoes: onde o organizador acha uma pessoa.
  *
- * Os filtros se combinam — evento, situacao, cidade, grupo, atividade
+ * Os filtros se combinam — evento, situacao, setor, grupo, atividade
  * escolhida, situacao da cobranca e periodo — e a busca por texto olha nome,
  * e-mail e codigo publico. **CPF nao entra**: esta cifrado e a impressao
  * digital so serve para comparar o numero inteiro, nunca um pedaco.
@@ -184,10 +184,14 @@ class InscricaoAdminController extends Controller
                 ->get(['id', 'nome'])
                 ->map(fn (Evento $evento): array => ['id' => $evento->id, 'nome' => $evento->nome])
                 ->all(),
+            // Os setores do filtro. O rotulo e so o nome: a UF servia para
+            // separar cidades homonimas de estados diferentes, e os setores da
+            // comunidade sao todos da mesma regiao. A chave da prop continua
+            // sendo `cidades`, como a coluna.
             'cidades' => Cidade::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'uf'])
-                ->map(fn (Cidade $cidade): array => ['id' => $cidade->id, 'nome' => "{$cidade->nome}/{$cidade->uf}"])
+                ->get(['id', 'nome'])
+                ->map(fn (Cidade $cidade): array => ['id' => $cidade->id, 'nome' => $cidade->nome])
                 ->all(),
             'grupos' => GrupoParticipante::query()
                 ->orderBy('nome')

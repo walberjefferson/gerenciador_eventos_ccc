@@ -53,7 +53,7 @@ it('abre o formulario com evento, cidades, grupos e conflitos', function (): voi
             ->where('evento.slug', 'caminhada-2026')
             ->has('evento.dias.0.grupos.0.atividades', 2)
             ->has('cidades', 2)
-            ->where('cidades.0.rotulo', 'Caeté (MG)')
+            ->where('cidades.0.rotulo', 'Caeté')
             ->has('grupos_participantes', 2)
             ->where('grupos_participantes.0.cidade_id', $sabara->id)
             ->has('conflitos', 1)

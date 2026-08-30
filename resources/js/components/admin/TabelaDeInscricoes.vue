@@ -5,7 +5,7 @@ import { Link } from '@inertiajs/vue3';
 /**
  * A tabela de inscrições encontradas.
  *
- * As colunas mostram nome, e-mail, cidade, grupo, situação, valor e prazo.
+ * As colunas mostram nome, e-mail, setor, grupo, situação, valor e prazo.
  * **CPF não é uma delas** — nem aqui, nem no CSV.
  */
 const props = defineProps<{
@@ -29,13 +29,13 @@ function momento(iso: string | null): string {
     <div class="overflow-x-auto rounded-lg border border-border">
         <table class="w-full text-sm">
             <caption class="sr-only">
-                Inscrições encontradas, com o evento, a cidade, o grupo, a situação, o valor e o prazo de pagamento de cada uma.
+                Inscrições encontradas, com o evento, o setor, o grupo, a situação, o valor e o prazo de pagamento de cada uma.
             </caption>
             <thead>
                 <tr class="border-b border-border text-left">
                     <th scope="col" class="px-4 py-2 font-medium">Pessoa</th>
                     <th scope="col" class="px-4 py-2 font-medium">Evento</th>
-                    <th scope="col" class="px-4 py-2 font-medium">Cidade</th>
+                    <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                     <th scope="col" class="px-4 py-2 font-medium">Grupo</th>
                     <th scope="col" class="px-4 py-2 font-medium">Situação</th>
                     <th scope="col" class="px-4 py-2 font-medium">Cobrança</th>

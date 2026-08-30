@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { FiltrosDeAuditoria, OpcoesDeAuditoria, PaginaDeAuditoria } from '@/types/auditoria';
 import { Link, router } from '@inertiajs/vue3';
@@ -23,6 +24,15 @@ const props = defineProps<{
 }>();
 
 const campos = reactive<FiltrosDeAuditoria>({ ...props.filtros });
+
+/**
+ * Quantos filtros vieram APLICADOS do servidor — e nao quantos estao digitados.
+ * Quem preencheu um campo e ainda nao clicou em "Filtrar" nao mudou a lista, e
+ * o cabecalho do painel estaria mentindo se ja contasse.
+ */
+const filtrosAtivos = computed<number>(
+    () => Object.values(props.filtros).filter((valor) => valor !== null && valor !== '' && valor !== undefined).length,
+);
 
 function aplicar(): void {
     const parametros: Record<string, string> = {};
@@ -106,87 +116,89 @@ function formatarValor(valor: unknown): string {
         titulo="Auditoria"
         descricao="Tudo o que foi feito no painel e mexe em vaga, em dinheiro ou em acesso fica registrado aqui. A lista é só de leitura: nem esta tela, nem qualquer outra, consegue alterar ou apagar um registro."
     >
-        <form aria-labelledby="titulo-filtros-auditoria" class="grid gap-4 rounded-lg border border-border p-4" @submit.prevent="aplicar">
-            <h2 id="titulo-filtros-auditoria" class="text-lg font-semibold">Filtros</h2>
+        <PainelDeFiltros id="filtros-auditoria" :ativos="filtrosAtivos">
+            <form aria-labelledby="titulo-filtros-auditoria" class="grid gap-4" @submit.prevent="aplicar">
+                <div class="grid gap-4 md:grid-cols-4">
+                    <div class="flex flex-col gap-1">
+                        <label for="auditoria-de" class="text-sm font-medium">A partir de</label>
+                        <input
+                            id="auditoria-de"
+                            v-model="campos.de"
+                            type="date"
+                            data-testid="auditoria-filtro-de"
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                    </div>
 
-            <div class="grid gap-4 md:grid-cols-4">
-                <div class="flex flex-col gap-1">
-                    <label for="auditoria-de" class="text-sm font-medium">A partir de</label>
-                    <input
-                        id="auditoria-de"
-                        v-model="campos.de"
-                        type="date"
-                        data-testid="auditoria-filtro-de"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    />
+                    <div class="flex flex-col gap-1">
+                        <label for="auditoria-ate" class="text-sm font-medium">Até</label>
+                        <input
+                            id="auditoria-ate"
+                            v-model="campos.ate"
+                            type="date"
+                            data-testid="auditoria-filtro-ate"
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label for="auditoria-usuario" class="text-sm font-medium">Quem fez</label>
+                        <select
+                            id="auditoria-usuario"
+                            v-model="campos.usuario_id"
+                            data-testid="auditoria-filtro-usuario"
+                            aria-describedby="ajuda-auditoria-usuario"
+                            class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option :value="null">Todos</option>
+                            <option v-for="usuario in props.opcoes.usuarios" :key="usuario.id" :value="String(usuario.id)">
+                                {{ usuario.nome }}
+                            </option>
+                        </select>
+                        <p id="ajuda-auditoria-usuario" class="text-muted-foreground text-sm">
+                            Só aparecem aqui as pessoas que já fizeram alguma coisa registrada.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label for="auditoria-acao" class="text-sm font-medium">O que foi feito</label>
+                        <select
+                            id="auditoria-acao"
+                            v-model="campos.acao"
+                            data-testid="auditoria-filtro-acao"
+                            class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option :value="null">Tudo</option>
+                            <option v-for="acao in props.opcoes.acoes" :key="acao.valor" :value="acao.valor">{{ acao.rotulo }}</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="flex flex-col gap-1">
-                    <label for="auditoria-ate" class="text-sm font-medium">Até</label>
-                    <input
-                        id="auditoria-ate"
-                        v-model="campos.ate"
-                        type="date"
-                        data-testid="auditoria-filtro-ate"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <label for="auditoria-usuario" class="text-sm font-medium">Quem fez</label>
-                    <select
-                        id="auditoria-usuario"
-                        v-model="campos.usuario_id"
-                        data-testid="auditoria-filtro-usuario"
-                        aria-describedby="ajuda-auditoria-usuario"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        type="submit"
+                        class="bg-acao text-acao-foreground focus-visible:ring-ring h-10 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
                     >
-                        <option :value="null">Todos</option>
-                        <option v-for="usuario in props.opcoes.usuarios" :key="usuario.id" :value="String(usuario.id)">
-                            {{ usuario.nome }}
-                        </option>
-                    </select>
-                    <p id="ajuda-auditoria-usuario" class="text-sm text-muted-foreground">
-                        Só aparecem aqui as pessoas que já fizeram alguma coisa registrada.
-                    </p>
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <label for="auditoria-acao" class="text-sm font-medium">O que foi feito</label>
-                    <select
-                        id="auditoria-acao"
-                        v-model="campos.acao"
-                        data-testid="auditoria-filtro-acao"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                        Filtrar
+                    </button>
+                    <button
+                        type="button"
+                        class="border-border focus-visible:ring-ring h-10 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        @click="limpar"
                     >
-                        <option :value="null">Tudo</option>
-                        <option v-for="acao in props.opcoes.acoes" :key="acao.valor" :value="acao.valor">{{ acao.rotulo }}</option>
-                    </select>
+                        Limpar filtros
+                    </button>
                 </div>
-            </div>
+            </form>
+        </PainelDeFiltros>
 
-            <div class="flex flex-wrap gap-2">
-                <button
-                    type="submit"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    Filtrar
-                </button>
-                <button
-                    type="button"
-                    class="h-10 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    @click="limpar"
-                >
-                    Limpar filtros
-                </button>
-            </div>
-        </form>
+        <p role="status" class="text-muted-foreground text-sm">{{ resumo }}</p>
 
-        <p role="status" class="text-sm text-muted-foreground">{{ resumo }}</p>
-
-        <div v-if="props.registros.dados.length > 0" class="overflow-x-auto rounded-lg border border-border">
+        <div v-if="props.registros.dados.length > 0" class="border-border overflow-x-auto rounded-lg border">
             <table class="w-full text-left text-sm" data-testid="tabela-auditoria">
-                <caption class="sr-only">Registros de auditoria, do mais recente para o mais antigo</caption>
+                <caption class="sr-only">
+                    Registros de auditoria, do mais recente para o mais antigo
+                </caption>
                 <thead class="bg-muted/40">
                     <tr>
                         <th scope="col" class="px-4 py-3 font-medium">Quando</th>
@@ -199,8 +211,8 @@ function formatarValor(valor: unknown): string {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="registro in props.registros.dados" :key="registro.id" class="border-t border-border align-top">
-                        <td class="whitespace-nowrap px-4 py-3">{{ registro.quando ?? '—' }}</td>
+                    <tr v-for="registro in props.registros.dados" :key="registro.id" class="border-border border-t align-top">
+                        <td class="px-4 py-3 whitespace-nowrap">{{ registro.quando ?? '—' }}</td>
                         <td class="px-4 py-3">{{ registro.responsavel }}</td>
                         <td class="px-4 py-3">{{ registro.acao_rotulo }}</td>
                         <td class="px-4 py-3">
@@ -208,7 +220,7 @@ function formatarValor(valor: unknown): string {
                         </td>
                         <td class="px-4 py-3">{{ registro.motivo ?? '—' }}</td>
                         <td class="px-4 py-3">{{ descreverDados(registro.dados) }}</td>
-                        <td class="whitespace-nowrap px-4 py-3">{{ registro.ip ?? '—' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">{{ registro.ip ?? '—' }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -219,18 +231,18 @@ function formatarValor(valor: unknown): string {
                 v-if="props.registros.links.anterior"
                 :href="props.registros.links.anterior"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring h-10 rounded-md border px-4 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Página anterior
             </Link>
 
-            <span class="text-sm text-muted-foreground"> Página {{ props.registros.pagina_atual }} de {{ props.registros.ultima_pagina }} </span>
+            <span class="text-muted-foreground text-sm"> Página {{ props.registros.pagina_atual }} de {{ props.registros.ultima_pagina }} </span>
 
             <Link
                 v-if="props.registros.links.proxima"
                 :href="props.registros.links.proxima"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring h-10 rounded-md border px-4 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Próxima página
             </Link>

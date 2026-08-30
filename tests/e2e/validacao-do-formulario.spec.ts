@@ -23,8 +23,8 @@ test('a tela avisa, antes de enviar, o CPF incompleto e o campo obrigatorio vazi
     // dd/mm/aaaa: o campo de nascimento passou a ser digitavel, com a mascara
     // do desenho, e nao mais o seletor nativo do navegador.
     await page.getByLabel('Data de nascimento').fill('20/02/1975');
-    await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
-    await escolherNaLista(page, 'Grupo', 'Centro');
+    await escolherNaLista(page, 'Setor', 'Setor Batalha');
+    await escolherNaLista(page, 'Grupo', 'Batalha (Sede)');
 
     await page.getByRole('button', { name: 'Continuar' }).click();
 
@@ -56,8 +56,10 @@ test('o servidor recusa o CPF impossivel e a tela volta ao passo do campo', asyn
     await page.getByLabel('Telefone com DDD').fill('(11) 95555-4444');
     await page.getByLabel('CPF').fill(CPF_IMPOSSIVEL);
     await page.getByLabel('Data de nascimento').fill('07/11/1980');
-    await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
-    await escolherNaLista(page, 'Grupo', 'Centro');
+    // APOSTROFO e ACENTO de proposito, e nao por acaso: sao dados reais do
+    // catalogo, e um seletor escrito com aspas simples quebraria neles.
+    await escolherNaLista(page, 'Setor', "Setor Olho d'água das Flores");
+    await escolherNaLista(page, 'Grupo', 'Pão de Açúcar');
 
     await page.getByRole('button', { name: 'Continuar' }).click();
 

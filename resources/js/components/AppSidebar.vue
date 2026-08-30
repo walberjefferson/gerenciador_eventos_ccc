@@ -4,7 +4,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { CalendarDays, KeyRound, LayoutGrid, ScrollText, Users } from 'lucide-vue-next';
+import { BellRing, CalendarDays, KeyRound, LayoutGrid, MapPin, ScrollText, ShieldCheck, Users, UsersRound } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -41,6 +41,30 @@ const itensDoPainel = computed<NavItem[]>(() => {
     const permissoes = page.props.auth?.permissoes ?? [];
     const itens = [...itensFixos];
 
+    // O catalogo: setores e grupos. As duas telas existiam desde a Fase 6b, com
+    // cadastro, edicao e exclusao completos — mas SEM nenhum link apontando
+    // para elas em lugar nenhum do sistema. Quem administra so chegava la
+    // digitando o endereco, ou seja, na pratica nao chegava: um CRUD que
+    // ninguem alcanca e um CRUD que nao existe.
+    if (permissoes.includes('catalogo.gerenciar')) {
+        itens.push({ title: 'Setores', href: '/admin/catalogo/setores', icon: MapPin });
+        itens.push({ title: 'Grupos', href: '/admin/catalogo/grupos-participantes', icon: UsersRound });
+    }
+
+    // Quem entra no painel e com que papel. Mesma regra dos demais: o
+    // organizador não tem 'usuarios.gerenciar' e receberia 403 ao clicar.
+    //
+    // A TELA DE PAPÉIS NÃO GANHA ITEM PRÓPRIO, de propósito. Ela responde a
+    // uma pergunta que só nasce depois de a pessoa já estar olhando a lista
+    // de contas — "esse tal de organizador alcança o quê?" —, e é de lá que
+    // se chega a ela, por um link no fim da página. Um item de menu para uma
+    // tabela que ninguém abre sozinha só faria a barra crescer e afastar o que
+    // é usado todo dia. As duas telas moram sob a mesma permissão: quem vê
+    // "Usuários" alcança a matriz, e quem não vê, não alcança nenhuma das duas.
+    if (permissoes.includes('usuarios.gerenciar')) {
+        itens.push({ title: 'Usuários', href: '/admin/usuarios', icon: ShieldCheck });
+    }
+
     if (permissoes.includes('auditoria.ver')) {
         itens.push({ title: 'Auditoria', href: '/admin/auditoria', icon: ScrollText });
     }
@@ -50,6 +74,12 @@ const itensDoPainel = computed<NavItem[]>(() => {
     // administrador alcanca.
     if (permissoes.includes('pagamentos.credenciais')) {
         itens.push({ title: 'Credenciais de pagamento', href: '/admin/pagamentos/credenciais', icon: KeyRound });
+    }
+
+    // E para os avisos do provedor, de novo pela mesma razão: quem organiza o
+    // evento não tem 'pagamentos.avisos-ver' e receberia 403 ao clicar.
+    if (permissoes.includes('pagamentos.avisos-ver')) {
+        itens.push({ title: 'Avisos do provedor', href: '/admin/pagamentos/avisos', icon: BellRing });
     }
 
     return itens;

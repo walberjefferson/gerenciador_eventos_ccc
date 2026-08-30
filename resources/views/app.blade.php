@@ -28,7 +28,15 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'Inscrições') }}</title>
+
+        {{-- O favicon e um SVG, e nao um .ico: o `public/favicon.ico` que veio
+             do pacote inicial tinha ZERO byte, entao ate aqui nao havia icone
+             nenhum na aba. SVG escala para qualquer tamanho num arquivo so e e
+             lido por todo navegador atual; o `.ico` vazio foi removido para
+             ninguem achar que ele ainda serve para alguma coisa. --}}
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/favicon.svg">
 
         {{-- As tres familias vem todas do fonts.bunny.net, e a razao e a CSP:
              `CabecalhosDeSeguranca` libera essa origem, e so ela, em `style-src`

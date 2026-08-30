@@ -29,6 +29,33 @@ enum AcaoAuditada: string
     case CriouUsuarioAdministrativo = 'criou-usuario-administrativo';
 
     /**
+     * Alguem ativou ou desativou uma conta administrativa.
+     *
+     * Tem verbo proprio, e nao o "alterou" generico, porque desativar uma
+     * conta e tirar o acesso de alguem ao sistema — e quem revisa procura
+     * exatamente por isso. Com o verbo generico, a acao apareceria na tela de
+     * auditoria com o mesmo rotulo de uma edicao de cadastro qualquer e
+     * ficaria de fora do filtro de acoes sensiveis.
+     */
+    case MudouSituacaoDoUsuario = 'mudou-situacao-do-usuario';
+
+    /**
+     * Nome e e-mail de uma conta administrativa mudaram.
+     *
+     * E sensivel porque o e-mail E O LOGIN: mudar o e-mail de uma conta muda
+     * por onde ela entra. Quem revisa o sistema depois precisa ver isso.
+     */
+    case AlterouDadosDoUsuario = 'alterou-dados-do-usuario';
+
+    /**
+     * A senha de uma conta foi redefinida por outra pessoa.
+     *
+     * O registro guarda QUE aconteceu e por qual caminho — link enviado ou
+     * senha definida na hora —, nunca a senha nem o hash dela.
+     */
+    case RedefiniuSenhaDeUsuario = 'redefiniu-senha-de-usuario';
+
+    /**
      * Mexer na credencial do provedor de pagamento — ou trocar qual ambiente
      * esta valendo.
      *
@@ -48,6 +75,9 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual => 'Confirmou pagamento na mão',
             self::PromoveuUsuario => 'Mudou o papel de um usuário',
             self::CriouUsuarioAdministrativo => 'Criou conta administrativa',
+            self::MudouSituacaoDoUsuario => 'Ativou ou desativou uma conta',
+            self::AlterouDadosDoUsuario => 'Alterou o nome ou o e-mail de uma conta',
+            self::RedefiniuSenhaDeUsuario => 'Redefiniu a senha de uma conta',
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
         };
     }
@@ -65,6 +95,9 @@ enum AcaoAuditada: string
             self::ConfirmouPagamentoManual,
             self::PromoveuUsuario,
             self::CriouUsuarioAdministrativo,
+            self::MudouSituacaoDoUsuario,
+            self::AlterouDadosDoUsuario,
+            self::RedefiniuSenhaDeUsuario,
             self::AlterouCredencialPagamento,
         ];
     }

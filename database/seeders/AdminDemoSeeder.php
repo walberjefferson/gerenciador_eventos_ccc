@@ -20,7 +20,7 @@ class AdminDemoSeeder extends Seeder
 {
     public const EMAIL = 'admin@exemplo.test';
 
-    public const SENHA = 'senha-de-demonstracao';
+    public const SENHA = 'password';
 
     public function run(): void
     {

@@ -168,11 +168,12 @@ test('da para percorrer o formulario so com o teclado, e o foco fica sempre visi
     // O primeiro elemento da pagina e o atalho para pular o cabecalho.
     expect([...visitados][0]).toContain('Ir direto para o con');
 
-    // A lista de grupos so entra na ordem de tabulacao depois que ha cidade
-    // escolhida — antes disso ela esta vazia, e um campo vazio que recebe foco
+    // A lista de grupos so entra na ordem de tabulacao depois que ha setor
+    // escolhido — antes disso ela esta vazia, e um campo vazio que recebe foco
     // e so um obstaculo a mais.
     await expect(page.locator('#grupo_participante_id')).toBeDisabled();
-    await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
+    // O campo continua se chamando `cidade_id`; so o rotulo virou "Setor".
+    await escolherNaLista(page, 'Setor', 'Setor Batalha');
     await page.locator('#grupo_participante_id').focus();
     await expect(page.locator('#grupo_participante_id')).toBeFocused();
 

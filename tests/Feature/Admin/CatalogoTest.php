@@ -9,7 +9,11 @@ use Tests\Feature\Admin\Cenario;
 use Tests\Feature\Inscricoes\Cenario as CenarioInscricao;
 
 /**
- * O catalogo global: cidades e grupos de participantes.
+ * O catalogo global: setores e grupos de participantes.
+ *
+ * A tela e a URL dizem "setor"; o Model e a tabela continuam sendo
+ * `Cidade`/`cidades`. Por isso os testes montam `Cidade::factory()` e batem em
+ * `/admin/catalogo/setores`.
  *
  * O que precisa ficar provado e sempre o mesmo: cadastro que ja esta em uso
  * nao some do banco, e quem tenta apagar recebe uma frase em portugues
@@ -19,48 +23,73 @@ beforeEach(function (): void {
     Cenario::semearPapeis();
 });
 
-describe('cidades', function () {
+describe('setores', function () {
     it('abre a lista para quem gerencia o catalogo', function () {
-        Cidade::factory()->create(['nome' => 'Franca', 'uf' => 'SP']);
+        Cidade::factory()->create(['nome' => 'Setor Batalha', 'uf' => 'AL']);
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->get('/admin/catalogo/cidades')
+            ->get('/admin/catalogo/setores')
             ->assertOk()
             ->assertInertia(fn (Assert $pagina) => $pagina
-                ->component('Admin/Catalogo/Cidades')
+                ->component('Admin/Catalogo/Setores')
                 ->has('cidades', 1)
-                ->where('cidades.0.nome', 'Franca'));
+                ->where('cidades.0.nome', 'Setor Batalha'));
     });
 
     it('recusa com 403 quem nao tem papel nenhum', function () {
         $this->actingAs(Cenario::usuarioCom())
-            ->get('/admin/catalogo/cidades')
+            ->get('/admin/catalogo/setores')
             ->assertForbidden();
     });
 
-    it('cadastra uma cidade', function () {
+    // O endereco antigo saiu de circulacao sem redirecionamento: o sistema nao
+    // esta publicado e ninguem tem esse link guardado.
+    it('nao responde mais no endereco antigo', function () {
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->post('/admin/catalogo/cidades', ['nome' => 'Ribeirão Preto', 'uf' => 'sp'])
+            ->get('/admin/catalogo/cidades')
+            ->assertNotFound();
+    });
+
+    it('cadastra um setor', function () {
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/catalogo/setores', ['nome' => 'Setor Palmeira', 'uf' => 'al'])
             ->assertRedirect();
 
-        expect(Cidade::where('nome', 'Ribeirão Preto')->where('uf', 'SP')->exists())->toBeTrue();
+        expect(Cidade::where('nome', 'Setor Palmeira')->where('uf', 'AL')->exists())->toBeTrue();
+    });
+
+    // O binding de rota casa pelo NOME do parametro (`{setor}`), nao pelo da
+    // classe: e o que permite a URL dizer "setor" e o type-hint continuar
+    // sendo `Cidade`. Esta prova edita um setor pela rota nova de ponta a ponta.
+    it('edita um setor pela rota nova, com o binding resolvendo {setor}', function () {
+        $setor = Cidade::factory()->create(['nome' => 'Setor Santana', 'uf' => 'AL']);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->put(route('admin.catalogo.setores.update', ['setor' => $setor->id]), [
+                'nome' => 'Setor Santana do Ipanema',
+                'uf' => 'AL',
+                'ativo' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        expect($setor->fresh()->nome)->toBe('Setor Santana do Ipanema');
     });
 
     it('recusa nome repetido no mesmo estado antes de o banco reclamar', function () {
-        Cidade::factory()->create(['nome' => 'Franca', 'uf' => 'SP']);
+        Cidade::factory()->create(['nome' => 'Setor Batalha', 'uf' => 'AL']);
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->post('/admin/catalogo/cidades', ['nome' => 'Franca', 'uf' => 'SP'])
+            ->post('/admin/catalogo/setores', ['nome' => 'Setor Batalha', 'uf' => 'AL'])
             ->assertSessionHasErrors('nome');
 
         expect(Cidade::count())->toBe(1);
     });
 
     it('aceita o mesmo nome em estados diferentes', function () {
-        Cidade::factory()->create(['nome' => 'Franca', 'uf' => 'SP']);
+        Cidade::factory()->create(['nome' => 'Setor Batalha', 'uf' => 'AL']);
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->post('/admin/catalogo/cidades', ['nome' => 'Franca', 'uf' => 'MG'])
+            ->post('/admin/catalogo/setores', ['nome' => 'Setor Batalha', 'uf' => 'SE'])
             ->assertSessionHasNoErrors();
 
         expect(Cidade::count())->toBe(2);
@@ -68,52 +97,52 @@ describe('cidades', function () {
 
     it('recusa sigla de estado que nao existe', function () {
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->post('/admin/catalogo/cidades', ['nome' => 'Cidade Nova', 'uf' => 'XX'])
+            ->post('/admin/catalogo/setores', ['nome' => 'Setor Novo', 'uf' => 'XX'])
             ->assertSessionHasErrors('uf');
     });
 
-    it('recusa apagar cidade em uso, explicando o caminho certo', function () {
-        $cidade = Cidade::factory()->create();
-        GrupoParticipante::factory()->for($cidade)->create();
+    it('recusa apagar setor em uso, explicando o caminho certo', function () {
+        $setor = Cidade::factory()->create();
+        GrupoParticipante::factory()->for($setor)->create();
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->delete("/admin/catalogo/cidades/{$cidade->id}")
+            ->delete("/admin/catalogo/setores/{$setor->id}")
             ->assertSessionHasErrors('exclusao');
 
-        expect(Cidade::whereKey($cidade->id)->exists())->toBeTrue();
+        expect(Cidade::whereKey($setor->id)->exists())->toBeTrue();
 
         $erro = session('errors')->first('exclusao');
 
-        expect($erro)->toContain('Desative a cidade');
+        expect($erro)->toContain('Desative o setor');
     });
 
-    it('apaga cidade que ninguem usa', function () {
-        $cidade = Cidade::factory()->create();
+    it('apaga setor que ninguem usa', function () {
+        $setor = Cidade::factory()->create();
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->delete("/admin/catalogo/cidades/{$cidade->id}")
+            ->delete("/admin/catalogo/setores/{$setor->id}")
             ->assertSessionHasNoErrors();
 
-        expect(Cidade::whereKey($cidade->id)->exists())->toBeFalse();
+        expect(Cidade::whereKey($setor->id)->exists())->toBeFalse();
     });
 
     it('desativa em vez de apagar, quando e esse o caminho', function () {
-        $cidade = Cidade::factory()->create(['ativo' => true]);
+        $setor = Cidade::factory()->create(['ativo' => true]);
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
-            ->put("/admin/catalogo/cidades/{$cidade->id}", [
-                'nome' => $cidade->nome,
-                'uf' => $cidade->uf,
+            ->put("/admin/catalogo/setores/{$setor->id}", [
+                'nome' => $setor->nome,
+                'uf' => $setor->uf,
                 'ativo' => false,
             ])
             ->assertSessionHasNoErrors();
 
-        expect($cidade->fresh()->ativo)->toBeFalse();
+        expect($setor->fresh()->ativo)->toBeFalse();
     });
 });
 
 describe('grupos de participantes', function () {
-    it('cadastra um grupo numa cidade', function () {
+    it('cadastra um grupo num setor', function () {
         $cidade = Cidade::factory()->create();
 
         $this->actingAs(Cenario::usuarioCom('organizador'))
@@ -126,7 +155,7 @@ describe('grupos de participantes', function () {
         expect(GrupoParticipante::where('nome', 'Grupo do Centro')->exists())->toBeTrue();
     });
 
-    it('recusa nome repetido na mesma cidade', function () {
+    it('recusa nome repetido no mesmo setor', function () {
         $cidade = Cidade::factory()->create();
         GrupoParticipante::factory()->for($cidade)->create(['nome' => 'Grupo do Centro']);
 

@@ -223,7 +223,7 @@ function sair(campo: string): void {
         </div>
 
         <div class="space-y-[7px]">
-            <Label for="cidade_id" class="text-[14.5px] font-medium">Cidade</Label>
+            <Label for="cidade_id" class="text-[14.5px] font-medium">Setor</Label>
             <Select v-model="cidadeSelecionada">
                 <SelectTrigger
                     id="cidade_id"
@@ -231,7 +231,7 @@ function sair(campo: string): void {
                     :aria-invalid="erro('cidade_id') ? 'true' : undefined"
                     :aria-describedby="erro('cidade_id') ? 'erro-cidade_id' : undefined"
                 >
-                    <SelectValue placeholder="Escolha a sua cidade" />
+                    <SelectValue placeholder="Escolha o seu setor" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem v-for="cidade in cidades" :key="cidade.id" :value="String(cidade.id)">{{ cidade.rotulo }}</SelectItem>
@@ -252,10 +252,10 @@ function sair(campo: string): void {
                     :aria-describedby="erro('grupo_participante_id') ? 'erro-grupo_participante_id' : 'ajuda-grupo'"
                 >
                     <!-- O texto de espera diz o que fazer ANTES, e nao so o que
-                         escolher: sem cidade a lista esta vazia, e "Escolha o
+                         escolher: sem setor a lista esta vazia, e "Escolha o
                          seu grupo" seria um convite para um campo que nao
                          responde. -->
-                    <SelectValue :placeholder="formulario.cidade_id === null ? 'Escolha a cidade primeiro' : 'Escolha o seu grupo'" />
+                    <SelectValue :placeholder="formulario.cidade_id === null ? 'Escolha o setor primeiro' : 'Escolha o seu grupo'" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem v-for="grupo in gruposDaCidade" :key="grupo.id" :value="String(grupo.id)">{{ grupo.nome }}</SelectItem>
@@ -270,7 +270,7 @@ function sair(campo: string): void {
                 {{ erro('grupo_participante_id') }}
             </p>
             <p v-else id="ajuda-grupo" class="text-muted-foreground text-[13.5px]">
-                {{ avisoSemGrupos ?? 'A lista mostra os grupos da cidade escolhida.' }}
+                {{ avisoSemGrupos ?? 'A lista mostra os grupos do setor escolhido.' }}
             </p>
         </div>
     </div>

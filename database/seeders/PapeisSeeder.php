@@ -34,7 +34,7 @@ class PapeisSeeder extends Seeder
      */
     public const PERMISSOES = [
         'painel.ver' => 'Abrir o painel com os numeros do evento',
-        'catalogo.gerenciar' => 'Cadastrar cidades e grupos de participantes',
+        'catalogo.gerenciar' => 'Cadastrar setores e grupos de participantes',
         'eventos.gerenciar' => 'Cadastrar evento, dias, grupos, atividades e conflitos',
         'inscricoes.ver' => 'Consultar a lista de inscricoes',
         'inscricoes.exportar' => 'Baixar a lista de inscricoes',
@@ -43,6 +43,7 @@ class PapeisSeeder extends Seeder
         'usuarios.gerenciar' => 'Criar e ajustar contas administrativas',
         'auditoria.ver' => 'Ler o historico de quem fez o que (Fase 9)',
         'pagamentos.credenciais' => 'Cadastrar a credencial e o certificado do provedor de pagamento (Fase 8b)',
+        'pagamentos.avisos-ver' => 'Ler os avisos automaticos que o provedor de pagamento enviou',
     ];
 
     /**
@@ -58,6 +59,12 @@ class PapeisSeeder extends Seeder
      * dinheiro do evento vai. Quem organiza o evento no dia a dia nao precisa
      * dela nem uma vez.
      *
+     * "pagamentos.avisos-ver" acompanha as duas de cima: o aviso do provedor e
+     * conversa entre o sistema e a instituicao financeira. Quem responde pelo
+     * sistema precisa saber se o provedor ainda esta chamando; quem organiza o
+     * evento no dia a dia trabalha com a inscricao, que ja mostra o resultado
+     * dessa conversa.
+     *
      * @var array<int, string>
      */
     public const FORA_DO_ORGANIZADOR = [
@@ -65,6 +72,7 @@ class PapeisSeeder extends Seeder
         'usuarios.gerenciar',
         'auditoria.ver',
         'pagamentos.credenciais',
+        'pagamentos.avisos-ver',
     ];
 
     public function run(): void

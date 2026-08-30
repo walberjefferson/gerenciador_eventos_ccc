@@ -9,7 +9,7 @@ import { computed } from 'vue';
 /**
  * A lista de inscrições.
  *
- * É onde o organizador acha uma pessoa: filtra por evento, situação, cidade,
+ * É onde o organizador acha uma pessoa: filtra por evento, situação, setor,
  * grupo, atividade escolhida, situação da cobrança e período, ou busca pelo
  * nome, pelo e-mail ou pelo código da inscrição.
  *

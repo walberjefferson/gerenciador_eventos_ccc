@@ -166,7 +166,7 @@ const conferidores: Record<string, (dados: FormularioInscricao) => string | null
         // quem digita: ninguem nasceu depois de hoje.
         return dados.data_nascimento > hojeEmIso ? 'A data de nascimento não pode estar no futuro.' : null;
     },
-    cidade_id: (dados) => (dados.cidade_id === null ? 'Escolha a sua cidade.' : null),
+    cidade_id: (dados) => (dados.cidade_id === null ? 'Escolha o seu setor.' : null),
     grupo_participante_id: (dados) => (dados.grupo_participante_id === null ? 'Escolha o seu grupo.' : null),
 };
 
@@ -296,7 +296,7 @@ const resumoPessoal = computed<Array<{ rotulo: string; valor: string }>>(() => {
         { rotulo: 'Telefone', valor: dados.telefone },
         { rotulo: 'CPF', valor: dados.documento },
         { rotulo: 'Data de nascimento', valor: formatarDataCurta(dados.data_nascimento) },
-        { rotulo: 'Cidade', valor: cidade?.rotulo ?? '—' },
+        { rotulo: 'Setor', valor: cidade?.rotulo ?? '—' },
         { rotulo: 'Grupo', valor: grupo?.nome ?? '—' },
     ];
 });

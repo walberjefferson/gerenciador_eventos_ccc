@@ -100,6 +100,9 @@ async function vagasRestantes(page: Page): Promise<number> {
 async function abrirFichaDe(page: Page, nome: string): Promise<void> {
     await page.goto('/admin/inscricoes');
 
+    // O painel de filtros comeca recolhido: abrir e o primeiro passo de quem
+    // vai filtrar, tanto aqui quanto na tela.
+    await page.getByTestId('abrir-filtros').click();
     await page.getByLabel('Buscar').fill(nome);
     await page.getByRole('button', { name: 'Filtrar' }).click();
 
@@ -171,6 +174,7 @@ test('o organizador acha a pessoa pelo filtro, cancela com motivo e a vaga volta
 
     // 1. Achar: a busca reduz a lista a uma linha so.
     await page.goto('/admin/inscricoes');
+    await page.getByTestId('abrir-filtros').click();
     await page.getByLabel('Buscar').fill('Marta Desistente');
     await page.getByRole('button', { name: 'Filtrar' }).click();
 

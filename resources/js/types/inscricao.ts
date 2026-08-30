@@ -5,11 +5,15 @@
  * StoreInscricaoRequest. Nenhuma regra vive aqui: apenas o formato dos dados.
  */
 
+/**
+ * Um setor, como o formulário público o recebe. O tipo e o campo guardam o
+ * nome antigo, como a tabela: o renome para "setor" vale para o que a pessoa lê.
+ */
 export interface CidadePublica {
     id: number;
     nome: string;
     uf: string;
-    /** "Belo Horizonte (MG)" — pronto para aparecer na lista. */
+    /** "Setor Batalha" — só o nome, sem a UF. */
     rotulo: string;
 }
 

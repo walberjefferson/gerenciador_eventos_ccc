@@ -55,8 +55,8 @@ class StoreInscricaoRequest extends FormRequest
         return [
             'evento_id.required' => 'Não foi possível identificar o evento desta inscrição.',
             'evento_id.exists' => 'Este evento não existe mais.',
-            'cidade_id.required' => 'Escolha a sua cidade.',
-            'cidade_id.exists' => 'A cidade escolhida não está disponível.',
+            'cidade_id.required' => 'Escolha o seu setor.',
+            'cidade_id.exists' => 'O setor escolhido não está disponível.',
             'grupo_participante_id.required' => 'Escolha o seu grupo.',
             'grupo_participante_id.exists' => 'O grupo escolhido não está disponível.',
             'nome_completo.required' => 'Informe o seu nome completo.',

@@ -7,13 +7,13 @@
  * nenhum tipo o declara.
  */
 
-/** Uma cidade do catálogo global. */
+/** Um setor do catálogo global. O tipo guarda o nome antigo, como a tabela. */
 export interface CidadeDoCatalogo {
     id: number;
     nome: string;
     uf: string;
     ativo: boolean;
-    /** Quantos grupos de participantes dependem desta cidade. */
+    /** Quantos grupos de participantes dependem deste setor. */
     grupos: number;
 }
 
@@ -23,13 +23,13 @@ export interface GrupoDoCatalogo {
     nome: string;
     ativo: boolean;
     cidade_id: number;
-    /** Nome da cidade já formatado como "Cidade/UF". */
+    /** Nome do setor já formatado como "Setor/UF", na tela de catálogo. */
     cidade: string;
     /** Quantas inscrições apontam para este grupo. */
     inscricoes: number;
 }
 
-/** Opção de cidade nos seletores. */
+/** Opção de setor nos seletores. */
 export interface OpcaoDeCidade {
     id: number;
     nome: string;
@@ -270,4 +270,145 @@ export interface CobrancaDaFicha {
     origem_manual: boolean;
     observacao: string | null;
     responsavel: string | null;
+}
+
+/**
+ * Um aviso automático recebido do provedor de pagamento.
+ *
+ * O `payload` já vem limpo do banco: o que costuma carregar segredo foi
+ * trocado por "[removido]" antes de virar linha, então não há nada aqui que a
+ * tela precise esconder de novo.
+ */
+export interface AvisoDoProvedor {
+    id: number;
+    gateway: string;
+    /** O identificador que o provedor deu ao aviso. Nulo quando ele não mandou. */
+    id_evento_externo: string | null;
+    tipo_evento: string | null;
+    /** Falso é informação de segurança: alguém bateu na porta com a chave errada. */
+    assinatura_valida: boolean;
+    /** Data e hora já formatadas como "dd/mm/aaaa hh:mm:ss". */
+    recebido_em: string | null;
+    processado_em: string | null;
+    situacao: string;
+    situacao_rotulo: string;
+    /** O motivo, quando o aviso foi ignorado ou falhou. */
+    erro: string | null;
+    payload: Record<string, unknown> | null;
+}
+
+/** Uma página de avisos, do mais recente para o mais antigo. */
+export interface PaginaDeAvisos {
+    dados: AvisoDoProvedor[];
+    pagina_atual: number;
+    ultima_pagina: number;
+    total: number;
+    por_pagina: number;
+    links: {
+        anterior: string | null;
+        proxima: string | null;
+    };
+}
+
+/** Os filtros que estão valendo, do jeito que vieram do endereço. */
+export interface FiltrosDeAvisos {
+    de: string | null;
+    ate: string | null;
+    situacao: string | null;
+    gateway: string | null;
+    /** "sim", "nao" ou nulo — nulo quer dizer "tanto faz". */
+    assinatura_valida: string | null;
+}
+
+/** O que os seletores de filtro dos avisos oferecem. */
+export interface OpcoesDeAvisos {
+    situacoes: OpcaoDeSituacao[];
+    /** Só os provedores que já mandaram algum aviso. */
+    gateways: string[];
+}
+
+/** O aviso mais recente, como o cartão do painel o recebe. */
+export interface UltimoAvisoDoProvedor {
+    recebido_em: string | null;
+    /** Quantos minutos atrás ele chegou. A frase é escrita na tela. */
+    minutos_atras: number | null;
+    situacao: string;
+    situacao_rotulo: string;
+    gateway: string;
+}
+
+/**
+ * O bloco de avisos do painel.
+ *
+ * Nulo inteiro quer dizer "esta pessoa não pode ver os avisos"; `ultimo` nulo
+ * quer dizer "nenhum aviso chegou ainda". São coisas diferentes, e a tela
+ * responde diferente a cada uma.
+ */
+export interface AvisosDoProvedorNoPainel {
+    ultimo: UltimoAvisoDoProvedor | null;
+}
+
+/**
+ * Uma conta administrativa, como a lista de usuários a recebe.
+ *
+ * Nenhum campo de senha aparece aqui, e não é esquecimento: a tela mostra
+ * quem entra e com que papel; hash de senha não é assunto de tela nenhuma.
+ */
+export interface UsuarioAdministrativo {
+    id: number;
+    nome: string;
+    email: string;
+    /** O nome do papel, como o `PapeisSeeder` o escreve. Nulo = conta sem papel. */
+    papel: string | null;
+    ativo: boolean;
+    /** Quando a conta nasceu, já formatado como "dd/mm/aaaa". */
+    entrou_em: string | null;
+    /** Verdadeiro na linha de quem está olhando a tela. */
+    sou_eu: boolean;
+}
+
+/** Uma página da lista de usuários. */
+export interface PaginaDeUsuarios {
+    dados: UsuarioAdministrativo[];
+    pagina_atual: number;
+    ultima_pagina: number;
+    total: number;
+    por_pagina: number;
+    links: {
+        anterior: string | null;
+        proxima: string | null;
+    };
+}
+
+/** Os filtros da lista de usuários, do jeito que vieram do endereço. */
+export interface FiltrosDeUsuarios {
+    busca: string | null;
+    papel: string | null;
+    /** "ativos", "desativados" ou nulo — nulo quer dizer "tanto faz". */
+    situacao: string | null;
+}
+
+/** Um papel oferecido no seletor da lista. */
+export interface OpcaoDePapel {
+    valor: string;
+    rotulo: string;
+}
+
+/** O que o seletor de papel oferece. */
+export interface OpcoesDeUsuarios {
+    papeis: OpcaoDePapel[];
+}
+
+/** Um papel na tela de consulta, com as permissões que ele alcança. */
+export interface PapelDaMatriz {
+    nome: string;
+    rotulo: string;
+    permissoes: string[];
+    quantas: number;
+}
+
+/** Uma permissão, com a frase em português que diz o que ela alcança. */
+export interface PermissaoDaMatriz {
+    nome: string;
+    explicacao: string;
 }

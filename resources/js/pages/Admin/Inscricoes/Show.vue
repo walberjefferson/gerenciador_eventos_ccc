@@ -111,7 +111,7 @@ function confirmarPagamento(): void {
                     <dd class="text-sm font-medium">{{ props.inscricao.telefone ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Cidade</dt>
+                    <dt class="text-sm text-muted-foreground">Setor</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.cidade || '—' }}</dd>
                 </div>
                 <div>
@@ -262,7 +262,7 @@ function confirmarPagamento(): void {
                     <select
                         id="metodo-manual"
                         v-model="formularioConfirmacao.metodo"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring w-full"
                     >
                         <option v-for="metodo in props.metodos_manuais" :key="metodo.valor" :value="metodo.valor">{{ metodo.rotulo }}</option>
                     </select>
