@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Inscrições da Caminhada Comunitária com Cristo">
+    <!--
+        O mesmo desenho do AppLogoIcon.vue — prancheta com visto —, aqui sobre
+        o verde da identidade da comunidade (#0F6B4E).
+
+        Fundo cheio, e não ícone solto: na aba do navegador o favicon aparece
+        com 16px sobre um fundo que muda de cor conforme o tema de quem olha, e
+        um traço sem fundo some no claro ou no escuro.
+    -->
+    <rect width="32" height="32" rx="7" fill="#0F6B4E" />
+    <g fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 7h6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+        <path d="M20 8.7h1.6a1.6 1.6 0 0 1 1.6 1.6v12.1a1.6 1.6 0 0 1-1.6 1.6H10.4a1.6 1.6 0 0 1-1.6-1.6V10.3a1.6 1.6 0 0 1 1.6-1.6H12" />
+        <path d="m13.2 17.2 2.2 2.2 4.2-4.8" />
+    </g>
+</svg>
