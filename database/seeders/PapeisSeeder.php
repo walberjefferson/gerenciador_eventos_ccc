@@ -34,7 +34,7 @@ class PapeisSeeder extends Seeder
      */
     public const PERMISSOES = [
         'painel.ver' => 'Abrir o painel com os numeros do evento',
-        'catalogo.gerenciar' => 'Cadastrar cidades e grupos de participantes',
+        'catalogo.gerenciar' => 'Cadastrar setores e grupos de participantes',
         'eventos.gerenciar' => 'Cadastrar evento, dias, grupos, atividades e conflitos',
         'inscricoes.ver' => 'Consultar a lista de inscricoes',
         'inscricoes.exportar' => 'Baixar a lista de inscricoes',

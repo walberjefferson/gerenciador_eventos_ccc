@@ -4,7 +4,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BellRing, CalendarDays, KeyRound, LayoutGrid, ScrollText, Users } from 'lucide-vue-next';
+import { BellRing, CalendarDays, KeyRound, LayoutGrid, MapPin, ScrollText, Users, UsersRound } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -40,6 +40,16 @@ const itensFixos: NavItem[] = [
 const itensDoPainel = computed<NavItem[]>(() => {
     const permissoes = page.props.auth?.permissoes ?? [];
     const itens = [...itensFixos];
+
+    // O catalogo: setores e grupos. As duas telas existiam desde a Fase 6b, com
+    // cadastro, edicao e exclusao completos — mas SEM nenhum link apontando
+    // para elas em lugar nenhum do sistema. Quem administra so chegava la
+    // digitando o endereco, ou seja, na pratica nao chegava: um CRUD que
+    // ninguem alcanca e um CRUD que nao existe.
+    if (permissoes.includes('catalogo.gerenciar')) {
+        itens.push({ title: 'Setores', href: '/admin/catalogo/setores', icon: MapPin });
+        itens.push({ title: 'Grupos', href: '/admin/catalogo/grupos-participantes', icon: UsersRound });
+    }
 
     if (permissoes.includes('auditoria.ver')) {
         itens.push({ title: 'Auditoria', href: '/admin/auditoria', icon: ScrollText });
