@@ -35,7 +35,14 @@ const grupo = computed(() => {
         return null;
     }
 
-    return dados.cidade ? `${dados.nome} — ${dados.cidade}${dados.uf ? ` (${dados.uf})` : ''}` : dados.nome;
+    // "Batalha (Sede) — Setor Batalha", sem a UF.
+    //
+    // Ela saiu do rotulo em todo o resto do sistema quando cidade virou setor:
+    // existia para desambiguar cidades homonimas de estados diferentes, e os
+    // cinco setores sao todos da mesma regiao. Aqui ela tinha ficado para tras,
+    // e a tela de acompanhamento dizia "(AL)" enquanto o formulario, ao lado,
+    // nao dizia — o mesmo dado escrito de dois jeitos na mesma inscricao.
+    return dados.cidade ? `${dados.nome} — ${dados.cidade}` : dados.nome;
 });
 </script>
 
