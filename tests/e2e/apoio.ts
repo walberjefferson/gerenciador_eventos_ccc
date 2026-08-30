@@ -36,7 +36,23 @@ export interface PessoaDeTeste {
     email: string;
     telefone: string;
     cpf: string;
+    /** Em ISO (AAAA-MM-DD), como cada cenario a escreve. */
     nascimento: string;
+}
+
+/**
+ * A data como a TELA a escreve: dd/mm/aaaa.
+ *
+ * O campo de nascimento deixou de ser o seletor nativo do navegador e passou a
+ * ser digitavel, com a mascara do desenho. Os cenarios continuam guardando a
+ * data em ISO — e o formato do dominio, e e ele que aparece nas asseveracoes —
+ * e a conversao mora aqui, num lugar so: mudar o formato da tela nao pode
+ * obrigar a reescrever dezoito arquivos de cenario.
+ */
+export function dataComoNaTela(iso: string): string {
+    const [ano, mes, dia] = iso.split('-');
+
+    return `${dia}/${mes}/${ano}`;
 }
 
 /**
@@ -47,7 +63,7 @@ export async function preencherDadosPessoais(page: Page, pessoa: PessoaDeTeste):
     await page.getByLabel('E-mail').fill(pessoa.email);
     await page.getByLabel('Telefone com DDD').fill(pessoa.telefone);
     await page.getByLabel('CPF').fill(pessoa.cpf);
-    await page.getByLabel('Data de nascimento').fill(pessoa.nascimento);
+    await page.getByLabel('Data de nascimento').fill(dataComoNaTela(pessoa.nascimento));
 
     await escolherNaLista(page, 'Cidade', 'São Paulo (SP)');
     await escolherNaLista(page, 'Grupo', 'Centro');

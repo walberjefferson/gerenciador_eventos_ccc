@@ -113,6 +113,31 @@ function apenasDigitos(valor: string): string {
 }
 
 /**
+ * A data existe mesmo?
+ *
+ * Enquanto o campo de nascimento era um `<input type="date">`, quem impedia
+ * 31/02/2000 era o proprio navegador — nao havia como digitar um dia que nao
+ * existe. Com o campo digitavel do desenho isso deixou de ser verdade, e a
+ * conferencia precisa ser escrita: o mes de fevereiro nao tem 31 dias, e quem
+ * digitou merece ouvir isso aqui em vez de esperar a viagem ate o servidor.
+ */
+function dataExiste(iso: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        return false;
+    }
+
+    const [ano, mes, dia] = iso.split('-').map(Number);
+    const candidata = new Date(Date.UTC(ano, mes - 1, dia));
+
+    // O Date "corrige" 31/02 para 03/03 em silencio. Se o que voltou nao e o
+    // que entrou, a data digitada nao existe no calendario.
+    return candidata.getUTCFullYear() === ano && candidata.getUTCMonth() === mes - 1 && candidata.getUTCDate() === dia;
+}
+
+/** Hoje em ISO — o mesmo teto que o calendario do campo respeita. */
+const hojeEmIso = new Date().toLocaleDateString('sv-SE');
+
+/**
  * Conferencia de formato — a mesma que o StoreInscricaoRequest faz. Nao e
  * regra de negocio: so evita a viagem ate o servidor por um campo vazio.
  *
@@ -128,7 +153,19 @@ const conferidores: Record<string, (dados: FormularioInscricao) => string | null
     email: (dados) => (/^\S+@\S+\.\S+$/.test(dados.email.trim()) ? null : 'Este e-mail parece incompleto. Confira e tente de novo.'),
     telefone: (dados) => (apenasDigitos(dados.telefone).length < 8 ? 'Informe um telefone com DDD para contato.' : null),
     documento: (dados) => (apenasDigitos(dados.documento).length !== 11 ? 'Este CPF não parece válido. Confira os números digitados.' : null),
-    data_nascimento: (dados) => (dados.data_nascimento === '' ? 'Informe a sua data de nascimento.' : null),
+    data_nascimento: (dados) => {
+        if (dados.data_nascimento === '') {
+            return 'Informe a sua data de nascimento.';
+        }
+
+        if (!dataExiste(dados.data_nascimento)) {
+            return 'Esta data não existe. Confira o dia e o mês.';
+        }
+
+        // O mesmo teto que o campo ja aplica no calendario, agora tambem para
+        // quem digita: ninguem nasceu depois de hoje.
+        return dados.data_nascimento > hojeEmIso ? 'A data de nascimento não pode estar no futuro.' : null;
+    },
     cidade_id: (dados) => (dados.cidade_id === null ? 'Escolha a sua cidade.' : null),
     grupo_participante_id: (dados) => (dados.grupo_participante_id === null ? 'Escolha o seu grupo.' : null),
 };
@@ -358,14 +395,29 @@ async function voltar(): Promise<void> {
             <AlertDescription>Tente recarregar a página em alguns instantes. Se o problema continuar, fale com a organização.</AlertDescription>
         </Alert>
 
-        <div v-else class="space-y-6">
-            <div>
-                <p class="text-muted-foreground text-sm">{{ evento.periodo_rotulo }}</p>
-                <h1 class="text-2xl font-semibold">Inscrição — {{ evento.nome }}</h1>
-                <p class="text-muted-foreground mt-1 text-sm">
-                    Valor da inscrição: <strong>{{ formatarValor(evento.valor_centavos, evento.moeda) }}</strong>
-                </p>
-            </div>
+        <div v-else>
+            <!--
+                .crumb — 14px muted, 20px abaixo, com a seta a 7px do nome.
+
+                No lugar do antigo "Inscrição — {nome do evento}" em duas
+                linhas de titulo: o caminho de volta e o nome do evento sao a
+                mesma informacao, e assim ela tambem vira o caminho de volta.
+
+                A linha "Valor da inscrição" SAIU daqui: o valor vive no resumo
+                ao lado (e, no celular, na barra do rodape). Repeti-lo acima do
+                indicador de etapas era o mesmo numero duas vezes na mesma dobra.
+            -->
+            <Link
+                :href="`/eventos/${evento.slug}`"
+                class="text-muted-foreground mb-5 inline-flex min-h-11 items-center gap-[7px] text-sm"
+                data-testid="voltar-ao-evento"
+            >
+                <span aria-hidden="true">&larr;</span>
+                {{ evento.nome }}
+            </Link>
+
+            <!-- 30px, como o titulo da tela de inscricao do prototipo -->
+            <h1 class="text-[30px] leading-tight font-semibold">Inscrição</h1>
 
             <IndicadorDePassos :passo-atual="passo" />
 
@@ -380,8 +432,20 @@ async function voltar(): Promise<void> {
                 Quem faz o papel dele ali e o total na barra do rodape.
             -->
             <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-                <div class="min-w-0 space-y-6">
-                    <h2 ref="tituloDoPasso" tabindex="-1" class="text-xl font-semibold outline-hidden">{{ titulos[passo] }}</h2>
+                <!--
+                    .panel — cartao branco de raio 14px, borda de 1px e sombra
+                    baixa, com 28px de padding (20px abaixo de 640px, como o
+                    prototipo). O formulario deixou de ser campo solto sobre o
+                    papel e passou a viver dentro dele.
+                -->
+                <section class="border-border bg-card min-w-0 rounded-[14px] border p-5 shadow-sm sm:p-[28px]" data-testid="painel-da-etapa">
+                    <!-- .panel h2 — 23px -->
+                    <h2 ref="tituloDoPasso" tabindex="-1" class="text-[23px] font-semibold outline-hidden">{{ titulos[passo] }}</h2>
+
+                    <!-- .panel__n — 15px muted, 8px abaixo do titulo -->
+                    <p v-if="passo === 'dados'" class="text-muted-foreground mt-2 text-[15px]">
+                        Usamos só para organizar o encontro e enviar sua confirmação.
+                    </p>
 
                     <PassoDadosPessoais
                         v-show="passo === 'dados'"
@@ -395,6 +459,7 @@ async function voltar(): Promise<void> {
 
                     <PassoParticipacao
                         v-if="passo === 'participacao'"
+                        class="mt-[26px]"
                         :dias="dias"
                         :selecao="selecao"
                         :mostrar-problemas="mostrarProblemasDaParticipacao"
@@ -402,6 +467,7 @@ async function voltar(): Promise<void> {
 
                     <PassoRevisao
                         v-if="passo === 'revisao'"
+                        class="mt-[26px]"
                         v-model="formulario"
                         :evento="evento"
                         :resumo-pessoal="resumoPessoal"
@@ -413,16 +479,26 @@ async function voltar(): Promise<void> {
                     />
 
                     <!--
-                        A barra de navegacao do formulario.
+                        A barra de navegacao do formulario — o `.actions` do
+                        prototipo: linha de 1px em cima, 30px acima e 24px de
+                        respiro, com a acao principal empurrada para a direita.
 
                         "sticky" no celular: ela acompanha a rolagem sem sair do
                         fluxo, entao o botao esta sempre a um toque de distancia
                         e nunca cobre o campo que esta sendo preenchido. Em tela
                         grande ela volta a ser uma linha comum no fim do
                         formulario, porque ali o botao ja esta visivel.
+
+                        DESVIO CONSCIENTE do desenho: o prototipo poe as acoes
+                        so dentro do painel, e no celular isso esconderia o
+                        Total e o "Continuar" atras de uma rolagem — ali nao ha
+                        resumo lateral para compensar. As margens negativas
+                        levam a barra ate a borda do painel, para ela ser lida
+                        como rodape dele e nao como mais uma caixa.
                     -->
                     <div
-                        class="border-border bg-card/95 sticky bottom-0 z-30 -mx-4 border-t px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:mt-[30px] lg:bg-transparent lg:px-0 lg:pt-6 lg:pb-0 lg:backdrop-blur-none"
+                        class="border-border bg-card/95 sticky bottom-0 z-30 -mx-5 -mb-5 rounded-b-[14px] border-t px-5 py-3 backdrop-blur sm:-mx-[28px] sm:-mb-[28px] sm:px-[28px] lg:static lg:mx-0 lg:mt-[30px] lg:mb-0 lg:rounded-none lg:bg-transparent lg:px-0 lg:pt-6 lg:pb-0 lg:backdrop-blur-none"
+                        data-testid="barra-de-acoes"
                     >
                         <!--
                             No celular: total e acao principal na MESMA linha, e o
@@ -456,19 +532,26 @@ async function voltar(): Promise<void> {
                                 Voltar
                             </Button>
 
-                            <Button v-else as-child variant="ghost" class="h-12 w-full text-base sm:w-auto">
-                                <Link :href="`/eventos/${evento.slug}`">Voltar para o evento</Link>
+                            <!-- .btn--quiet — discreto, a esquerda, com o texto
+                                 do prototipo -->
+                            <Button v-else as-child variant="ghost" class="text-muted-foreground h-12 w-full text-base sm:w-auto">
+                                <Link :href="`/eventos/${evento.slug}`">Voltar ao evento</Link>
                             </Button>
                         </div>
                     </div>
-                </div>
+                </section>
 
+                <!--
+                    O `.summary` do prototipo e `sticky` em `top: 84px` porque
+                    la o cabecalho e fixo e mede 64px. O NOSSO cabecalho rola
+                    junto com a pagina: copiar os 84px abriria um vao de 84
+                    pixels acima do resumo assim que a pessoa rolasse. Os 24px
+                    aqui sao so o respiro do topo da janela.
+                -->
                 <ResumoDaInscricao
                     class="hidden lg:sticky lg:top-6 lg:block"
                     :evento="evento"
                     :atividades-por-dia="atividadesPorDia"
-                    :contato-email="evento.contato_email"
-                    :contato-telefone="evento.contato_telefone"
                     @editar="irPara('participacao')"
                 />
             </div>

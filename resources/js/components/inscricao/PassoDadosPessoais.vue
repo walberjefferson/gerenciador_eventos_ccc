@@ -11,11 +11,13 @@ import { computed } from 'vue';
  * fica ligado ao campo por aria-describedby, para o leitor de tela anunciar o
  * problema junto com o nome do campo.
  *
- * Os campos tem a largura do dado que recebem, e nao a largura da tela. CPF,
- * data de nascimento e telefone tem tamanho conhecido e fixo; uma caixa de 740
- * pixels para onze digitos nao e generosidade, e uma pista errada — ela sugere
- * que cabe mais coisa ali. Nome e e-mail, que variam de verdade, seguem
- * ocupando a linha inteira.
+ * Os sete campos moram numa GRADE UNICA de duas colunas — o `.fields` do
+ * prototipo —, e nao em tres grades empilhadas com larguras proprias. A
+ * largura "do tamanho do dado" que valia aqui antes tinha um custo maior do
+ * que o ganho: CPF e nascimento ficavam encolhidos no meio da linha e a coluna
+ * da direita sumia na altura deles, quebrando o alinhamento do formulario
+ * inteiro. Quem precisa de largura propria e so o nome, que ocupa as duas
+ * colunas.
  */
 const props = defineProps<{
     cidades: CidadePublica[];
@@ -48,7 +50,14 @@ const grupoSelecionado = computed<string>({
     },
 });
 
-const hoje = new Date().toISOString().slice(0, 10);
+/**
+ * O teto do campo de nascimento: hoje, no fuso de quem esta na tela.
+ *
+ * `toLocaleDateString('sv-SE')` devolve AAAA-MM-DD, que e o formato ISO que o
+ * campo troca com o formulario. O `toISOString()` que estava aqui devolvia a
+ * data em UTC: depois das 21h no Brasil, o teto virava o dia seguinte.
+ */
+const hoje = new Date().toLocaleDateString('sv-SE');
 
 function erro(campo: string): string | undefined {
     return props.erros[campo];
@@ -60,8 +69,19 @@ function sair(campo: string): void {
 </script>
 
 <template>
-    <div class="space-y-[18px]">
-        <div class="space-y-[7px]">
+    <!--
+        .fields — uma grade SO, de duas colunas com 18px de intervalo e 26px de
+        topo, virando uma coluna abaixo de 640px.
+
+        Antes eram tres grades empilhadas, e uma delas com `sm:max-w-md`: CPF e
+        nascimento sobravam encolhidos no meio da largura, e a coluna da
+        direita deixava de existir na altura deles. Numa grade unica os sete
+        campos alinham nas mesmas duas colunas, do primeiro ao ultimo.
+    -->
+    <div class="mt-[26px] grid gap-[18px] sm:grid-cols-2">
+        <!-- .f--full — o nome ocupa as duas colunas: e o unico dado sem
+             tamanho previsivel. -->
+        <div class="space-y-[7px] sm:col-span-2">
             <Label for="nome_completo" class="text-[14.5px] font-medium">Nome completo</Label>
             <Input
                 id="nome_completo"
@@ -69,6 +89,7 @@ function sair(campo: string): void {
                 name="nome_completo"
                 type="text"
                 autocomplete="name"
+                placeholder="Como está no documento"
                 class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
                 :aria-invalid="erro('nome_completo') ? 'true' : undefined"
                 :aria-describedby="erro('nome_completo') ? 'erro-nome_completo' : undefined"
@@ -79,139 +100,146 @@ function sair(campo: string): void {
             </p>
         </div>
 
-        <!-- E-mail e telefone lado a lado a partir do tablet: os dois sao "como
-             falamos com voce", e lidos juntos fazem mais sentido do que
-             separados por uma rolagem. -->
-        <div class="grid gap-[18px] sm:grid-cols-2">
-            <div class="space-y-[7px]">
-                <Label for="email" class="text-[14.5px] font-medium">E-mail</Label>
-                <Input
-                    id="email"
-                    v-model="formulario.email"
-                    name="email"
-                    type="email"
-                    autocomplete="email"
-                    inputmode="email"
+        <div class="space-y-[7px]">
+            <Label for="email" class="text-[14.5px] font-medium">E-mail</Label>
+            <Input
+                id="email"
+                v-model="formulario.email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                inputmode="email"
+                placeholder="nome@email.com"
+                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
+                :aria-invalid="erro('email') ? 'true' : undefined"
+                :aria-describedby="erro('email') ? 'erro-email' : 'ajuda-email'"
+                @blur="sair('email')"
+            />
+            <!-- .f__e no LUGAR do .f__n: onde ha erro, a nota de ajuda sai. Duas
+                 frases pequenas embaixo do mesmo campo competem entre si, e a
+                 que precisa ser lida e a do erro. -->
+            <p v-if="erro('email')" id="erro-email" role="alert" class="text-destructive text-[13.5px] font-medium">{{ erro('email') }}</p>
+            <p v-else id="ajuda-email" class="text-muted-foreground text-[13.5px]">Enviamos a confirmação para este endereço.</p>
+        </div>
+
+        <div class="space-y-[7px]">
+            <Label for="telefone" class="text-[14.5px] font-medium">Telefone com DDD</Label>
+            <Input
+                id="telefone"
+                v-model="formulario.telefone"
+                name="telefone"
+                type="tel"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="(00) 00000-0000"
+                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
+                :aria-invalid="erro('telefone') ? 'true' : undefined"
+                :aria-describedby="erro('telefone') ? 'erro-telefone' : 'ajuda-telefone'"
+                @blur="sair('telefone')"
+            />
+            <p v-if="erro('telefone')" id="erro-telefone" role="alert" class="text-destructive text-[13.5px] font-medium">
+                {{ erro('telefone') }}
+            </p>
+            <p v-else id="ajuda-telefone" class="text-muted-foreground text-[13.5px]">Usado só se precisarmos falar com você.</p>
+        </div>
+
+        <div class="space-y-[7px]">
+            <Label for="documento" class="text-[14.5px] font-medium">CPF</Label>
+            <Input
+                id="documento"
+                v-model="formulario.documento"
+                name="documento"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="000.000.000-00"
+                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
+                :aria-invalid="erro('documento') ? 'true' : undefined"
+                :aria-describedby="erro('documento') ? 'erro-documento' : 'ajuda-documento'"
+                @blur="sair('documento')"
+            />
+            <p v-if="erro('documento')" id="erro-documento" role="alert" class="text-destructive text-[13.5px] font-medium">
+                {{ erro('documento') }}
+            </p>
+            <p v-else id="ajuda-documento" class="text-muted-foreground text-[13.5px]">Só os números.</p>
+        </div>
+
+        <div class="space-y-[7px]">
+            <Label for="data_nascimento" class="text-[14.5px] font-medium">Data de nascimento</Label>
+            <DateField
+                id="data_nascimento"
+                v-model="formulario.data_nascimento"
+                name="data_nascimento"
+                :max="hoje"
+                class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
+                :aria-invalid="erro('data_nascimento') ? 'true' : undefined"
+                :aria-describedby="erro('data_nascimento') ? 'erro-data_nascimento' : 'ajuda-data_nascimento'"
+                @blur="sair('data_nascimento')"
+            />
+            <p v-if="erro('data_nascimento')" id="erro-data_nascimento" role="alert" class="text-destructive text-[13.5px] font-medium">
+                {{ erro('data_nascimento') }}
+            </p>
+            <!--
+                EXCECAO DELIBERADA AO DESENHO. O prototipo escreve "Algumas
+                atividades têm idade mínima."; aqui fica "mínima ou máxima"
+                porque o sistema aceita as DUAS regras e recusa a inscricao
+                pelas duas. Escrever so uma faria a tela mentir sobre a propria
+                validacao, e quem fosse recusado por idade maxima nao teria
+                lido nada a respeito.
+            -->
+            <p v-else id="ajuda-data_nascimento" class="text-muted-foreground text-[13.5px]">Algumas atividades têm idade mínima ou máxima.</p>
+        </div>
+
+        <div class="space-y-[7px]">
+            <Label for="cidade_id" class="text-[14.5px] font-medium">Cidade</Label>
+            <Select v-model="cidadeSelecionada">
+                <SelectTrigger
+                    id="cidade_id"
                     class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
-                    :aria-invalid="erro('email') ? 'true' : undefined"
-                    :aria-describedby="erro('email') ? 'erro-email' : 'ajuda-email'"
-                    @blur="sair('email')"
-                />
-                <p id="ajuda-email" class="text-muted-foreground text-[13.5px]">É por ele que enviaremos a confirmação da sua inscrição.</p>
-                <p v-if="erro('email')" id="erro-email" role="alert" class="text-destructive text-[13.5px] font-medium">{{ erro('email') }}</p>
-            </div>
-
-            <div class="space-y-[7px]">
-                <Label for="telefone" class="text-[14.5px] font-medium">Telefone com DDD</Label>
-                <Input
-                    id="telefone"
-                    v-model="formulario.telefone"
-                    name="telefone"
-                    type="tel"
-                    autocomplete="tel"
-                    inputmode="tel"
-                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
-                    :aria-invalid="erro('telefone') ? 'true' : undefined"
-                    :aria-describedby="erro('telefone') ? 'erro-telefone' : undefined"
-                    @blur="sair('telefone')"
-                />
-                <p v-if="erro('telefone')" id="erro-telefone" role="alert" class="text-destructive text-[13.5px] font-medium">
-                    {{ erro('telefone') }}
-                </p>
-            </div>
-        </div>
-
-        <!-- CPF e data de nascimento: dois dados de tamanho fixo. A caixa para
-             de crescer em telas grandes porque onze digitos nao ficam mais
-             legiveis por ocuparem meia tela. -->
-        <div class="grid gap-[18px] sm:max-w-md sm:grid-cols-2">
-            <div class="space-y-[7px]">
-                <Label for="documento" class="text-[14.5px] font-medium">CPF</Label>
-                <Input
-                    id="documento"
-                    v-model="formulario.documento"
-                    name="documento"
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
-                    :aria-invalid="erro('documento') ? 'true' : undefined"
-                    :aria-describedby="erro('documento') ? 'erro-documento' : 'ajuda-documento'"
-                    @blur="sair('documento')"
-                />
-                <p id="ajuda-documento" class="text-muted-foreground text-[13.5px]">Só os números, sem ponto nem traço.</p>
-                <p v-if="erro('documento')" id="erro-documento" role="alert" class="text-destructive text-[13.5px] font-medium">
-                    {{ erro('documento') }}
-                </p>
-            </div>
-
-            <div class="space-y-[7px]">
-                <Label for="data_nascimento" class="text-[14.5px] font-medium">Data de nascimento</Label>
-                <DateField
-                    id="data_nascimento"
-                    v-model="formulario.data_nascimento"
-                    name="data_nascimento"
-                    :max="hoje"
-                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] font-mono text-base tabular-nums"
-                    :aria-invalid="erro('data_nascimento') ? 'true' : undefined"
-                    :aria-describedby="erro('data_nascimento') ? 'erro-data_nascimento' : 'ajuda-data_nascimento'"
-                    @blur="sair('data_nascimento')"
-                />
-                <p id="ajuda-data_nascimento" class="text-muted-foreground text-[13.5px]">Algumas atividades têm idade mínima ou máxima.</p>
-                <p v-if="erro('data_nascimento')" id="erro-data_nascimento" role="alert" class="text-destructive text-[13.5px] font-medium">
-                    {{ erro('data_nascimento') }}
-                </p>
-            </div>
-        </div>
-
-        <div class="grid gap-[18px] sm:grid-cols-2">
-            <div class="space-y-[7px]">
-                <Label for="cidade_id" class="text-[14.5px] font-medium">Cidade</Label>
-                <Select v-model="cidadeSelecionada">
-                    <SelectTrigger
-                        class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
-                        id="cidade_id"
-                        :aria-invalid="erro('cidade_id') ? 'true' : undefined"
-                        :aria-describedby="erro('cidade_id') ? 'erro-cidade_id' : undefined"
-                    >
-                        <SelectValue placeholder="Escolha a sua cidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="cidade in cidades" :key="cidade.id" :value="String(cidade.id)">{{ cidade.rotulo }}</SelectItem>
-                    </SelectContent>
-                </Select>
-                <p v-if="erro('cidade_id')" id="erro-cidade_id" role="alert" class="text-destructive text-[13.5px] font-medium">
-                    {{ erro('cidade_id') }}
-                </p>
-            </div>
-
-            <div class="space-y-[7px]">
-                <Label for="grupo_participante_id" class="text-[14.5px] font-medium">Grupo</Label>
-                <Select v-model="grupoSelecionado" :disabled="formulario.cidade_id === null || gruposDaCidade.length === 0">
-                    <SelectTrigger
-                        class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
-                        id="grupo_participante_id"
-                        :aria-invalid="erro('grupo_participante_id') ? 'true' : undefined"
-                        :aria-describedby="erro('grupo_participante_id') ? 'erro-grupo_participante_id' : 'ajuda-grupo'"
-                    >
-                        <SelectValue placeholder="Escolha o seu grupo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="grupo in gruposDaCidade" :key="grupo.id" :value="String(grupo.id)">{{ grupo.nome }}</SelectItem>
-                    </SelectContent>
-                </Select>
-                <p id="ajuda-grupo" class="text-muted-foreground text-[13.5px]">
-                    {{ avisoSemGrupos ?? 'A lista mostra apenas os grupos da cidade que você escolheu.' }}
-                </p>
-                <p
-                    v-if="erro('grupo_participante_id')"
-                    id="erro-grupo_participante_id"
-                    role="alert"
-                    class="text-destructive text-[13.5px] font-medium"
+                    :aria-invalid="erro('cidade_id') ? 'true' : undefined"
+                    :aria-describedby="erro('cidade_id') ? 'erro-cidade_id' : undefined"
                 >
-                    {{ erro('grupo_participante_id') }}
-                </p>
-            </div>
+                    <SelectValue placeholder="Escolha a sua cidade" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="cidade in cidades" :key="cidade.id" :value="String(cidade.id)">{{ cidade.rotulo }}</SelectItem>
+                </SelectContent>
+            </Select>
+            <p v-if="erro('cidade_id')" id="erro-cidade_id" role="alert" class="text-destructive text-[13.5px] font-medium">
+                {{ erro('cidade_id') }}
+            </p>
+        </div>
+
+        <div class="space-y-[7px]">
+            <Label for="grupo_participante_id" class="text-[14.5px] font-medium">Grupo</Label>
+            <Select v-model="grupoSelecionado" :disabled="formulario.cidade_id === null || gruposDaCidade.length === 0">
+                <SelectTrigger
+                    id="grupo_participante_id"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
+                    :aria-invalid="erro('grupo_participante_id') ? 'true' : undefined"
+                    :aria-describedby="erro('grupo_participante_id') ? 'erro-grupo_participante_id' : 'ajuda-grupo'"
+                >
+                    <!-- O texto de espera diz o que fazer ANTES, e nao so o que
+                         escolher: sem cidade a lista esta vazia, e "Escolha o
+                         seu grupo" seria um convite para um campo que nao
+                         responde. -->
+                    <SelectValue :placeholder="formulario.cidade_id === null ? 'Escolha a cidade primeiro' : 'Escolha o seu grupo'" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="grupo in gruposDaCidade" :key="grupo.id" :value="String(grupo.id)">{{ grupo.nome }}</SelectItem>
+                </SelectContent>
+            </Select>
+            <p
+                v-if="erro('grupo_participante_id')"
+                id="erro-grupo_participante_id"
+                role="alert"
+                class="text-destructive text-[13.5px] font-medium"
+            >
+                {{ erro('grupo_participante_id') }}
+            </p>
+            <p v-else id="ajuda-grupo" class="text-muted-foreground text-[13.5px]">
+                {{ avisoSemGrupos ?? 'A lista mostra os grupos da cidade escolhida.' }}
+            </p>
         </div>
     </div>
 </template>

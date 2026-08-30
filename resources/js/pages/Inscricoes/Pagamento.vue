@@ -149,8 +149,15 @@ const passosDoPagamento = computed<string[]>(() => [
 
             <!-- ESTADO 1: aguardando pagamento -->
             <template v-if="estado === 'aguardando'">
-                <Card data-testid="cobranca-aguardando">
-                    <CardHeader class="pb-2">
+                <!--
+                    A MESMA moldura das etapas do formulario — o `.panel` do
+                    prototipo: 28px de padding (20px no celular), raio de 14px
+                    e a sombra baixa da identidade. O `rounded-lg` do cartao ja
+                    e esse raio no tema publico; o que faltava era o respiro e
+                    a sombra. Nada do que esta dentro mudou.
+                -->
+                <Card class="p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-aguardando">
+                    <CardHeader class="p-0 pb-2">
                         <CardTitle class="text-muted-foreground text-base font-medium">Valor a pagar</CardTitle>
                         <!-- .pix__val — a familia dos titulos, como todo preco desta identidade -->
                         <p class="font-titulo text-[34px] leading-none font-semibold tracking-[-0.03em] tabular-nums" data-testid="valor-da-cobranca">
@@ -158,7 +165,7 @@ const passosDoPagamento = computed<string[]>(() => [
                         </p>
                     </CardHeader>
 
-                    <CardContent class="space-y-6">
+                    <CardContent class="space-y-6 p-0">
                         <ContadorRegressivo :prazo="prazo" @expirou="consultarSituacao" />
 
                         <QrCodePix :svg="props.pagamento?.qr_code_svg ?? null" />
@@ -222,8 +229,8 @@ const passosDoPagamento = computed<string[]>(() => [
 
             <!-- ESTADO 2: pagamento reconhecido pelo domínio -->
             <template v-else-if="estado === 'confirmada'">
-                <Card class="border-sucesso/40" data-testid="cobranca-confirmada">
-                    <CardContent class="space-y-4 pt-6">
+                <Card class="border-sucesso/40 p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-confirmada">
+                    <CardContent class="space-y-4 p-0">
                         <div class="flex items-start gap-3">
                             <span class="bg-sucesso text-sucesso-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
                                 <CheckCircle2 class="size-6" aria-hidden="true" />
@@ -269,8 +276,8 @@ const passosDoPagamento = computed<string[]>(() => [
 
             <!-- ESTADO 3: prazo vencido -->
             <template v-else>
-                <Card data-testid="cobranca-expirada">
-                    <CardContent class="space-y-4 pt-6">
+                <Card class="p-5 shadow-sm sm:p-[28px]" data-testid="cobranca-expirada">
+                    <CardContent class="space-y-4 p-0">
                         <div class="flex items-start gap-3">
                             <span class="bg-muted text-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
                                 <CircleAlert class="size-6" aria-hidden="true" />

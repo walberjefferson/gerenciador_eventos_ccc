@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Toaster } from '@/components/ui/toast';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 /**
@@ -38,6 +39,29 @@ const props = withDefaults(
 const larguraDaColuna = computed<string>(() => (props.largura === 'ampla' ? 'max-w-5xl' : 'max-w-3xl'));
 
 const anoAtual = new Date().getFullYear();
+
+/**
+ * A navegacao do cabecalho — o `.top__nav` do prototipo.
+ *
+ * Sao os dois caminhos que alguem procura de fora de uma tela: a agenda, para
+ * ver o que existe, e a propria inscricao, para quem ja se inscreveu e perdeu
+ * o link. Ate aqui o segundo so aparecia na home, e quem chegasse por um link
+ * direto do WhatsApp nao tinha como voltar a ele.
+ *
+ * O monograma do prototipo NAO entra: marca e assunto de quem conduz a
+ * comunidade, e nao desta tela (DA-37).
+ */
+const caminhoAtual = computed<string>(() => {
+    const endereco = usePage().url;
+
+    // O `url` do Inertia ja vem sem dominio, mas pode trazer a consulta.
+    return endereco.split('?')[0];
+});
+
+const links: Array<{ rotulo: string; destino: string; atual: (caminho: string) => boolean }> = [
+    { rotulo: 'Agenda', destino: route('home'), atual: (caminho) => caminho === '/' },
+    { rotulo: 'Minha inscrição', destino: route('inscricoes.acesso'), atual: (caminho) => caminho.startsWith('/acesso') },
+];
 </script>
 
 <template>
@@ -50,7 +74,7 @@ const anoAtual = new Date().getFullYear();
         </a>
 
         <header class="border-border bg-card border-b">
-            <div :class="['mx-auto flex w-full items-center gap-3 px-4 py-3', larguraDaColuna]">
+            <div :class="['mx-auto flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3', larguraDaColuna]">
                 <img
                     src="/img/logo-ccc.png"
                     width="1937"
@@ -60,10 +84,33 @@ const anoAtual = new Date().getFullYear();
                     decoding="async"
                 />
 
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                     <p class="truncate text-sm leading-tight font-semibold sm:text-base">Caminhada Comunitária com Cristo</p>
                     <p class="text-muted-foreground truncate text-xs">Inscrições da comunidade</p>
                 </div>
+
+                <!--
+                    .top__nav — 8px entre os links, encostada a direita.
+
+                    No celular ela desce para uma segunda linha inteira, em vez
+                    de espremer o nome da comunidade ao lado dela: a 320px os
+                    dois nao cabem na mesma faixa sem que um dos dois vire
+                    reticencias.
+                -->
+                <nav aria-label="Navegação do site" class="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
+                    <!-- .top__link — 14px, muted, padding 8/12 e raio de pilula.
+                         A altura minima e nossa: o desenho deixa o link com 33px
+                         de altura, abaixo dos 44px de alvo de toque (DA-42). -->
+                    <Link
+                        v-for="link in links"
+                        :key="link.rotulo"
+                        :href="link.destino"
+                        :aria-current="link.atual(caminhoAtual) ? 'page' : undefined"
+                        class="text-muted-foreground hover:bg-secondary hover:text-foreground aria-[current=page]:text-foreground aria-[current=page]:bg-secondary inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium"
+                    >
+                        {{ link.rotulo }}
+                    </Link>
+                </nav>
             </div>
         </header>
 
