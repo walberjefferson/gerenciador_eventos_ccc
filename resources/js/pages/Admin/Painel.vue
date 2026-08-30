@@ -138,7 +138,7 @@ function haQuantoTempo(minutos: number | null): string {
                 <select
                     id="seletor-de-evento"
                     v-model.number="eventoSelecionado"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full"
                     @change="trocarEvento"
                 >
                     <option v-for="item in props.eventos" :key="item.id" :value="item.id">{{ item.nome }} — {{ item.situacao_rotulo }}</option>

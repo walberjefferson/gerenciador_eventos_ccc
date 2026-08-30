@@ -262,7 +262,7 @@ function confirmarPagamento(): void {
                     <select
                         id="metodo-manual"
                         v-model="formularioConfirmacao.metodo"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring w-full"
                     >
                         <option v-for="metodo in props.metodos_manuais" :key="metodo.valor" :value="metodo.valor">{{ metodo.rotulo }}</option>
                     </select>
