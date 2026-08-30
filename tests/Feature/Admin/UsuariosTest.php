@@ -237,12 +237,19 @@ describe('a lista', function (): void {
             ->and($comFiltro(['busca' => 'ninguem']))->toHaveCount(0);
     });
 
-    it('nao oferece rota para criar nem para excluir conta', function (): void {
-        // Conta administrativa nasce por comando (D-51) e nao se apaga: a
-        // auditoria guarda `usuario_id`. Se um dia alguem acrescentar uma
-        // dessas rotas, este teste avisa.
-        expect(Route::getRoutes()->getByName('admin.usuarios.store'))->toBeNull()
-            ->and(Route::getRoutes()->getByName('admin.usuarios.destroy'))->toBeNull();
+    it('nao oferece rota para excluir conta', function (): void {
+        // Usuario NAO SE APAGA: a auditoria guarda `usuario_id`, e excluir
+        // deixaria o historico apontando para o vazio — o rastro que a Fase 9
+        // existiu para tornar inapagavel. Quem sai da equipe e desativado.
+        //
+        // Este teste ja afirmou tambem que `store` nao existia, quando conta so
+        // nascia por comando (D-51). O dono do produto reverteu ESSA metade, e
+        // a asserção foi INVERTIDA em vez de apagada: agora ela cobra que a
+        // rota de cadastro exista. Apagar a linha deixaria o arquivo mudo sobre
+        // uma decisao que mudou; inverte-la mantem a decisao vigiada nos dois
+        // sentidos — a mesma escolha feita com o RegistrationTest na D-51.
+        expect(Route::getRoutes()->getByName('admin.usuarios.destroy'))->toBeNull()
+            ->and(Route::getRoutes()->getByName('admin.usuarios.store'))->not->toBeNull();
     });
 });
 

@@ -199,15 +199,34 @@ Route::middleware(['auth', 'verified'])
         // cobrava: ela nasceu junto com o papel de administrador e ficou orfa
         // enquanto promover alguem so acontecia por comando no servidor.
         //
-        // NAO HA ROTA DE CADASTRO NEM DE EXCLUSAO, e as duas ausencias sao
-        // decisao: conta administrativa nasce por
-        // `php artisan usuario:criar-administrador` (D-51), e usuario nao se
-        // apaga, porque a auditoria guarda `usuario_id`.
+        // O CADASTRO PELA TELA EXISTE desde que o dono do produto reverteu a
+        // D-51 nesta parte: quem responde pelo sistema passou a cadastrar a
+        // equipe sem depender de alguem com acesso ao container. O comando
+        // `php artisan usuario:criar-administrador` CONTINUA, e continua sendo
+        // o unico caminho para a PRIMEIRA conta — sem ninguem cadastrado, nao
+        // ha quem abra esta tela.
+        //
+        // NAO HA ROTA DE EXCLUSAO, e a ausencia e decisao: usuario nao se
+        // apaga, porque a auditoria guarda `usuario_id` e apagar deixaria o
+        // rastro apontando para o vazio. Quem sai da equipe e DESATIVADO.
         Route::middleware('permission:usuarios.gerenciar')
             ->prefix('usuarios')
             ->name('usuarios.')
             ->group(function (): void {
                 Route::get('/', [UsuarioController::class, 'index'])->name('index');
+
+                Route::post('/', [UsuarioController::class, 'store'])->name('store');
+
+                // Nome, e-mail, papel e — se vier preenchida — a senha, no
+                // mesmo envio. O papel continua passando pela mesma trava da
+                // rota dedicada abaixo: ele nao entra por uma porta mais fraca
+                // so por estar num formulario maior.
+                Route::put('{usuario}', [UsuarioController::class, 'update'])->name('update');
+
+                // O caminho preferido para "nao consigo entrar": manda o link
+                // de redefinicao sem que ninguem chegue a saber a senha alheia.
+                Route::post('{usuario}/redefinir-senha', [UsuarioController::class, 'enviarRedefinicao'])
+                    ->name('redefinir-senha');
 
                 Route::put('{usuario}/papel', [UsuarioController::class, 'atualizarPapel'])->name('papel');
 

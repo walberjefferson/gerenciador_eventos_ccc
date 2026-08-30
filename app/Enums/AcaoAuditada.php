@@ -40,6 +40,22 @@ enum AcaoAuditada: string
     case MudouSituacaoDoUsuario = 'mudou-situacao-do-usuario';
 
     /**
+     * Nome e e-mail de uma conta administrativa mudaram.
+     *
+     * E sensivel porque o e-mail E O LOGIN: mudar o e-mail de uma conta muda
+     * por onde ela entra. Quem revisa o sistema depois precisa ver isso.
+     */
+    case AlterouDadosDoUsuario = 'alterou-dados-do-usuario';
+
+    /**
+     * A senha de uma conta foi redefinida por outra pessoa.
+     *
+     * O registro guarda QUE aconteceu e por qual caminho — link enviado ou
+     * senha definida na hora —, nunca a senha nem o hash dela.
+     */
+    case RedefiniuSenhaDeUsuario = 'redefiniu-senha-de-usuario';
+
+    /**
      * Mexer na credencial do provedor de pagamento — ou trocar qual ambiente
      * esta valendo.
      *
@@ -60,6 +76,8 @@ enum AcaoAuditada: string
             self::PromoveuUsuario => 'Mudou o papel de um usuário',
             self::CriouUsuarioAdministrativo => 'Criou conta administrativa',
             self::MudouSituacaoDoUsuario => 'Ativou ou desativou uma conta',
+            self::AlterouDadosDoUsuario => 'Alterou o nome ou o e-mail de uma conta',
+            self::RedefiniuSenhaDeUsuario => 'Redefiniu a senha de uma conta',
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
         };
     }
@@ -78,6 +96,8 @@ enum AcaoAuditada: string
             self::PromoveuUsuario,
             self::CriouUsuarioAdministrativo,
             self::MudouSituacaoDoUsuario,
+            self::AlterouDadosDoUsuario,
+            self::RedefiniuSenhaDeUsuario,
             self::AlterouCredencialPagamento,
         ];
     }

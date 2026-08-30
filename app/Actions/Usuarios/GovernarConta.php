@@ -10,6 +10,9 @@ use App\Services\Auditoria\RegistrarAcao;
 use Database\Seeders\PapeisSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 /**
  * Quem entra no painel, com que papel, e ate quando.
@@ -206,5 +209,152 @@ class GovernarConta
                     PapeisSeeder::PAPEL_ADMINISTRADOR,
                 ),
             );
+    }
+
+    /**
+     * Cria uma conta administrativa pela tela.
+     *
+     * Ate aqui a conta so nascia por `usuario:criar-administrador`, dentro do
+     * container (D-51). O dono do produto reverteu essa decisao: quem responde
+     * pelo sistema passa a cadastrar a equipe sem depender de alguem com acesso
+     * ao servidor. O COMANDO CONTINUA EXISTINDO, e continua sendo o unico
+     * caminho para a PRIMEIRA conta — quando ainda nao ha ninguem para abrir a
+     * tela, nao ha tela.
+     *
+     * O e-mail e verificado na hora: quem cadastra a conta esta dizendo, com o
+     * proprio acesso, que aquela pessoa e da equipe. Exigir que ela confirme o
+     * e-mail depois so a impediria de entrar sem provar nada a mais.
+     *
+     * @param  array{name: string, email: string, password: string, papel: string}  $dados
+     */
+    public function criar(array $dados, User $responsavel): User
+    {
+        return DB::transaction(function () use ($dados, $responsavel): User {
+            $usuario = new User;
+
+            // `ativo` e `email_verified_at` ficam FORA do `$fillable` de
+            // proposito — quem entra no sistema nao e campo de formulario que
+            // se preenche em massa (ver o comentario no proprio Model). Por
+            // isso os tres primeiros vao por `fill` e os dois de acesso, por
+            // `forceFill`: a intencao de conceder acesso fica explicita aqui,
+            // em vez de escondida numa lista de campos preenchiveis.
+            $usuario->fill([
+                'name' => $dados['name'],
+                'email' => $dados['email'],
+                'password' => Hash::make($dados['password']),
+            ]);
+
+            // O e-mail nasce confirmado: quem cadastrou a conta esta dizendo,
+            // com o proprio acesso, que aquela pessoa e da equipe. Sem isto ela
+            // cairia na exigencia de e-mail verificado do grupo /admin e nao
+            // entraria em lugar nenhum, sem o sistema explicar por que.
+            $usuario->forceFill(['email_verified_at' => now(), 'ativo' => true])->save();
+
+            $usuario->assignRole($dados['papel']);
+
+            // O mesmo formato que o comando ja usava (CriarAdministrador:96):
+            // e-mail e papel entram, a senha nao existe para a auditoria.
+            $this->registrarAcao->__invoke(
+                AcaoAuditada::CriouUsuarioAdministrativo,
+                'usuario',
+                (int) $usuario->getKey(),
+                ['email' => $usuario->email, 'papel' => $dados['papel'], 'origem' => 'tela'],
+                responsavel: $responsavel,
+            );
+
+            return $usuario;
+        });
+    }
+
+    /**
+     * Corrige nome e e-mail de uma conta.
+     *
+     * Vale inclusive para a PROPRIA conta de quem esta mexendo — diferente do
+     * papel e da situacao, corrigir o proprio nome nao tranca ninguem para fora.
+     *
+     * O e-mail e o login: trocar o e-mail de uma conta muda por onde ela entra,
+     * e por isso a acao e sensivel e o antes/depois fica gravado.
+     *
+     * @return string|null sempre null hoje; a assinatura ja devolve recusa para
+     *                     o dia em que houver uma, como as outras desta classe
+     */
+    public function atualizarDados(User $usuario, string $nome, string $email, User $responsavel): ?string
+    {
+        $antes = ['name' => $usuario->name, 'email' => $usuario->email];
+
+        if ($antes['name'] === $nome && $antes['email'] === $email) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($usuario, $nome, $email, $antes, $responsavel): ?string {
+            $usuario->forceFill(['name' => $nome, 'email' => $email])->save();
+
+            $this->registrarAcao->__invoke(
+                AcaoAuditada::AlterouDadosDoUsuario,
+                'usuario',
+                (int) $usuario->getKey(),
+                [
+                    'nome' => ['antes' => $antes['name'], 'depois' => $nome],
+                    'email' => ['antes' => $antes['email'], 'depois' => $email],
+                ],
+                responsavel: $responsavel,
+            );
+
+            return null;
+        });
+    }
+
+    /**
+     * Define a senha de outra conta, na hora.
+     *
+     * DECISAO DO DONO DO PRODUTO, tomada com a ressalva a vista: a partir daqui
+     * existe um momento em que duas pessoas conhecem a mesma senha, e o rastro
+     * da auditoria — que diz "fulano fez" — passa a depender de fulano trocar
+     * essa senha depois. O caminho recomendado continua sendo o link de
+     * redefinicao (`enviarRedefinicaoDeSenha`), em que ninguem alem da propria
+     * pessoa chega a saber a senha.
+     *
+     * As sessoes abertas da conta CAEM: `setRememberToken` novo invalida o
+     * "lembrar-me", e a senha trocada invalida a sessao pelo hash que o Laravel
+     * guarda nela. Senha redefinida com a sessao antiga viva seria uma troca
+     * que nao troca nada.
+     */
+    public function definirSenha(User $usuario, string $senha, User $responsavel): void
+    {
+        DB::transaction(function () use ($usuario, $senha, $responsavel): void {
+            $usuario->forceFill([
+                'password' => Hash::make($senha),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            // A senha NAO entra na auditoria — nem ela, nem o hash. O que fica
+            // registrado e que a redefinicao aconteceu e por qual caminho.
+            $this->registrarAcao->__invoke(
+                AcaoAuditada::RedefiniuSenhaDeUsuario,
+                'usuario',
+                (int) $usuario->getKey(),
+                ['email' => $usuario->email, 'caminho' => 'senha definida na tela'],
+                responsavel: $responsavel,
+            );
+        });
+    }
+
+    /**
+     * Manda para a pessoa o e-mail de redefinicao que o Laravel ja tem.
+     *
+     * E o caminho preferido: quem administra resolve o "nao consigo entrar" sem
+     * chegar a saber a senha de ninguem.
+     */
+    public function enviarRedefinicaoDeSenha(User $usuario, User $responsavel): void
+    {
+        Password::sendResetLink(['email' => $usuario->email]);
+
+        $this->registrarAcao->__invoke(
+            AcaoAuditada::RedefiniuSenhaDeUsuario,
+            'usuario',
+            (int) $usuario->getKey(),
+            ['email' => $usuario->email, 'caminho' => 'link enviado por e-mail'],
+            responsavel: $responsavel,
+        );
     }
 }

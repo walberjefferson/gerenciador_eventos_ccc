@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Usuarios\GovernarConta;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioPapelRequest;
+use App\Http\Requests\Admin\UsuarioRequest;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -107,6 +108,91 @@ class UsuarioController extends Controller
             'sucesso',
             sprintf('%s foi %s.', $usuario->name, $ativo ? 'reativado e volta a entrar' : 'desativado e não entra mais'),
         );
+    }
+
+    /**
+     * Cadastra uma conta administrativa.
+     *
+     * Ate aqui a conta so nascia por comando, dentro do container (D-51). O
+     * dono do produto reverteu: quem responde pelo sistema cadastra a equipe
+     * sozinho. O COMANDO CONTINUA sendo o unico caminho para a PRIMEIRA conta —
+     * sem ninguem cadastrado nao ha quem abra esta tela.
+     */
+    public function store(UsuarioRequest $pedido): RedirectResponse
+    {
+        $this->conferirPermissao($pedido);
+
+        $usuario = $this->governarConta->criar([
+            'name' => (string) $pedido->string('name'),
+            'email' => (string) $pedido->string('email'),
+            'password' => (string) $pedido->string('password'),
+            'papel' => (string) $pedido->string('papel'),
+        ], $this->responsavel($pedido));
+
+        return back()->with('sucesso', sprintf('Conta criada para %s. Ela já pode entrar.', $usuario->name));
+    }
+
+    /**
+     * Corrige nome, e-mail e — quando vier preenchida — a senha.
+     *
+     * Diferente do papel e da situacao, isto vale para a PROPRIA conta: corrigir
+     * o proprio nome nao tranca ninguem para fora. O papel, porem, continua
+     * passando pela trava de sempre, inclusive aqui.
+     */
+    public function update(UsuarioRequest $pedido, User $usuario): RedirectResponse
+    {
+        $this->conferirPermissao($pedido);
+
+        $responsavel = $this->responsavel($pedido);
+
+        $this->governarConta->atualizarDados(
+            $usuario,
+            (string) $pedido->string('name'),
+            (string) $pedido->string('email'),
+            $responsavel,
+        );
+
+        // O papel viaja no mesmo formulario, mas NAO desvia da trava: e a mesma
+        // `trocarPapel` das outras chamadas, com as mesmas recusas.
+        //
+        // So que ela so e chamada quando o papel MUDOU. Sem esta conferencia,
+        // corrigir o proprio nome seria recusado — `trocarPapel` barra "mexer
+        // em si mesmo" antes de olhar se havia algo para mudar, e a pessoa
+        // levaria um erro de papel por ter trocado uma letra do nome.
+        $papelPedido = (string) $pedido->string('papel');
+        $recusa = $papelPedido === $usuario->getRoleNames()->first()
+            ? null
+            : $this->governarConta->trocarPapel($usuario, $papelPedido, $responsavel);
+
+        $senha = (string) $pedido->string('password');
+
+        if ($senha !== '') {
+            $this->governarConta->definirSenha($usuario, $senha, $responsavel);
+        }
+
+        if ($recusa !== null) {
+            // Nome e e-mail foram salvos; so o papel nao. Dizer isso e melhor
+            // que devolver um erro seco que faria a pessoa achar que perdeu
+            // tudo o que digitou.
+            return back()->withErrors(['papel' => $recusa]);
+        }
+
+        return back()->with('sucesso', sprintf('Os dados de %s foram atualizados.', $usuario->name));
+    }
+
+    /**
+     * Manda o e-mail de redefinicao de senha que o Laravel ja tem.
+     *
+     * E o caminho preferido para "nao consigo entrar": resolve sem que quem
+     * administra chegue a saber a senha de ninguem.
+     */
+    public function enviarRedefinicao(Request $pedido, User $usuario): RedirectResponse
+    {
+        $this->conferirPermissao($pedido);
+
+        $this->governarConta->enviarRedefinicaoDeSenha($usuario, $this->responsavel($pedido));
+
+        return back()->with('sucesso', sprintf('Enviamos para %s um link para definir a senha.', $usuario->email));
     }
 
     /**

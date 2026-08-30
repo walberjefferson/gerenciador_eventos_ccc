@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { FiltrosDeUsuarios, OpcoesDeUsuarios, PaginaDeUsuarios, UsuarioAdministrativo } from '@/types/admin';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 
 /**
  * Quem entra no painel, com que papel, e até quando.
  *
- * **Esta tela governa contas; ela não as cria.** Não há botão de "nova conta":
- * conta administrativa nasce por `php artisan usuario:criar-administrador`,
- * rodado por quem já tem acesso ao servidor (D-51). E não há botão de excluir:
- * a auditoria guarda `usuario_id`, e apagar deixaria o histórico apontando
- * para o vazio.
+ * **Esta tela cadastra, edita e governa contas.** O cadastro pela tela entrou
+ * depois, quando o dono do produto reverteu essa parte da D-51: quem responde
+ * pelo sistema passou a montar a equipe sem depender de alguém com acesso ao
+ * container. O comando `usuario:criar-administrador` continua existindo, e
+ * continua sendo o único caminho para a PRIMEIRA conta — sem ninguém
+ * cadastrado, não há quem abra esta tela.
+ *
+ * **Não há botão de excluir**, e a ausência é decisão: a auditoria guarda
+ * `usuario_id`, e apagar deixaria o histórico apontando para o vazio. Quem sai
+ * da equipe é desativado.
  *
  * Duas decisões de desenho valem ser lidas antes de mexer aqui:
  *
@@ -32,6 +38,87 @@ const props = defineProps<{
 }>();
 
 const campos = reactive<FiltrosDeUsuarios>({ ...props.filtros });
+
+/**
+ * O cadastro e a edição moram num MODAL, como no catálogo e na programação: o
+ * formulário é eventual, a lista é o que se olha sempre.
+ *
+ * `emEdicao` guarda quem está sendo editado — nulo quer dizer conta nova. É ele
+ * que decide o título, o texto do botão e se a senha é obrigatória.
+ */
+const modalAberto = ref(false);
+const emEdicao = ref<UsuarioAdministrativo | null>(null);
+
+const formulario = useForm({
+    name: '',
+    email: '',
+    papel: props.opcoes.papeis[0]?.valor ?? '',
+    password: '',
+    password_confirmation: '',
+});
+
+function abrirCadastro(): void {
+    emEdicao.value = null;
+    formulario.clearErrors();
+    formulario.reset();
+    modalAberto.value = true;
+}
+
+function abrirEdicao(usuario: UsuarioAdministrativo): void {
+    emEdicao.value = usuario;
+    formulario.clearErrors();
+    formulario.name = usuario.nome;
+    formulario.email = usuario.email;
+    formulario.papel = usuario.papel ?? props.opcoes.papeis[0]?.valor ?? '';
+    // A senha nasce vazia na edição de propósito: em branco, ela não é tocada.
+    // Preencher aqui obrigaria a inventar uma senha nova para corrigir um nome.
+    formulario.password = '';
+    formulario.password_confirmation = '';
+    modalAberto.value = true;
+}
+
+/** Fechar desfaz o que estava sendo digitado: quem fechou desistiu. */
+function aoTrocarAbertura(aberto: boolean): void {
+    modalAberto.value = aberto;
+
+    if (!aberto) {
+        emEdicao.value = null;
+        formulario.clearErrors();
+        formulario.reset();
+    }
+}
+
+function gravar(): void {
+    const opcoes = {
+        preserveScroll: true,
+        // O modal só fecha quando o servidor ACEITA. Recusado — e-mail
+        // repetido, senhas diferentes, papel que deixaria o sistema sem
+        // administrador —, ele fica aberto com a mensagem ao lado do campo.
+        onSuccess: () => aoTrocarAbertura(false),
+    };
+
+    if (emEdicao.value === null) {
+        formulario.post(route('admin.usuarios.store'), opcoes);
+
+        return;
+    }
+
+    formulario.put(route('admin.usuarios.update', { usuario: emEdicao.value.id }), opcoes);
+}
+
+/**
+ * Manda o link de redefinição. É o caminho preferido para "não consigo entrar":
+ * resolve sem que quem administra chegue a saber a senha de ninguém.
+ */
+function enviarRedefinicao(usuario: UsuarioAdministrativo): void {
+    emAndamento.value = usuario.id;
+
+    router.post(
+        route('admin.usuarios.redefinir-senha', { usuario: usuario.id }),
+        {},
+        { preserveScroll: true, onFinish: () => (emAndamento.value = null) },
+    );
+}
 
 /** Qual linha está com a pergunta "desativar mesmo?" aberta. */
 const confirmandoDesativacao = ref<number | null>(null);
@@ -143,15 +230,31 @@ function rotuloDoPapel(papel: string | null): string {
 <template>
     <AdminLayout
         titulo="Usuários"
-        descricao="Quem entra no painel, com que papel, e até quando. As contas nascem pela linha de comando e não são excluídas: quem sai da organização é desativado, e o histórico do que essa pessoa fez continua de pé."
+        descricao="Quem entra no painel, com que papel, e até quando. Contas não são excluídas: quem sai da organização é desativado, e o histórico do que essa pessoa fez continua de pé."
     >
         <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
             {{ props.sucesso }}
         </p>
 
-        <p v-if="erro" role="alert" data-testid="usuarios-recusa" class="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-4 py-2 text-sm">
+        <p
+            v-if="erro"
+            role="alert"
+            data-testid="usuarios-recusa"
+            class="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-4 py-2 text-sm"
+        >
             {{ erro }}
         </p>
+
+        <div>
+            <button
+                type="button"
+                data-testid="nova-conta"
+                class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
+                @click="abrirCadastro"
+            >
+                Nova conta
+            </button>
+        </div>
 
         <PainelDeFiltros id="filtros-usuarios" :ativos="filtrosAtivos">
             <form aria-labelledby="titulo-filtros-usuarios" class="grid gap-4" @submit.prevent="aplicar">
@@ -285,12 +388,51 @@ function rotuloDoPapel(papel: string | null): string {
                             <!-- A própria linha não oferece ação nenhuma, e o
                                  motivo fica escrito: sem ele, o espaço vazio
                                  pareceria defeito. -->
-                            <p v-if="usuario.sou_eu" class="text-muted-foreground max-w-xs text-sm">
-                                Esta é a sua conta. Ninguém muda o próprio papel nem desativa a si mesmo — peça a outra pessoa com acesso de
-                                administrador.
-                            </p>
+                            <div v-if="usuario.sou_eu" class="flex flex-wrap items-center gap-2">
+                                <!-- Editar a PRÓPRIA conta é permitido: corrigir
+                                     o próprio nome ou e-mail não tranca ninguém
+                                     para fora. O que continua barrado é mudar o
+                                     próprio papel e desativar a si mesmo, e o
+                                     motivo fica escrito — espaço vazio sem
+                                     explicação pareceria defeito. -->
+                                <button
+                                    type="button"
+                                    :data-testid="`editar-${usuario.id}`"
+                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                    @click="abrirEdicao(usuario)"
+                                >
+                                    Editar
+                                </button>
+
+                                <p class="text-muted-foreground max-w-xs text-sm">
+                                    Esta é a sua conta. Ninguém muda o próprio papel nem desativa a si mesmo — peça a outra pessoa com acesso de
+                                    administrador.
+                                </p>
+                            </div>
 
                             <div v-else class="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    :data-testid="`editar-${usuario.id}`"
+                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                    @click="abrirEdicao(usuario)"
+                                >
+                                    Editar
+                                </button>
+
+                                <!-- O caminho preferido para "não consigo
+                                     entrar": resolve sem que quem administra
+                                     chegue a saber a senha de ninguém. -->
+                                <button
+                                    type="button"
+                                    :disabled="emAndamento === usuario.id"
+                                    :data-testid="`redefinir-senha-${usuario.id}`"
+                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
+                                    @click="enviarRedefinicao(usuario)"
+                                >
+                                    Enviar link de senha
+                                </button>
+
                                 <template v-if="confirmandoDesativacao === usuario.id">
                                     <span class="text-muted-foreground">Desativar mesmo? Ela deixa de entrar na hora.</span>
                                     <button
@@ -374,5 +516,122 @@ function rotuloDoPapel(papel: string | null): string {
                 Ver a matriz de papéis
             </Link>
         </section>
+
+        <Dialog :open="modalAberto" @update:open="aoTrocarAbertura">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{{ emEdicao === null ? 'Nova conta' : `Editando ${emEdicao.nome}` }}</DialogTitle>
+                    <DialogDescription>
+                        {{
+                            emEdicao === null
+                                ? 'A pessoa entra com este e-mail e esta senha. Peça que ela troque a senha na primeira entrada.'
+                                : 'Nome e e-mail podem ser corrigidos. A senha só muda se você preencher os dois campos.'
+                        }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form class="grid gap-4" @submit.prevent="gravar">
+                    <div class="grid gap-1">
+                        <label for="conta-nome" class="text-sm font-medium">Nome</label>
+                        <input
+                            id="conta-nome"
+                            v-model="formulario.name"
+                            type="text"
+                            required
+                            data-testid="conta-nome"
+                            :aria-invalid="formulario.errors.name ? true : undefined"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                        <p v-if="formulario.errors.name" role="alert" class="text-destructive text-sm">{{ formulario.errors.name }}</p>
+                    </div>
+
+                    <div class="grid gap-1">
+                        <label for="conta-email" class="text-sm font-medium">E-mail</label>
+                        <input
+                            id="conta-email"
+                            v-model="formulario.email"
+                            type="email"
+                            required
+                            autocomplete="off"
+                            data-testid="conta-email"
+                            :aria-describedby="formulario.errors.email ? undefined : 'ajuda-conta-email'"
+                            :aria-invalid="formulario.errors.email ? true : undefined"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                        <p v-if="formulario.errors.email" role="alert" class="text-destructive text-sm">{{ formulario.errors.email }}</p>
+                        <p v-else id="ajuda-conta-email" class="text-muted-foreground text-sm">É por ele que a pessoa entra no painel.</p>
+                    </div>
+
+                    <div class="grid gap-1">
+                        <label for="conta-papel" class="text-sm font-medium">Papel</label>
+                        <select
+                            id="conta-papel"
+                            v-model="formulario.papel"
+                            data-testid="conta-papel"
+                            :aria-describedby="formulario.errors.papel ? undefined : 'ajuda-conta-papel'"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option v-for="papel in props.opcoes.papeis" :key="papel.valor" :value="papel.valor">{{ papel.rotulo }}</option>
+                        </select>
+                        <p v-if="formulario.errors.papel" role="alert" class="text-destructive text-sm">{{ formulario.errors.papel }}</p>
+                        <p v-else id="ajuda-conta-papel" class="text-muted-foreground text-sm">
+                            O que cada papel alcança está em
+                            <Link :href="route('admin.papeis')" class="text-acao-texto font-medium">Papéis e permissões</Link>.
+                        </p>
+                    </div>
+
+                    <!-- Na EDIÇÃO a senha é opcional, e em branco ela não é
+                         tocada: corrigir um nome não pode obrigar a inventar uma
+                         senha nova para a pessoa. -->
+                    <div class="grid gap-1">
+                        <label for="conta-senha" class="text-sm font-medium">
+                            {{ emEdicao === null ? 'Senha' : 'Nova senha (deixe em branco para não mexer)' }}
+                        </label>
+                        <input
+                            id="conta-senha"
+                            v-model="formulario.password"
+                            type="password"
+                            autocomplete="new-password"
+                            :required="emEdicao === null"
+                            data-testid="conta-senha"
+                            :aria-invalid="formulario.errors.password ? true : undefined"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                        <p v-if="formulario.errors.password" role="alert" class="text-destructive text-sm">{{ formulario.errors.password }}</p>
+                    </div>
+
+                    <div class="grid gap-1">
+                        <label for="conta-senha-confirmacao" class="text-sm font-medium">Repita a senha</label>
+                        <input
+                            id="conta-senha-confirmacao"
+                            v-model="formulario.password_confirmation"
+                            type="password"
+                            autocomplete="new-password"
+                            :required="emEdicao === null"
+                            data-testid="conta-senha-confirmacao"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                    </div>
+
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            @click="aoTrocarAbertura(false)"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            :disabled="formulario.processing"
+                            data-testid="salvar-conta"
+                            class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
+                        >
+                            {{ emEdicao === null ? 'Cadastrar' : 'Salvar' }}
+                        </button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>
