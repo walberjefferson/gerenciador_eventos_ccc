@@ -134,6 +134,10 @@ test.describe('em tela grande', () => {
         await entrar(page, ADMINISTRADOR);
         await page.goto('/admin/pagamentos/avisos');
 
+        // O painel de filtros comeca recolhido quando nenhum filtro esta
+        // valendo: os campos existem, mas ficam `hidden` ate alguem abrir.
+        await page.getByTestId('abrir-filtros').click();
+
         await page.getByTestId('avisos-filtro-situacao').selectOption('falhou');
         await page.getByRole('button', { name: 'Filtrar' }).click();
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { AvisoDoProvedor, FiltrosDeAvisos, OpcoesDeAvisos, PaginaDeAvisos } from '@/types/admin';
 import { Link, router } from '@inertiajs/vue3';
@@ -23,6 +24,15 @@ const props = defineProps<{
 }>();
 
 const campos = reactive<FiltrosDeAvisos>({ ...props.filtros });
+
+/**
+ * Quantos filtros vieram APLICADOS do servidor — e nao quantos estao digitados.
+ * Quem preencheu um campo e ainda nao clicou em "Filtrar" nao mudou a lista, e
+ * o cabecalho do painel estaria mentindo se ja contasse.
+ */
+const filtrosAtivos = computed<number>(
+    () => Object.values(props.filtros).filter((valor) => valor !== null && valor !== '' && valor !== undefined).length,
+);
 
 /** Quais avisos estão com o payload aberto. Fechado é o estado normal. */
 const abertos = ref<number[]>([]);
@@ -71,9 +81,7 @@ const resumo = computed(() => {
 });
 
 /** Verdadeiro só quando a tabela inteira está vazia, e não por causa de filtro. */
-const nenhumAvisoJamais = computed<boolean>(
-    () => props.avisos.total === 0 && Object.values(props.filtros).every((valor) => valor === null),
-);
+const nenhumAvisoJamais = computed<boolean>(() => props.avisos.total === 0 && Object.values(props.filtros).every((valor) => valor === null));
 
 /**
  * A cor de cada situação, decidida de uma vez só.
@@ -115,111 +123,112 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
         titulo="Avisos do provedor"
         descricao="Todo aviso automático que o provedor de pagamento enviou, do mais recente para o mais antigo. A lista é só de leitura: nada aqui reprocessa, altera ou apaga um aviso — ele é o registro do que aconteceu fora do sistema."
     >
-        <form aria-labelledby="titulo-filtros-avisos" class="grid gap-4 rounded-lg border border-border p-4" @submit.prevent="aplicar">
-            <h2 id="titulo-filtros-avisos" class="text-lg font-semibold">Filtros</h2>
+        <PainelDeFiltros id="filtros-avisos" :ativos="filtrosAtivos">
+            <form aria-labelledby="titulo-filtros-avisos" class="grid gap-4" @submit.prevent="aplicar">
+                <div class="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                    <div class="flex flex-col gap-1">
+                        <label for="avisos-de" class="text-sm font-medium">A partir de</label>
+                        <input
+                            id="avisos-de"
+                            v-model="campos.de"
+                            type="date"
+                            data-testid="avisos-filtro-de"
+                            class="border-input bg-background focus-visible:ring-ring h-11 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                    </div>
 
-            <div class="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-                <div class="flex flex-col gap-1">
-                    <label for="avisos-de" class="text-sm font-medium">A partir de</label>
-                    <input
-                        id="avisos-de"
-                        v-model="campos.de"
-                        type="date"
-                        data-testid="avisos-filtro-de"
-                        class="h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    />
+                    <div class="flex flex-col gap-1">
+                        <label for="avisos-ate" class="text-sm font-medium">Até</label>
+                        <input
+                            id="avisos-ate"
+                            v-model="campos.ate"
+                            type="date"
+                            data-testid="avisos-filtro-ate"
+                            class="border-input bg-background focus-visible:ring-ring h-11 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        />
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label for="avisos-situacao" class="text-sm font-medium">Situação</label>
+                        <select
+                            id="avisos-situacao"
+                            v-model="campos.situacao"
+                            data-testid="avisos-filtro-situacao"
+                            aria-describedby="ajuda-avisos-situacao"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option :value="null">Todas</option>
+                            <option v-for="situacao in props.opcoes.situacoes" :key="situacao.valor" :value="situacao.valor">
+                                {{ situacao.rotulo }}
+                            </option>
+                        </select>
+                        <!-- A explicação fica aqui, à vista, e não escondida atrás de um ícone: "ignorado" é a situação que mais assusta quem lê pela primeira vez, e ela é justamente a que não é problema. -->
+                        <p id="ajuda-avisos-situacao" class="text-muted-foreground text-sm">
+                            <strong class="font-medium">Ignorado não é erro:</strong> é o aviso que chegou sem assinatura válida, que falava de uma
+                            cobrança que não existe aqui, ou que repetia algo já resolvido. Quem exige atenção é
+                            <strong class="font-medium">Falhou</strong>.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label for="avisos-gateway" class="text-sm font-medium">Provedor</label>
+                        <select
+                            id="avisos-gateway"
+                            v-model="campos.gateway"
+                            data-testid="avisos-filtro-gateway"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option :value="null">Todos</option>
+                            <option v-for="gateway in props.opcoes.gateways" :key="gateway" :value="gateway">{{ gateway }}</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label for="avisos-assinatura" class="text-sm font-medium">Assinatura</label>
+                        <select
+                            id="avisos-assinatura"
+                            v-model="campos.assinatura_valida"
+                            data-testid="avisos-filtro-assinatura"
+                            class="border-input bg-background focus-visible:ring-ring h-11 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <option :value="null">Tanto faz</option>
+                            <option value="sim">Válida</option>
+                            <option value="nao">Inválida</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="flex flex-col gap-1">
-                    <label for="avisos-ate" class="text-sm font-medium">Até</label>
-                    <input
-                        id="avisos-ate"
-                        v-model="campos.ate"
-                        type="date"
-                        data-testid="avisos-filtro-ate"
-                        class="h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <label for="avisos-situacao" class="text-sm font-medium">Situação</label>
-                    <select
-                        id="avisos-situacao"
-                        v-model="campos.situacao"
-                        data-testid="avisos-filtro-situacao"
-                        aria-describedby="ajuda-avisos-situacao"
-                        class="h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        type="submit"
+                        class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
                     >
-                        <option :value="null">Todas</option>
-                        <option v-for="situacao in props.opcoes.situacoes" :key="situacao.valor" :value="situacao.valor">
-                            {{ situacao.rotulo }}
-                        </option>
-                    </select>
-                    <!-- A explicação fica aqui, à vista, e não escondida atrás de um ícone: "ignorado" é a situação que mais assusta quem lê pela primeira vez, e ela é justamente a que não é problema. -->
-                    <p id="ajuda-avisos-situacao" class="text-sm text-muted-foreground">
-                        <strong class="font-medium">Ignorado não é erro:</strong> é o aviso que chegou sem assinatura válida, que falava de uma
-                        cobrança que não existe aqui, ou que repetia algo já resolvido. Quem exige atenção é <strong class="font-medium">Falhou</strong>.
-                    </p>
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <label for="avisos-gateway" class="text-sm font-medium">Provedor</label>
-                    <select
-                        id="avisos-gateway"
-                        v-model="campos.gateway"
-                        data-testid="avisos-filtro-gateway"
-                        class="h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                        Filtrar
+                    </button>
+                    <button
+                        type="button"
+                        class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        @click="limpar"
                     >
-                        <option :value="null">Todos</option>
-                        <option v-for="gateway in props.opcoes.gateways" :key="gateway" :value="gateway">{{ gateway }}</option>
-                    </select>
+                        Limpar filtros
+                    </button>
                 </div>
+            </form>
+        </PainelDeFiltros>
 
-                <div class="flex flex-col gap-1">
-                    <label for="avisos-assinatura" class="text-sm font-medium">Assinatura</label>
-                    <select
-                        id="avisos-assinatura"
-                        v-model="campos.assinatura_valida"
-                        data-testid="avisos-filtro-assinatura"
-                        class="h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <option :value="null">Tanto faz</option>
-                        <option value="sim">Válida</option>
-                        <option value="nao">Inválida</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-                <button
-                    type="submit"
-                    class="h-11 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    Filtrar
-                </button>
-                <button
-                    type="button"
-                    class="h-11 rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                    @click="limpar"
-                >
-                    Limpar filtros
-                </button>
-            </div>
-        </form>
-
-        <p role="status" class="text-sm text-muted-foreground" data-testid="avisos-resumo">{{ resumo }}</p>
+        <p role="status" class="text-muted-foreground text-sm" data-testid="avisos-resumo">{{ resumo }}</p>
 
         <!-- Nenhum aviso na tabela inteira não é defeito, e a tela precisa dizer isso: em desenvolvimento o provedor é simulado e nunca chama; em produção pode ser o endereço de aviso que ficou por registrar. -->
-        <div v-if="nenhumAvisoJamais" class="rounded-lg border border-border bg-muted/40 p-6" data-testid="avisos-vazio">
+        <div v-if="nenhumAvisoJamais" class="border-border bg-muted/40 rounded-lg border p-6" data-testid="avisos-vazio">
             <h2 class="text-base font-semibold">Nenhum aviso recebido até agora</h2>
-            <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Isso é o esperado enquanto o sistema estiver cobrando pelo provedor simulado (<code>PAYMENT_GATEWAY=fake</code>): não existe
-                provedor de verdade para chamar. Com a cobrança real ligada, porém, uma lista vazia costuma querer dizer que o endereço de aviso
-                não foi registrado no painel da Efí — as cobranças nascem normalmente e nenhuma se confirma sozinha.
+            <p class="text-muted-foreground mt-1 max-w-3xl text-sm">
+                Isso é o esperado enquanto o sistema estiver cobrando pelo provedor simulado (<code>PAYMENT_GATEWAY=fake</code>): não existe provedor
+                de verdade para chamar. Com a cobrança real ligada, porém, uma lista vazia costuma querer dizer que o endereço de aviso não foi
+                registrado no painel da Efí — as cobranças nascem normalmente e nenhuma se confirma sozinha.
             </p>
         </div>
 
-        <div v-else-if="props.avisos.dados.length > 0" class="overflow-x-auto rounded-lg border border-border">
+        <div v-else-if="props.avisos.dados.length > 0" class="border-border overflow-x-auto rounded-lg border">
             <table class="w-full text-left text-sm" data-testid="tabela-avisos">
                 <caption class="sr-only">
                     Avisos recebidos do provedor de pagamento, do mais recente para o mais antigo
@@ -239,8 +248,8 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                 </thead>
                 <tbody>
                     <template v-for="aviso in props.avisos.dados" :key="aviso.id">
-                        <tr class="border-t border-border align-top" :data-testid="`avisos-linha-${aviso.id}`">
-                            <td class="whitespace-nowrap px-4 py-3">{{ aviso.recebido_em ?? '—' }}</td>
+                        <tr class="border-border border-t align-top" :data-testid="`avisos-linha-${aviso.id}`">
+                            <td class="px-4 py-3 whitespace-nowrap">{{ aviso.recebido_em ?? '—' }}</td>
                             <td class="px-4 py-3">{{ aviso.gateway }}</td>
                             <td class="px-4 py-3">{{ aviso.tipo_evento ?? '—' }}</td>
                             <td class="px-4 py-3 break-all">{{ aviso.id_evento_externo ?? '—' }}</td>
@@ -265,7 +274,7 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                                     {{ aviso.assinatura_valida ? 'Válida' : 'Inválida' }}
                                 </span>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3">{{ aviso.processado_em ?? '—' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">{{ aviso.processado_em ?? '—' }}</td>
                             <td class="px-4 py-3">{{ aviso.erro ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 <button
@@ -273,7 +282,7 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                                     :data-testid="`avisos-expandir-${aviso.id}`"
                                     :aria-expanded="estaAberto(aviso.id)"
                                     :aria-controls="`avisos-payload-${aviso.id}`"
-                                    class="inline-flex h-11 min-w-11 items-center rounded-md border border-border px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="border-border focus-visible:ring-ring inline-flex h-11 min-w-11 items-center rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                                     @click="alternar(aviso.id)"
                                 >
                                     {{ estaAberto(aviso.id) ? 'Ocultar conteúdo do aviso' : 'Ver conteúdo do aviso' }}
@@ -282,15 +291,15 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                         </tr>
 
                         <!-- O conteúdo só aparece quando alguém pede: um jsonb inteiro em cada linha tornaria a lista ilegível. -->
-                        <tr v-if="estaAberto(aviso.id)" class="border-t border-border bg-muted/20">
+                        <tr v-if="estaAberto(aviso.id)" class="border-border bg-muted/20 border-t">
                             <td :id="`avisos-payload-${aviso.id}`" colspan="9" class="px-4 py-3">
-                                <p class="mb-2 text-sm text-muted-foreground">
+                                <p class="text-muted-foreground mb-2 text-sm">
                                     O que o provedor mandou, como foi gravado. Campos que costumam carregar segredo já entraram no banco como
                                     <code>[removido]</code>.
                                 </p>
                                 <pre
                                     :data-testid="`avisos-payload-${aviso.id}`"
-                                    class="max-h-80 overflow-auto rounded-md border border-border bg-background p-3 text-xs"
+                                    class="border-border bg-background max-h-80 overflow-auto rounded-md border p-3 text-xs"
                                     >{{ payloadLegivel(aviso) }}</pre
                                 >
                             </td>
@@ -305,18 +314,18 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                 v-if="props.avisos.links.anterior"
                 :href="props.avisos.links.anterior"
                 preserve-scroll
-                class="flex h-11 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring flex h-11 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Página anterior
             </Link>
 
-            <span class="text-sm text-muted-foreground"> Página {{ props.avisos.pagina_atual }} de {{ props.avisos.ultima_pagina }} </span>
+            <span class="text-muted-foreground text-sm"> Página {{ props.avisos.pagina_atual }} de {{ props.avisos.ultima_pagina }} </span>
 
             <Link
                 v-if="props.avisos.links.proxima"
                 :href="props.avisos.links.proxima"
                 preserve-scroll
-                class="flex h-11 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring flex h-11 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Próxima página
             </Link>
