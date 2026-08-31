@@ -11,8 +11,14 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views';
 
 /*
- * Modo escuro por classe. Na v3 isso era `darkMode: ['class']`; na v4 e uma
- * variante declarada aqui, e sem ela o `dark:` simplesmente para de existir.
+ * O sistema nao tem modo escuro: as telas sao claras para todo mundo, sempre.
+ *
+ * Esta linha e justamente o que garante isso, e por isso ela NAO pode sair. Na
+ * v4 o `dark:` ja vem de fabrica ligado a preferencia do sistema operacional;
+ * sem esta variante, quem usa o computador no escuro voltaria a receber as
+ * telas escuras sozinho. Amarrando o `dark:` a uma classe `.dark` que nada
+ * mais escreve no `<html>`, as classes `dark:` que sobraram pelos componentes
+ * ficam sem efeito em vez de reviverem o tema pelas costas.
  */
 @custom-variant dark (&:is(.dark *));
 
@@ -191,104 +197,6 @@
         --sombra-2xl: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
     }
 
-    .dark {
-        /*
-         * Modo escuro. Os dois fundos de referencia sao #09090B (a pagina) e
-         * #18181B (o card); as razoes abaixo trazem os dois quando o valor
-         * serve de texto, porque o card e o caso dificil.
-         */
-        --background: #09090b; /* #09090B */
-        --foreground: #fafafa; /* #FAFAFA - 19.06:1 sobre a pagina */
-        --card: #18181b; /* #18181B */
-        --card-foreground: #fafafa; /* 16.97:1 sobre o card */
-        --popover: #18181b;
-        --popover-foreground: #fafafa; /* 16.97:1 */
-
-        /*
-         * Azul claro do studio #2B7FFF. Ajuste de acessibilidade (DA-42): o
-         * `--primary-foreground` que o studio traz para o escuro e um azul
-         * escuro (#1C398E) que rende apenas 2.76:1 sobre este azul e reprova
-         * em qualquer tamanho de texto. Trocado pelo quase-preto #09090B, que
-         * rende 5.29:1. Branco por cima daria 3.76:1 e tambem reprovaria.
-         */
-        --primary: #2b7fff;
-        --primary-foreground: #09090b;
-
-        --secondary: #27272a; /* #27272A */
-        --secondary-foreground: #fafafa; /* 14.11:1 sobre o secondary */
-        --muted: #27272a;
-        --muted-foreground: #9f9fa9; /* #9F9FA9 - 7.59:1 na pagina, 5.68:1 sobre o muted */
-        --accent: #27272a;
-        --accent-foreground: #fafafa; /* 14.11:1 */
-
-        /*
-         * Vermelho de erro no escuro (#FF6467). Ajuste de acessibilidade
-         * (DA-42): branco por cima rende 2.89:1 e reprova; o quase-preto
-         * #09090B rende 6.89:1. O mesmo tom como texto na pagina: 6.89:1.
-         */
-        --destructive: #ff6467;
-        --destructive-foreground: #09090b;
-
-        /*
-         * O studio traz estes dois translucidos (branco a 10% e a 15%). Aqui
-         * eles sao o equivalente opaco sobre o fundo, porque o projeto usa
-         * `bg-border` como superficie de verdade (o fio da linha do tempo, o
-         * separador) e porque uma cor translucida confunde a busca de fundo
-         * feita pelo cenario que mede contraste.
-         */
-        --border: #27272a;
-        --input: #2e2e33;
-        --ring: #2b7fff;
-
-        --chart-1: #155dfc;
-        --chart-2: #1447e6;
-        --chart-3: #193cb8;
-        --chart-4: #1c398e;
-        --chart-5: #162456;
-
-        /* Acao - azul #2B7FFF. Preto por cima: 5.29:1 (branco daria 3.76:1 e
-         * reprova). Como texto: 5.29:1 na pagina e 4.71:1 sobre o card. */
-        --cor-acao: #2b7fff;
-        --cor-acao-contraste: #09090b;
-        --cor-acao-texto: #2b7fff;
-
-        /* Sucesso - verde #00BC7D. Preto por cima: 8.04:1.
-         * Como texto: 8.04:1 na pagina e 7.16:1 sobre o card. */
-        --cor-sucesso: #00bc7d;
-        --cor-sucesso-contraste: #09090b;
-        --cor-sucesso-texto: #00bc7d;
-        /* Superficie suave no escuro: verde quase preto com o verde claro por
-         * cima. Texto #00BC7D sobre #0B2E22: 5.94:1. */
-        --cor-sucesso-suave: #0b2e22;
-        --cor-sucesso-suave-contraste: #00bc7d;
-
-        /* Informacao - azul-céu #00BCFF. Preto por cima: 9.13:1.
-         * Como texto: 9.13:1 na pagina e 8.13:1 sobre o card. */
-        --cor-informacao: #00bcff;
-        --cor-informacao-contraste: #09090b;
-        --cor-informacao-texto: #00bcff;
-
-        /* Atencao - ambar #FFB900. Preto por cima: 11.55:1. No escuro o ambar
-         * pode servir de texto: 11.55:1 na pagina e 10.29:1 sobre o card. */
-        --cor-atencao: #ffb900;
-        /* Ambar #FFD230, o realce mais forte. Preto por cima: 13.75:1. */
-        --cor-atencao-forte: #ffd230;
-        --cor-atencao-contraste: #09090b;
-        --cor-atencao-texto: #ffb900;
-        /* Superficie suave no escuro. Texto #FFB900 sobre #3A2A05: 8.06:1. */
-        --cor-atencao-suave: #3a2a05;
-        --cor-atencao-suave-contraste: #ffb900;
-
-        --sidebar-background: #18181b; /* #18181B */
-        --sidebar-foreground: #fafafa; /* 16.97:1 sobre a barra */
-        --sidebar-primary: #155dfc;
-        --sidebar-primary-foreground: #eff6ff; /* 4.82:1 */
-        --sidebar-accent: #27272a;
-        --sidebar-accent-foreground: #fafafa; /* 14.11:1 */
-        --sidebar-border: #27272a;
-        --sidebar-ring: #71717b;
-    }
-
     /*
      * =====================================================================
      * O TEMA DO LADO PUBLICO — verde-mata sobre papel
@@ -458,101 +366,6 @@
         --sombra-lg: 0 1px 2px rgb(16 35 28 / 0.05), 0 16px 40px -20px rgb(16 35 28 / 0.45);
         --sombra-xl: 0 2px 4px rgb(16 35 28 / 0.06), 0 22px 50px -22px rgb(16 35 28 / 0.5);
         --sombra-2xl: 0 2px 6px rgb(16 35 28 / 0.08), 0 30px 60px -24px rgb(16 35 28 / 0.55);
-    }
-
-    /*
-     * O lado publico no modo escuro — DERIVADO (DA-54).
-     *
-     * O prototipo e so claro. Tirar o escuro daqui seria regressao para quem o
-     * usa por necessidade, e vai contra a linha da Etapa 23, que passou a
-     * respeitar "reduzir movimento". Entao a variante escura foi derivada da
-     * mesma identidade: o papel vira mata quase preta, o verde clareia o
-     * bastante para carregar texto, e cada par foi medido contra os DOIS
-     * fundos escuros — a pagina (#0C1A15) e o cartao (#152B23), que e o caso
-     * dificil para texto claro.
-     *
-     * O seletor precisa dos dois — atributo e classe — porque os dois moram no
-     * mesmo `<html>`: e `[data-tema='publico'].dark`, nao um dentro do outro.
-     */
-    [data-tema='publico'].dark {
-        --background: #0c1a15;
-        --foreground: #ecf1ee; /* 15.66:1 na pagina */
-        --card: #152b23;
-        --card-foreground: #ecf1ee; /* 13.11:1 sobre o cartao */
-        --popover: #152b23;
-        --popover-foreground: #ecf1ee; /* 13.11:1 */
-
-        /* Verde claro #3FCB94. O quase-preto verde #08130F por cima: 9.17:1
-         * (branco daria 2.06:1 e reprovaria). Como texto: 8.67:1 na pagina e
-         * 7.26:1 sobre o cartao. */
-        --primary: #3fcb94;
-        --primary-foreground: #08130f;
-
-        --secondary: #24382f;
-        --secondary-foreground: #ecf1ee; /* 10.93:1 sobre o secondary */
-        --muted: #24382f;
-        --muted-foreground: #a9bcb2; /* 8.96:1 na pagina, 7.51:1 no cartao, 6.26:1 sobre o muted */
-        --accent: #24382f;
-        --accent-foreground: #ecf1ee; /* 10.93:1 */
-
-        /* Coral #F98E7D. Quase-preto por cima: 8.28:1. Como texto: 7.83:1 na
-         * pagina e 6.56:1 sobre o cartao. */
-        --destructive: #f98e7d;
-        --destructive-foreground: #08130f;
-
-        --border: #24382f; /* fio decorativo, como no claro */
-        /* Borda de campo, com a mesma regra do claro (1.4.11): 4.05:1 na
-         * pagina e 3.40:1 sobre o cartao. */
-        --input: #647e70;
-        --ring: #3fcb94; /* 8.67:1 na pagina */
-
-        --chart-1: #3fcb94;
-        --chart-2: #2fa97a;
-        --chart-3: #23855f;
-        --chart-4: #186546;
-        --chart-5: #0f4630;
-
-        --radius: 0.875rem;
-
-        --cor-acao: #3fcb94;
-        --cor-acao-contraste: #08130f; /* 9.17:1 */
-        --cor-acao-texto: #3fcb94; /* 8.67:1 na pagina, 7.26:1 no cartao */
-
-        --cor-sucesso: #3fcb94;
-        --cor-sucesso-contraste: #08130f; /* 9.17:1 */
-        --cor-sucesso-texto: #3fcb94; /* 8.67:1 na pagina */
-        --cor-sucesso-suave: #123528;
-        --cor-sucesso-suave-contraste: #3fcb94; /* 6.50:1 */
-
-        --cor-informacao: #5fc6e8;
-        --cor-informacao-contraste: #08130f; /* 9.66:1 */
-        --cor-informacao-texto: #5fc6e8; /* 9.14:1 na pagina, 7.65:1 no cartao */
-
-        /* No escuro o ambar clareia e passa a poder carregar texto sozinho:
-         * 8.96:1 na pagina e 7.51:1 sobre o cartao. */
-        --cor-atencao: #f2a93f;
-        --cor-atencao-forte: #ffc768; /* quase-preto por cima: 12.27:1 */
-        --cor-atencao-contraste: #08130f; /* 9.48:1 */
-        --cor-atencao-texto: #f2a93f;
-        --cor-atencao-suave: #3a2a10;
-        --cor-atencao-suave-contraste: #f2a93f; /* 6.93:1 */
-
-        --sidebar-background: #152b23;
-        --sidebar-foreground: #ecf1ee; /* 13.11:1 sobre a barra */
-        --sidebar-primary: #3fcb94;
-        --sidebar-primary-foreground: #08130f; /* 9.17:1 */
-        --sidebar-accent: #24382f;
-        --sidebar-accent-foreground: #ecf1ee; /* 10.93:1 */
-        --sidebar-border: #24382f;
-        --sidebar-ring: #3fcb94;
-
-        --sombra-2xs: 0 1px 2px rgb(0 0 0 / 0.3);
-        --sombra-xs: 0 1px 2px rgb(0 0 0 / 0.3);
-        --sombra-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 30px -18px rgb(0 0 0 / 0.7);
-        --sombra-md: 0 1px 3px rgb(0 0 0 / 0.4), 0 12px 32px -18px rgb(0 0 0 / 0.75);
-        --sombra-lg: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -20px rgb(0 0 0 / 0.8);
-        --sombra-xl: 0 2px 4px rgb(0 0 0 / 0.45), 0 22px 50px -22px rgb(0 0 0 / 0.85);
-        --sombra-2xl: 0 2px 6px rgb(0 0 0 / 0.5), 0 30px 60px -24px rgb(0 0 0 / 0.9);
     }
 }
 
