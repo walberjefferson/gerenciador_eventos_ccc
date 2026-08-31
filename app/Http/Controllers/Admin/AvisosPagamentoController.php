@@ -55,6 +55,12 @@ class AvisosPagamentoController extends Controller
                         'id' => (int) $linha->id,
                         'gateway' => $linha->gateway,
                         'id_evento_externo' => $linha->id_evento_externo,
+                        // A cobranca de que o aviso fala (o txid). Ele e o que
+                        // permite sair desta tela e achar a inscricao
+                        // correspondente na busca das inscricoes — o
+                        // identificador ao lado, apesar do nome parecido,
+                        // identifica a transferencia, nao a cobranca.
+                        'id_externo' => $linha->id_externo,
                         'tipo_evento' => $linha->tipo_evento,
                         'assinatura_valida' => (bool) $linha->assinatura_valida,
                         'recebido_em' => $linha->recebido_em?->format('d/m/Y H:i:s'),

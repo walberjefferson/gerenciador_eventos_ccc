@@ -238,7 +238,9 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                         <th scope="col" class="px-4 py-3 font-medium">Recebido em</th>
                         <th scope="col" class="px-4 py-3 font-medium">Provedor</th>
                         <th scope="col" class="px-4 py-3 font-medium">Tipo de aviso</th>
-                        <th scope="col" class="px-4 py-3 font-medium">Identificador no provedor</th>
+                        <!-- Duas colunas parecidas que respondem a perguntas diferentes: o txid diz QUAL COBRANÇA foi paga (e é ele que se cola na busca de inscrições para chegar à pessoa); o "fim a fim" diz QUAL TRANSFERÊNCIA pagou, e é o número que o banco usa. O rótulo antigo, "Identificador no provedor", cobria os dois e por isso não servia para nenhum. -->
+                        <th scope="col" class="px-4 py-3 font-medium">Cobrança na Efí (txid)</th>
+                        <th scope="col" class="px-4 py-3 font-medium">Fim a fim (E2E)</th>
                         <th scope="col" class="px-4 py-3 font-medium">Situação</th>
                         <th scope="col" class="px-4 py-3 font-medium">Assinatura</th>
                         <th scope="col" class="px-4 py-3 font-medium">Processado em</th>
@@ -252,7 +254,8 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                             <td class="px-4 py-3 whitespace-nowrap">{{ aviso.recebido_em ?? '—' }}</td>
                             <td class="px-4 py-3">{{ aviso.gateway }}</td>
                             <td class="px-4 py-3">{{ aviso.tipo_evento ?? '—' }}</td>
-                            <td class="px-4 py-3 break-all">{{ aviso.id_evento_externo ?? '—' }}</td>
+                            <td class="px-4 py-3 font-mono break-all" :data-testid="`avisos-txid-${aviso.id}`">{{ aviso.id_externo ?? '—' }}</td>
+                            <td class="px-4 py-3 font-mono break-all">{{ aviso.id_evento_externo ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 <span
                                     class="inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium"
@@ -292,7 +295,7 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
 
                         <!-- O conteúdo só aparece quando alguém pede: um jsonb inteiro em cada linha tornaria a lista ilegível. -->
                         <tr v-if="estaAberto(aviso.id)" class="border-border bg-muted/20 border-t">
-                            <td :id="`avisos-payload-${aviso.id}`" colspan="9" class="px-4 py-3">
+                            <td :id="`avisos-payload-${aviso.id}`" colspan="10" class="px-4 py-3">
                                 <p class="text-muted-foreground mb-2 text-sm">
                                     O que o provedor mandou, como foi gravado. Campos que costumam carregar segredo já entraram no banco como
                                     <code>[removido]</code>.

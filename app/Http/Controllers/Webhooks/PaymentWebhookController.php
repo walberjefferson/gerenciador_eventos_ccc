@@ -109,6 +109,11 @@ class PaymentWebhookController
             $webhook = WebhookPagamento::create([
                 'gateway' => $gateway,
                 'id_evento_externo' => $resultado->eventId,
+                // O identificador da COBRANCA de que este aviso fala, em coluna
+                // propria. Ele ja viajava dentro do payload, mas so ali ele nao
+                // se cruza com `pagamentos.id_externo` por consulta — e cruzar
+                // essas duas pontas e todo o trabalho de conciliar dinheiro.
+                'id_externo' => $resultado->externalId,
                 'tipo_evento' => $resultado->eventType,
                 'payload' => $this->semDadoSensivel($payload),
                 'assinatura_valida' => true,

@@ -13,6 +13,14 @@ use Illuminate\Database\Eloquent\Model;
  * Guardar o aviso antes de interpretar tem dois motivos: permite responder ao
  * provedor em milissegundos (ele desiste rapido e reenvia) e deixa rastro para
  * investigar qualquer divergencia depois.
+ *
+ * Dois identificadores moram aqui, e eles NAO sao a mesma coisa:
+ *
+ * - `id_evento_externo` identifica o AVISO. Na Efi e o "fim a fim" da
+ *   transferencia Pix; e ele que impede processar o mesmo aviso duas vezes.
+ * - `id_externo` identifica a COBRANCA de que o aviso fala — o txid. E por ele
+ *   que se liga o aviso ao registro em `pagamentos.id_externo` na hora de
+ *   conferir se o dinheiro que entrou bate com a inscricao certa.
  */
 class WebhookPagamento extends Model
 {
@@ -21,6 +29,7 @@ class WebhookPagamento extends Model
     protected $fillable = [
         'gateway',
         'id_evento_externo',
+        'id_externo',
         'tipo_evento',
         'payload',
         'assinatura_valida',

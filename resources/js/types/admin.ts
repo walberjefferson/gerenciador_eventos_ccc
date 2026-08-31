@@ -255,7 +255,10 @@ export interface FichaDaInscricao {
 /** Uma cobrança do histórico da inscrição. */
 export interface CobrancaDaFicha {
     id: number;
+    /** O código que este sistema deu à cobrança. Não existe no painel do provedor. */
     codigo_publico: string;
+    /** O identificador da cobrança no provedor (o `txid`, na Efí). Nulo quando o pagamento foi reconhecido na mão. */
+    id_externo: string | null;
     gateway: string;
     metodo: string;
     metodo_rotulo: string;
@@ -282,8 +285,10 @@ export interface CobrancaDaFicha {
 export interface AvisoDoProvedor {
     id: number;
     gateway: string;
-    /** O identificador que o provedor deu ao aviso. Nulo quando ele não mandou. */
+    /** O identificador que o provedor deu ao aviso — na Efí, o "fim a fim" da transferência. Nulo quando ele não mandou. */
     id_evento_externo: string | null;
+    /** A cobrança de que o aviso fala (o `txid`). É o mesmo valor de `id_externo` na ficha da inscrição. */
+    id_externo: string | null;
     tipo_evento: string | null;
     /** Falso é informação de segurança: alguém bateu na porta com a chave errada. */
     assinatura_valida: boolean;

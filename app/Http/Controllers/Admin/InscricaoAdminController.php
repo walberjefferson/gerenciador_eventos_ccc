@@ -147,6 +147,13 @@ class InscricaoAdminController extends Controller
                 return [
                     'id' => $pagamento->id,
                     'codigo_publico' => $pagamento->codigo_publico,
+                    // O identificador da cobranca no provedor — o txid, na Efi.
+                    // Vai para a tela porque e por ele que se procura a
+                    // cobranca no painel da instituicao financeira; o
+                    // `codigo_publico` acima nao existe do lado de la. Fica
+                    // nulo quando o pagamento foi reconhecido na mao, e a tela
+                    // desenha isso como vazio.
+                    'id_externo' => $pagamento->id_externo,
                     'gateway' => $pagamento->gateway,
                     'metodo' => $pagamento->metodo->value,
                     'metodo_rotulo' => $pagamento->metodo->rotulo(),

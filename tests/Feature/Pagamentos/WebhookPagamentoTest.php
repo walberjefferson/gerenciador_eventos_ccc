@@ -110,6 +110,26 @@ it('confirma a inscricao quando o aviso assinado diz que a cobranca foi paga', f
         ->toBe(SituacaoWebhook::Processado);
 });
 
+it('guarda em coluna propria a cobranca de que o aviso fala', function () {
+    [, , $pagamento] = cenarioComCobranca();
+
+    /** @var FakePaymentGateway $gateway */
+    $gateway = app(PaymentGateway::class);
+    $gateway->simulatePayment($pagamento->id_externo);
+
+    entregarAviso($gateway->emitWebhook($pagamento->id_externo, 'paid'))->assertOk();
+
+    $aviso = WebhookPagamento::query()->latest('id')->first();
+
+    // O aviso e a cobranca passam a se encontrar por consulta, e nao pelo olho
+    // de quem abre o JSON: e disso que depende conferir se o dinheiro que
+    // entrou e o da inscricao certa.
+    expect($aviso->id_externo)->toBe($pagamento->id_externo)
+        // E os dois identificadores do aviso continuam sendo dois: um aponta a
+        // cobranca, o outro identifica o proprio aviso.
+        ->and($aviso->id_evento_externo)->not->toBe($aviso->id_externo);
+});
+
 it('processa o mesmo aviso duas vezes e confirma uma vez so', function () {
     [$cenario, $inscricao, $pagamento] = cenarioComCobranca();
 

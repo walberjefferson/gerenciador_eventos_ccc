@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SituacaoInscricao;
+use App\Enums\SituacaoPagamento;
 use App\Events\InscricaoCancelada;
 use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -39,6 +40,53 @@ it('abre a ficha com o historico da cobranca e sem CPF', function () {
             ->etc());
 
     expect($resposta->getContent())->not->toContain('52998224725');
+});
+
+it('leva o identificador da cobranca no provedor ate a ficha', function () {
+    $cenario = CenarioInscricao::montar();
+    $inscricao = $cenario->inscrever();
+    $pagamento = $inscricao->pagamentoPendente();
+
+    // O txid so serve para conciliar se for exatamente o mesmo que esta no
+    // painel do provedor. Comparar com o valor gravado e o unico jeito de
+    // provar que a tela nao mostra outro codigo qualquer no lugar dele.
+    expect($pagamento->id_externo)->not->toBeNull();
+
+    $this->actingAs(Cenario::usuarioCom('organizador'))
+        ->get("/admin/inscricoes/{$inscricao->id}")
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('cobrancas.0.id_externo', $pagamento->id_externo)
+            ->where('cobrancas.0.codigo_publico', $pagamento->codigo_publico)
+            ->etc());
+
+    // E os dois codigos continuam sendo dois: se um dia virarem o mesmo valor,
+    // a coluna nova deixa de ter razao de existir e este teste avisa.
+    expect($pagamento->id_externo)->not->toBe($pagamento->codigo_publico);
+});
+
+it('mostra a cobranca reconhecida na mao sem identificador de provedor', function () {
+    $cenario = CenarioInscricao::montar();
+    $inscricao = $cenario->inscrever();
+
+    // A cobranca do provedor sai do caminho para que a confirmacao manual crie
+    // a dela — a que nasce de proposito sem identificador externo, porque
+    // provedor nenhum participou dela.
+    $inscricao->pagamentos()->update(['situacao' => SituacaoPagamento::Cancelado->value]);
+
+    $this->actingAs(Cenario::usuarioCom('administrador'))
+        ->post("/admin/inscricoes/{$inscricao->id}/confirmar-pagamento", [
+            'metodo' => 'dinheiro',
+            'observacao' => 'Entregou em espécie na secretaria.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs(Cenario::usuarioCom('organizador'))
+        ->get("/admin/inscricoes/{$inscricao->id}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('cobrancas.0.id_externo', null)
+            ->where('cobrancas.0.origem_manual', true)
+            ->etc());
 });
 
 it('recusa com 403 quem nao pode ver inscricoes', function () {

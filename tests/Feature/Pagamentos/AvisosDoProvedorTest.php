@@ -33,6 +33,7 @@ function avisoRecebido(array $atributos = []): WebhookPagamento
     return WebhookPagamento::query()->create(array_merge([
         'gateway' => 'efi',
         'id_evento_externo' => 'evento-externo-'.$sequencia,
+        'id_externo' => 'txid-'.$sequencia,
         'tipo_evento' => 'pix',
         // Ja limpo, como o controller do webhook grava: e ele que troca por
         // "[removido]" tudo o que costuma carregar segredo, antes de virar
@@ -84,6 +85,32 @@ it('mostra os avisos para quem administra, do mais recente para o mais antigo', 
             ->where('avisos.total', 2)
             ->where('avisos.por_pagina', 25)
         );
+});
+
+it('mostra os dois identificadores do aviso, cada um no seu lugar', function (): void {
+    Cenario::semearPapeis();
+
+    avisoRecebido(['id_evento_externo' => 'E1234567890', 'id_externo' => '01JBTXIDDACOBRANCA0000000']);
+
+    // A tela precisa dos dois. O de cima diz qual COBRANCA foi paga — e e ele
+    // que se cola na busca de inscricoes para chegar a pessoa. O de baixo diz
+    // qual TRANSFERENCIA pagou, e e o numero que o banco reconhece.
+    $this->actingAs(Cenario::usuarioCom('administrador'))
+        ->get('/admin/pagamentos/avisos')
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('avisos.dados.0.id_externo', '01JBTXIDDACOBRANCA0000000')
+            ->where('avisos.dados.0.id_evento_externo', 'E1234567890')
+        );
+});
+
+it('nao inventa identificador de cobranca quando o aviso nao trouxe nenhum', function (): void {
+    Cenario::semearPapeis();
+
+    avisoRecebido(['id_externo' => null]);
+
+    $this->actingAs(Cenario::usuarioCom('administrador'))
+        ->get('/admin/pagamentos/avisos')
+        ->assertInertia(fn (Assert $pagina) => $pagina->where('avisos.dados.0.id_externo', null));
 });
 
 it('usa o rotulo do proprio enum para escrever a situacao', function (): void {
