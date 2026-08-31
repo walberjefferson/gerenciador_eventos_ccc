@@ -97,6 +97,44 @@ describe('busca', function () {
                 ->where('inscricoes.dados.0.codigo_publico', $alvo->codigo_publico));
     });
 
+    it('acha pelo txid colado do painel do provedor', function () {
+        $cenario = CenarioInscricao::montar();
+        $alvo = $cenario->inscrever($cenario->outraPessoa(1));
+        $cenario->inscrever($cenario->outraPessoa(2));
+
+        $txid = $alvo->pagamentoPendente()->id_externo;
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->get('/admin/inscricoes?busca='.$txid)
+            ->assertInertia(fn (Assert $pagina) => $pagina
+                ->has('inscricoes.dados', 1)
+                ->where('inscricoes.dados.0.codigo_publico', $alvo->codigo_publico));
+    });
+
+    it('nao acha ninguem com um txid que nao existe', function () {
+        $cenario = CenarioInscricao::montar();
+        $cenario->inscrever();
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->get('/admin/inscricoes?busca=01JBTXIDQUENUNCAEXISTIU00')
+            ->assertInertia(fn (Assert $pagina) => $pagina->has('inscricoes.dados', 0));
+    });
+
+    it('procura o txid inteiro, e nao por pedaco', function () {
+        $cenario = CenarioInscricao::montar();
+        $alvo = $cenario->inscrever();
+
+        // Meio identificador nao acha nada, e isso e a decisao, nao um defeito:
+        // o txid e sempre colado inteiro do painel do provedor, e procurar por
+        // pedaco custaria varrer a tabela de pagamentos na busca mais usada do
+        // sistema.
+        $metade = substr((string) $alvo->pagamentoPendente()->id_externo, 0, 8);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->get('/admin/inscricoes?busca='.$metade)
+            ->assertInertia(fn (Assert $pagina) => $pagina->has('inscricoes.dados', 0));
+    });
+
     it('nao acha ninguem por pedaco de CPF', function () {
         $cenario = CenarioInscricao::montar();
         $cenario->inscrever();

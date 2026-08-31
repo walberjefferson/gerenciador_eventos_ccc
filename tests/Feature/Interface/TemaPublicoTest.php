@@ -21,8 +21,11 @@ use Tests\Feature\Admin\Cenario;
  *    inteira. Token que ele nao redeclare continua valendo o do painel — ou
  *    seja, azul do studio no meio de uma tela verde, num canto que ninguem
  *    abre todo dia. A vistoria de paridade abaixo exige que cada token do
- *    `:root` tenha par no bloco publico, e cada token do `.dark` tenha par no
- *    bloco publico escuro.
+ *    `:root` tenha par no bloco publico.
+ *
+ * Nao ha vistoria de modo escuro porque nao ha modo escuro: o sistema e claro
+ * para todo mundo, sempre, e a ultima prova deste arquivo e justamente a de
+ * que ele continua assim.
  *
  * E, no fim, a prova de que o atributo que liga tudo isso sai certo do
  * servidor — porque e ele que faz a PRIMEIRA pintura nao piscar.
@@ -197,38 +200,12 @@ test('todo tom do tema publico claro passa em AA, com a razao recalculada', func
     );
 });
 
-test('todo tom do tema publico escuro passa em AA, com a razao recalculada', function () use ($arquivoDoCss): void {
-    $css = (string) file_get_contents($arquivoDoCss);
-    $tokens = tokensDoBloco($css, "[data-tema='publico'].dark");
-
-    expect($tokens)->not->toBeEmpty("O bloco [data-tema='publico'].dark sumiu de {$arquivoDoCss}.");
-
-    $reprovados = [];
-
-    foreach (paresQuePrecisamPassar() as [$frente, $fundo, $limiar]) {
-        expect($tokens)->toHaveKeys([$frente, $fundo]);
-
-        $razao = razaoDeContraste($tokens[$frente], $tokens[$fundo]);
-
-        if ($razao < $limiar) {
-            $reprovados[] = sprintf(
-                '%s (%s) sobre %s (%s) = %.2f:1, precisa de %.1f:1',
-                $frente, $tokens[$frente], $fundo, $tokens[$fundo], $razao, $limiar
-            );
-        }
-    }
-
-    expect($reprovados)->toBeEmpty(
-        'Tons do tema publico escuro abaixo do minimo da WCAG 2.1:'.PHP_EOL.implode(PHP_EOL, $reprovados)
-    );
-});
-
 test('o tema publico redeclara todos os tokens do tema do painel', function () use ($arquivoDoCss): void {
     $css = (string) file_get_contents($arquivoDoCss);
 
     $faltando = [];
 
-    foreach ([[':root', "[data-tema='publico']"], ['.dark', "[data-tema='publico'].dark"]] as [$origem, $destino]) {
+    foreach ([[':root', "[data-tema='publico']"]] as [$origem, $destino]) {
         $doPainel = nomesDeTokenDoBloco($css, $origem);
         $doPublico = nomesDeTokenDoBloco($css, $destino);
 
@@ -251,7 +228,6 @@ test('o tema do painel nao mudou de cor', function () use ($arquivoDoCss): void 
     // As ancoras do tema do studio (DA-40). Se qualquer uma delas mudar, alguma
     // tela administrativa mudou de cor — e este plano jurou que nenhuma mudaria.
     $claro = tokensDoBloco($css, ':root');
-    $escuro = tokensDoBloco($css, '.dark');
 
     expect($claro['--background'])->toBe('#FFFFFF')
         ->and($claro['--primary'])->toBe('#155DFC')
@@ -259,10 +235,28 @@ test('o tema do painel nao mudou de cor', function () use ($arquivoDoCss): void 
         ->and($claro['--cor-sucesso'])->toBe('#007A55')
         ->and($claro['--cor-informacao'])->toBe('#0069A8')
         ->and($claro['--cor-atencao'])->toBe('#FE9A00')
-        ->and($claro['--sidebar-background'])->toBe('#FAFAFA')
-        ->and($escuro['--background'])->toBe('#09090B')
-        ->and($escuro['--primary'])->toBe('#2B7FFF')
-        ->and($escuro['--cor-acao'])->toBe('#2B7FFF');
+        ->and($claro['--sidebar-background'])->toBe('#FAFAFA');
+});
+
+test('o sistema nao tem modo escuro', function () use ($arquivoDoCss): void {
+    $css = (string) file_get_contents($arquivoDoCss);
+
+    // Nenhuma paleta escura sobrou no CSS — nem a do painel, nem a do publico.
+    expect($css)->not->toContain('.dark {');
+
+    /*
+     * E a trava que impede o escuro de voltar sozinho: no Tailwind v4 o `dark:`
+     * ja vem ligado a preferencia do sistema operacional, e so esta variante o
+     * prende a uma classe que ninguem mais escreve. Se alguem apagar a linha
+     * achando que e sobra, todo `dark:` espalhado pelos componentes volta a
+     * valer para quem usa o computador no escuro.
+     */
+    expect($css)->toContain('@custom-variant dark (&:is(.dark *));');
+
+    // E ninguem mais poe a classe no `<html>`.
+    $js = (string) shell_exec('grep -rn "classList" '.escapeshellarg(dirname(__DIR__, 3).'/resources/js').' || true');
+
+    expect($js)->not->toContain("'dark'");
 });
 
 test('a primeira pintura de uma tela publica ja sai no tema publico', function (): void {

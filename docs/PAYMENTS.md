@@ -301,17 +301,33 @@ Tudo o que conhece a Efí mora em **`app/Services/Payments/Efi/`**, mais o braç
 | **Cobrança vencida** | **Não existe** situação de vencida: passado o prazo, a consulta continua respondendo `ATIVA` | Quem decide que venceu continua sendo o `prazo_pagamento` do domínio (D-25). Traduzir `ATIVA` para "vencida" fecharia cobrança que a Efí ainda aceita pagar |
 | **Cobrança repetida** | Recusa com 409 se o `txid` já existe | Uma nova tentativa com identificador novo. **Uma só** — insistir para sempre transformaria um erro de programação em enxurrada contra a instituição financeira |
 
-### 9.3 O identificador da transferência (`endToEndId`)
+### 9.3 Os três identificadores
+
+Três códigos circulam por aqui e **dois deles têm 26 caracteres e a mesma cara**. Confundi-los custa tempo: é procurar no painel da Efí um código que nunca existiu lá.
+
+| Identificador | Quem gera | Onde vive | O que responde | Onde aparece |
+|---|---|---|---|---|
+| **Código interno** (`codigo_publico`) | este sistema, em `Pagamento::booted()` | `pagamentos.codigo_publico` | "qual cobrança nossa é essa?" | coluna **Código interno** da ficha da inscrição |
+| **`txid`** | este sistema, em `EfiPaymentGateway::novoTxid()`, e enviado à Efí ao criar a cobrança | `pagamentos.id_externo` e `webhooks_pagamento.id_externo` | "qual cobrança **na Efí** é essa?" | coluna **txid (Efí)** da ficha, coluna **Cobrança na Efí (txid)** dos avisos, e é o único que a busca de inscrições aceita colado do painel da Efí |
+| **`endToEndId`** | a Efí | `webhooks_pagamento.id_evento_externo` e `pagamentos.metadados` | "qual **transferência** pagou?" | coluna **Fim a fim (E2E)** dos avisos |
+
+Três consequências práticas:
+
+- **O código interno não serve para procurar na Efí**, e o `txid` não serve para falar com o participante. São dois ULIDs independentes: eles nunca coincidem, por construção (ver 9.2).
+- **A busca de inscrições compara o `txid` por igualdade**, não por pedaço. Ele é sempre colado inteiro do painel; procurar por pedaço obrigaria a varrer a tabela de pagamentos na busca mais usada do sistema, em vez de cair no índice `pagamentos_gateway_id_externo_unique`.
+- **Pagamento reconhecido na mão não tem `txid`** e aparece vazio (`—`) nas duas telas. Não é falha: não houve provedor nenhum, e inventar um identificador seria falsificar histórico de dinheiro.
+
+### 9.4 O identificador da transferência (`endToEndId`)
 
 O `endToEndId` é o número que identifica a transferência Pix no sistema bancário, e **só chega no aviso** — não está na cobrança. Uma devolução futura vai exigi-lo. Por isso ele é guardado em `pagamentos.metadados`, que já é `jsonb` (sem migração nova), **desde já**, mesmo com o estorno fora de escopo. Não guardar seria começar a fase de estorno com um passivo: todos os pagamentos anteriores sem como devolver.
 
-### 9.4 O que a Efí **não** faz nesta entrega
+### 9.5 O que a Efí **não** faz nesta entrega
 
 - **Devolução (estorno):** `refundPayment()` lança "não suportado", em voz alta. A política de reembolso do evento (**P-02**) não foi decidida, e implementar devolução antes de existir regra de negócio é construir um botão que ninguém sabe quando apertar.
 - **Cobrança com vencimento (`cobv`):** exige endereço completo de quem paga — logradouro, cidade, UF, CEP — que o formulário de inscrição não coleta e não precisa coletar. A cobrança imediata cobre o caso inteiro.
 - **Split, Pix enviado, Pix Automático, cartão:** fora de escopo.
 
-### 9.5 Provar contra a Efí de verdade
+### 9.6 Provar contra a Efí de verdade
 
 A suíte automatizada roda **sem credencial, sem certificado e sem rede**: o cliente da Efí é trocado por um duplo. Isso não é conveniência — o SDK usa cliente HTTP próprio, que o `Http::fake()` do Laravel não alcança.
 

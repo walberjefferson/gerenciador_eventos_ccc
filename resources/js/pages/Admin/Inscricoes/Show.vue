@@ -166,7 +166,9 @@ function confirmarPagamento(): void {
                     </caption>
                     <thead>
                         <tr class="border-b border-border text-left">
-                            <th scope="col" class="px-2 py-2 font-medium">Cobrança</th>
+                            <!-- Dois códigos, e eles nunca coincidem: o da esquerda é o que este sistema deu à cobrança; o txid é o que a Efí usa e o único que serve para procurar no painel dela. Antes esta coluna se chamava só "Cobrança", e era exatamente essa ambiguidade que fazia procurar o código errado do lado de lá. -->
+                            <th scope="col" class="px-2 py-2 font-medium">Código interno</th>
+                            <th scope="col" class="px-2 py-2 font-medium">txid (Efí)</th>
                             <th scope="col" class="px-2 py-2 font-medium">Método</th>
                             <th scope="col" class="px-2 py-2 font-medium">Situação</th>
                             <th scope="col" class="px-2 py-2 font-medium">Valor</th>
@@ -178,6 +180,8 @@ function confirmarPagamento(): void {
                     <tbody>
                         <tr v-for="cobranca in props.cobrancas" :key="cobranca.id" class="border-b border-border last:border-0 align-top">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ cobranca.codigo_publico }}</th>
+                            <!-- Vazio quando o pagamento foi reconhecido na mão: não houve provedor, e portanto não há txid. -->
+                            <td class="px-2 py-2 font-mono break-all" :data-testid="`cobranca-txid-${cobranca.id}`">{{ cobranca.id_externo ?? '—' }}</td>
                             <td class="px-2 py-2">{{ cobranca.metodo_rotulo }}</td>
                             <td class="px-2 py-2">{{ cobranca.situacao_rotulo }}</td>
                             <td class="px-2 py-2 whitespace-nowrap">{{ moeda(cobranca.valor_centavos) }}</td>

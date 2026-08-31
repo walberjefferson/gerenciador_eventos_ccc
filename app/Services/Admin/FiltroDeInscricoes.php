@@ -204,7 +204,19 @@ final class FiltroDeInscricoes
     }
 
     /**
-     * Busca por nome, e-mail e codigo publico — e so por isso.
+     * Busca por nome, e-mail, codigo publico e identificador da cobranca no
+     * provedor (o txid) — e so por isso.
+     *
+     * Os tres primeiros procuram por pedaco, porque quem digita "joana" ou o
+     * comeco de um codigo espera achar. O txid, nao: ele nunca e digitado, e
+     * sempre colado inteiro do painel da instituicao financeira. A comparacao
+     * dele e de igualdade por dois motivos, e o segundo importa mais que o
+     * primeiro: `ilike '%…%'` obrigaria a percorrer a tabela de pagamentos
+     * inteira na busca mais usada do sistema, enquanto a igualdade cai no
+     * indice `pagamentos_gateway_id_externo_unique` que ja existe.
+     *
+     * Cobranca reconhecida na mao tem `id_externo` nulo e por isso nunca entra
+     * neste ramo — o que esta certo: ela nao existe em provedor nenhum.
      *
      * @param  Builder<Inscricao>  $consulta
      */
@@ -214,12 +226,14 @@ final class FiltroDeInscricoes
             return;
         }
 
-        $termo = '%'.str_replace(['%', '_'], ['\%', '\_'], $this->valores['busca']).'%';
+        $busca = $this->valores['busca'];
+        $termo = '%'.str_replace(['%', '_'], ['\%', '\_'], $busca).'%';
 
-        $consulta->where(function (Builder $parte) use ($termo): void {
+        $consulta->where(function (Builder $parte) use ($termo, $busca): void {
             $parte->where('inscricoes.nome_completo', 'ilike', $termo)
                 ->orWhere('inscricoes.email', 'ilike', $termo)
-                ->orWhere('inscricoes.codigo_publico', 'ilike', $termo);
+                ->orWhere('inscricoes.codigo_publico', 'ilike', $termo)
+                ->orWhereHas('pagamentos', fn (Builder $pagamento) => $pagamento->where('id_externo', $busca));
         });
     }
 }
