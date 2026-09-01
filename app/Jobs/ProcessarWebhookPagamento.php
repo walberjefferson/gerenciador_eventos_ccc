@@ -71,6 +71,7 @@ class ProcessarWebhookPagamento implements ShouldQueue
             }
 
             $this->guardarIdentificadorDaTransferencia($pagamento, $resultado);
+            $this->guardarPagador($pagamento, $resultado);
 
             $situacao = SituacaoPagamento::deStatusExterno((string) $resultado->status);
 
@@ -122,6 +123,41 @@ class ProcessarWebhookPagamento implements ShouldQueue
         }
 
         $metadados['end_to_end_id'] = $identificador;
+
+        $pagamento->forceFill(['metadados' => $metadados])->save();
+    }
+
+    /**
+     * Guarda quem pagou, quando o aviso disser.
+     *
+     * Serve para conferir: o extrato do banco traz um nome, e e este campo que
+     * responde "esta cobranca foi paga por quem?" sem ninguem precisar abrir o
+     * painel do provedor. O caso comum e o pagamento feito por outra pessoa —
+     * a mae que paga a inscricao do filho, a igreja que paga a do grupo —, em
+     * que o nome do pagador nao e o do participante e a diferenca so aparece
+     * aqui.
+     *
+     * Vive em metadados pela mesma razao que o identificador da transferencia:
+     * ja e uma coluna jsonb, e nao ha consulta que peca coluna propria.
+     *
+     * O documento chega ja mascarado quando e CPF — quem mascara e a porta de
+     * entrada do aviso, antes de o payload virar linha.
+     */
+    private function guardarPagador(Pagamento $pagamento, WebhookResult $resultado): void
+    {
+        $pagador = $resultado->payer;
+
+        if ($pagador === []) {
+            return;
+        }
+
+        $metadados = (array) ($pagamento->metadados ?? []);
+
+        if (($metadados['pagador'] ?? null) === $pagador) {
+            return;
+        }
+
+        $metadados['pagador'] = $pagador;
 
         $pagamento->forceFill(['metadados' => $metadados])->save();
     }

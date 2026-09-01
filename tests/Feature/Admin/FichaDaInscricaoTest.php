@@ -64,6 +64,46 @@ it('leva o identificador da cobranca no provedor ate a ficha', function () {
     expect($pagamento->id_externo)->not->toBe($pagamento->codigo_publico);
 });
 
+it('leva quem pagou ate a ficha, e nunca o CPF inteiro', function () {
+    $cenario = CenarioInscricao::montar();
+    $inscricao = $cenario->inscrever();
+    $pagamento = $inscricao->pagamentoPendente();
+
+    // O pagador chega pelo aviso do provedor, ja mascarado por quem gravou o
+    // aviso. Aqui ele e escrito direto em metadados porque o que se prova e o
+    // caminho do dado ate a tela — o caminho do aviso ate metadados tem prova
+    // propria em EfiWebhookTest.
+    $pagamento->forceFill(['metadados' => array_merge((array) $pagamento->metadados, [
+        'pagador' => [
+            'nome' => 'MARIA DE SOUZA',
+            'documento' => '***.456.789-**',
+            'tipo_documento' => 'cpf',
+            'mensagem' => 'pagando a inscricao do meu filho',
+        ],
+    ])])->save();
+
+    $resposta = $this->actingAs(Cenario::usuarioCom('organizador'))
+        ->get("/admin/inscricoes/{$inscricao->id}");
+
+    $resposta->assertInertia(fn (Assert $pagina) => $pagina
+        ->where('cobrancas.0.pagador.nome', 'MARIA DE SOUZA')
+        ->where('cobrancas.0.pagador.documento', '***.456.789-**')
+        ->etc());
+
+    expect($resposta->getContent())->not->toContain('123.456.789');
+});
+
+it('nao inventa pagador na cobranca que nunca teve um', function () {
+    $cenario = CenarioInscricao::montar();
+    $inscricao = $cenario->inscrever();
+
+    $this->actingAs(Cenario::usuarioCom('organizador'))
+        ->get("/admin/inscricoes/{$inscricao->id}")
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('cobrancas.0.pagador', null)
+            ->etc());
+});
+
 it('mostra a cobranca reconhecida na mao sem identificador de provedor', function () {
     $cenario = CenarioInscricao::montar();
     $inscricao = $cenario->inscrever();

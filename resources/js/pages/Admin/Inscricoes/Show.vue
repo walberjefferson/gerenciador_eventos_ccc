@@ -192,7 +192,19 @@ function confirmarPagamento(): void {
                                     <span class="block">Reconhecida na mão{{ cobranca.responsavel ? ` por ${cobranca.responsavel}` : '' }}</span>
                                     <span v-if="cobranca.observacao" class="block text-muted-foreground">{{ cobranca.observacao }}</span>
                                 </template>
-                                <span v-else>{{ cobranca.gateway }}</span>
+                                <template v-else>
+                                    <span class="block">{{ cobranca.gateway }}</span>
+                                    <span v-if="cobranca.pagador" class="block text-muted-foreground">
+                                        Pago por {{ cobranca.pagador.nome ?? 'quem não se identificou' }}
+                                        <template v-if="cobranca.pagador.documento">
+                                            ({{ cobranca.pagador.tipo_documento === 'cnpj' ? 'CNPJ' : 'CPF' }}
+                                            {{ cobranca.pagador.documento }})
+                                        </template>
+                                    </span>
+                                    <span v-if="cobranca.pagador?.mensagem" class="block text-muted-foreground">
+                                        “{{ cobranca.pagador.mensagem }}”
+                                    </span>
+                                </template>
                             </td>
                         </tr>
                     </tbody>

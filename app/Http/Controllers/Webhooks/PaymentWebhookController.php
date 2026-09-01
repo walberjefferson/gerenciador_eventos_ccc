@@ -146,6 +146,16 @@ class PaymentWebhookController
      * ou dado de cartao. Guardamos o aviso para investigar, nao para colecionar
      * dado sensivel.
      *
+     * O CPF de quem pagou e o unico que nao e removido: ele e MASCARADO. A
+     * diferenca importa porque esse numero tem uso legitimo — e por ele que se
+     * confere, no extrato, quem mandou o dinheiro — e porque o aviso e a unica
+     * vez que ele passa por aqui. Removido, o dado sumiria; inteiro, este
+     * sistema passaria a guardar em claro um documento que ele proprio cifra
+     * quando e do participante (D-08). Os seis digitos do meio bastam para
+     * conferir e nao bastam para reconstruir o numero.
+     *
+     * O CNPJ fica inteiro, e de proposito: ele e publico por natureza.
+     *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
@@ -158,8 +168,16 @@ class PaymentWebhookController
         ];
 
         foreach ($payload as $chave => $valor) {
-            if (in_array(mb_strtolower((string) $chave), $proibidos, true)) {
+            $nome = mb_strtolower((string) $chave);
+
+            if (in_array($nome, $proibidos, true)) {
                 $payload[$chave] = '[removido]';
+
+                continue;
+            }
+
+            if ($nome === 'cpf' && is_scalar($valor)) {
+                $payload[$chave] = $this->cpfMascarado((string) $valor);
 
                 continue;
             }
@@ -170,5 +188,25 @@ class PaymentWebhookController
         }
 
         return $payload;
+    }
+
+    /**
+     * O CPF reduzido ao que serve para conferir e nao serve para vazar:
+     * `***.456.789-**`.
+     *
+     * Numero em formato inesperado vira `[removido]` inteiro. Nao ha como
+     * decidir que pedaco e seguro mostrar de algo que nao se sabe o que e, e
+     * errar para o lado de guardar demais e o unico erro que nao da para
+     * desfazer depois.
+     */
+    private function cpfMascarado(string $valor): string
+    {
+        $digitos = (string) preg_replace('/\D/', '', $valor);
+
+        if (mb_strlen($digitos) !== 11) {
+            return '[removido]';
+        }
+
+        return '***.'.mb_substr($digitos, 3, 3).'.'.mb_substr($digitos, 6, 3).'-**';
     }
 }

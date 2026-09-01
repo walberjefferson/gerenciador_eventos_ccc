@@ -219,6 +219,7 @@ class EfiPaymentGateway implements PaymentGateway
                     'pix' => [$item],
                     'end_to_end_id' => $identificadorDaTransferencia,
                 ], static fn (mixed $valor): bool => $valor !== null),
+                payer: $this->pagadorDoItem($item),
             );
         }
 
@@ -332,6 +333,57 @@ class EfiPaymentGateway implements PaymentGateway
      * Um ULID por cobranca: 26 caracteres, so letras e numeros, dentro do
      * formato que a Efi exige (^[a-zA-Z0-9]{26,35}$).
      */
+    /**
+     * Quem pagou, dito em palavras que nao sejam as desta instituicao.
+     *
+     * A Efi guarda esses campos em `gnExtras` — `gn` de Gerencianet, o nome
+     * antigo dela. Nome de fornecedor nao pode atravessar a fronteira: quem
+     * grava o pagador e o job, e o job nao conhece fornecedor nenhum. E a
+     * mesma razao pela qual `end_to_end_id` viaja com esse nome, e nao com o
+     * `endToEndId` do aviso original.
+     *
+     * O documento chega como `cpf` ou como `cnpj`, nunca os dois. O tipo viaja
+     * junto porque quem le do outro lado nao tem como distinguir um numero
+     * mascarado (`***.456.789-**`) de um CNPJ so pelo formato — e a tela
+     * precisa saber qual dos dois esta mostrando.
+     *
+     * Este metodo roda DUAS vezes por aviso: uma quando ele chega, sobre o
+     * corpo original, e outra quando o job releu o que foi guardado. E a
+     * segunda leitura que vira dado: nela o CPF ja vem mascarado, porque quem
+     * gravou o aviso mascarou antes. Por isso o resultado daqui viaja em campo
+     * proprio do resultado, e nao dentro do recorte cru — o recorte e o que se
+     * guarda, e nada que passe pela primeira leitura pode acabar guardado.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, string>
+     */
+    private function pagadorDoItem(array $item): array
+    {
+        $extras = $item['gnExtras']['pagador'] ?? null;
+        $extras = is_array($extras) ? $extras : [];
+
+        $texto = static function (mixed $valor): ?string {
+            $valor = is_scalar($valor) ? trim((string) $valor) : '';
+
+            return $valor === '' ? null : $valor;
+        };
+
+        $cpf = $texto($extras['cpf'] ?? null);
+        $cnpj = $texto($extras['cnpj'] ?? null);
+
+        $pagador = array_filter([
+            'nome' => $texto($extras['nome'] ?? null),
+            'documento' => $cpf ?? $cnpj,
+            'tipo_documento' => $cpf !== null ? 'cpf' : ($cnpj !== null ? 'cnpj' : null),
+            'banco' => $texto($extras['codigoBanco'] ?? null),
+            // A mensagem que a pessoa digitou no aplicativo do banco. Nao vem
+            // em `gnExtras`: ela e do proprio Pix, um nivel acima.
+            'mensagem' => $texto($item['infoPagador'] ?? null),
+        ], static fn (?string $valor): bool => $valor !== null);
+
+        return $pagador;
+    }
+
     private function novoTxid(): string
     {
         return (string) Str::ulid();

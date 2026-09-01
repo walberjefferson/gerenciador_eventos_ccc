@@ -13,7 +13,17 @@ use Illuminate\Support\Carbon;
 final readonly class WebhookResult
 {
     /**
+     * `$payer` is deliberately NOT part of `$raw`.
+     *
+     * `$raw` is what gets STORED — it is the webhook as the provider sent it,
+     * and it is scrubbed of sensitive data on the way in. `$payer` is a
+     * READING of that same webhook, produced before the scrubbing runs, so
+     * anything copied into it would be stored unscrubbed. Keeping it in its
+     * own field means the payer's document is only ever persisted through the
+     * scrubbed payload — never twice, never in the clear.
+     *
      * @param  array<string, mixed>  $raw
+     * @param  array<string, string>  $payer
      */
     public function __construct(
         public ?string $eventId,
@@ -23,6 +33,7 @@ final readonly class WebhookResult
         public ?int $amountCents = null,
         public ?Carbon $occurredAt = null,
         public array $raw = [],
+        public array $payer = [],
     ) {}
 
     /**

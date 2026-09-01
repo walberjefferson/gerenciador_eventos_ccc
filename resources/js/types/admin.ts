@@ -252,6 +252,21 @@ export interface FichaDaInscricao {
     foi_paga: boolean;
 }
 
+/**
+ * Quem mandou o dinheiro, segundo o aviso do provedor.
+ *
+ * Só existe em cobrança paga por Pix: pagamento reconhecido na mão não tem
+ * pagador nenhum. O `documento` vem mascarado quando é CPF (`***.456.789-**`)
+ * e inteiro quando é CNPJ — por isso o `tipo_documento` viaja junto.
+ */
+export interface PagadorDaCobranca {
+    nome?: string;
+    documento?: string;
+    tipo_documento?: 'cpf' | 'cnpj';
+    banco?: string;
+    mensagem?: string;
+}
+
 /** Uma cobrança do histórico da inscrição. */
 export interface CobrancaDaFicha {
     id: number;
@@ -269,6 +284,8 @@ export interface CobrancaDaFicha {
     expira_em: string | null;
     pago_em: string | null;
     cancelado_em: string | null;
+    /** Quem pagou, quando o aviso do provedor tiver dito. */
+    pagador: PagadorDaCobranca | null;
     /** Verdadeiro quando o pagamento foi reconhecido na mão por alguém. */
     origem_manual: boolean;
     observacao: string | null;

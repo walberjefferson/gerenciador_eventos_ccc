@@ -164,6 +164,10 @@ class InscricaoAdminController extends Controller
                     'expira_em' => $pagamento->expira_em?->toIso8601String(),
                     'pago_em' => $pagamento->pago_em?->toIso8601String(),
                     'cancelado_em' => $pagamento->cancelado_em?->toIso8601String(),
+                    // Quem pagou, quando o aviso do provedor tiver dito. Vem
+                    // do mesmo jsonb da observacao, e ja chega com o CPF
+                    // mascarado de quando o aviso foi gravado.
+                    'pagador' => is_array($metadados['pagador'] ?? null) ? $metadados['pagador'] : null,
                     'origem_manual' => ($metadados['origem'] ?? null) === 'manual',
                     'observacao' => is_string($metadados['observacao'] ?? null) ? $metadados['observacao'] : null,
                     'responsavel' => is_string($responsavel['nome'] ?? null) ? $responsavel['nome'] : null,

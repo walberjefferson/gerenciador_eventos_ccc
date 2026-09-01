@@ -321,13 +321,25 @@ Três consequências práticas:
 
 O `endToEndId` é o número que identifica a transferência Pix no sistema bancário, e **só chega no aviso** — não está na cobrança. Uma devolução futura vai exigi-lo. Por isso ele é guardado em `pagamentos.metadados`, que já é `jsonb` (sem migração nova), **desde já**, mesmo com o estorno fora de escopo. Não guardar seria começar a fase de estorno com um passivo: todos os pagamentos anteriores sem como devolver.
 
-### 9.5 O que a Efí **não** faz nesta entrega
+### 9.5 Quem pagou (`gnExtras.pagador`)
+
+O aviso diz quem mandou o dinheiro: nome, documento, banco e a mensagem digitada no aplicativo. Isso é guardado em `pagamentos.metadados['pagador']` e aparece na coluna "Origem" da ficha da inscrição. O caso que justifica: **quem paga muitas vezes não é quem se inscreve** — a mãe que paga a inscrição do filho, a igreja que paga a do grupo. Sem esse campo, o nome do extrato bancário não bate com nenhum participante e ninguém sabe explicar por quê.
+
+Três decisões, e as três são de privacidade:
+
+- **O CPF do pagador é mascarado, nunca guardado inteiro.** `***.456.789-**` — os seis dígitos do meio bastam para conferir contra o extrato e não bastam para reconstruir o número. A máscara é aplicada na **porta de entrada** (`PaymentWebhookController::semDadoSensivel`), antes de o aviso virar linha, então o número inteiro não existe em nenhuma tabela. Este sistema cifra o CPF do participante por decisão explícita (**D-08**); guardar em claro o de quem paga seria contradizê-la pela porta dos fundos.
+- **O CNPJ fica inteiro**, porque é público por natureza.
+- **O pagador não viaja no `raw` do `WebhookResult`.** O `raw` é o que se **grava**; o pagador é uma **leitura** feita antes da limpeza. Copiá-lo para dentro do `raw` gravaria o documento sem passar pelo filtro — foi o que aconteceu na primeira versão desta entrega, e o teste da prova pelo avesso (`EfiWebhookTest`, "guarda quem pagou…") pegou. Por isso ele tem campo próprio no DTO.
+
+A tradução de `gnExtras` (`gn` de Gerencianet) para nomes neutros acontece no gateway, nunca no job: o job não conhece fornecedor. É a mesma fronteira que o `end_to_end_id` respeita.
+
+### 9.6 O que a Efí **não** faz nesta entrega
 
 - **Devolução (estorno):** `refundPayment()` lança "não suportado", em voz alta. A política de reembolso do evento (**P-02**) não foi decidida, e implementar devolução antes de existir regra de negócio é construir um botão que ninguém sabe quando apertar.
 - **Cobrança com vencimento (`cobv`):** exige endereço completo de quem paga — logradouro, cidade, UF, CEP — que o formulário de inscrição não coleta e não precisa coletar. A cobrança imediata cobre o caso inteiro.
 - **Split, Pix enviado, Pix Automático, cartão:** fora de escopo.
 
-### 9.6 Provar contra a Efí de verdade
+### 9.7 Provar contra a Efí de verdade
 
 A suíte automatizada roda **sem credencial, sem certificado e sem rede**: o cliente da Efí é trocado por um duplo. Isso não é conveniência — o SDK usa cliente HTTP próprio, que o `Http::fake()` do Laravel não alcança.
 
