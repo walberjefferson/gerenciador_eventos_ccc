@@ -8,6 +8,7 @@ use App\Enums\SituacaoInscricao;
 use App\Http\Resources\InscricaoAcompanhamentoResource;
 use App\Http\Resources\PagamentoHistoricoResource;
 use App\Models\Inscricao;
+use App\Services\Ingressos\GeradorQrCodeIngresso;
 use App\Services\Inscricoes\LinhaDoTempoDaInscricao;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
@@ -26,6 +27,8 @@ use Inertia\Response;
  */
 class AcompanhamentoController extends Controller
 {
+    public function __construct(private readonly GeradorQrCodeIngresso $qrCodeIngresso) {}
+
     public function show(string $codigoPublico, LinhaDoTempoDaInscricao $linhaDoTempo): Response
     {
         $inscricao = Inscricao::query()
@@ -34,12 +37,19 @@ class AcompanhamentoController extends Controller
                 'grupoParticipante.cidade',
                 'atividades.grupoAtividade.diaEvento',
                 'pagamentos',
+                'ingresso',
             ])
             ->where('codigo_publico', $codigoPublico)
             ->firstOrFail();
 
         $podePagar = $inscricao->situacao === SituacaoInscricao::AguardandoPagamento
             && ! $inscricao->prazoVencido();
+
+        // O ingresso so aparece para quem esta confirmado. Nao e questao de
+        // tela: quem ainda deve nao pode sair daqui com um codigo que a
+        // portaria recusaria depois, na frente da fila.
+        $mostraIngresso = $inscricao->situacao === SituacaoInscricao::Confirmada
+            && $inscricao->ingresso !== null;
 
         return Inertia::render('Inscricoes/Acompanhar', [
             'inscricao' => new InscricaoAcompanhamentoResource($inscricao),
@@ -54,6 +64,13 @@ class AcompanhamentoController extends Controller
             'pode_pagar' => $podePagar,
             'url_pagamento' => $podePagar ? $this->urlAssinada($inscricao, 'inscricoes.pagamento') : null,
             'url_segunda_via' => $podePagar ? $this->urlAssinada($inscricao, 'inscricoes.segunda-via') : null,
+            // O desenho do QR vem pronto do servidor, em SVG, como ja acontece
+            // com o QR do Pix: aparece mesmo com a rede ruim e nao depende de
+            // biblioteca nenhuma no navegador.
+            'qr_ingresso' => $mostraIngresso
+                ? $this->qrCodeIngresso->svg((string) $inscricao->ingresso->codigo)
+                : null,
+            'url_ingresso_pdf' => $mostraIngresso ? $this->urlDoIngresso($inscricao) : null,
             // Explicacao deixada por quem redirecionou para ca — por exemplo,
             // um pedido de segunda via fora do prazo.
             'aviso' => session('aviso'),
@@ -72,6 +89,27 @@ class AcompanhamentoController extends Controller
         return URL::temporarySignedRoute(
             $rota,
             $prazo->copy()->addDay(),
+            ['codigo_publico' => $inscricao->codigo_publico],
+        );
+    }
+
+    /**
+     * Link assinado do ingresso em PDF.
+     *
+     * A validade NAO e a do prazo de pagamento: esse prazo ja passou para quem
+     * esta confirmado, e um link vencido no mesmo instante em que nasce nao
+     * serve a ninguem. Vale ate uma semana depois do fim do evento — tempo de
+     * imprimir de novo o papel que ficou na impressora de casa — com um piso de
+     * uma semana a partir de agora, para o caso de o evento ja ter acontecido.
+     */
+    private function urlDoIngresso(Inscricao $inscricao): string
+    {
+        $piso = Carbon::now()->addWeek();
+        $fimDoEvento = $inscricao->evento?->data_fim?->copy()->endOfDay()->addWeek();
+
+        return URL::temporarySignedRoute(
+            'inscricoes.ingresso',
+            $fimDoEvento !== null && $fimDoEvento->greaterThan($piso) ? $fimDoEvento : $piso,
             ['codigo_publico' => $inscricao->codigo_publico],
         );
     }

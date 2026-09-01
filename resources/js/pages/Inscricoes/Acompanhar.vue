@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HistoricoDaCobranca from '@/components/participante/HistoricoDaCobranca.vue';
+import IngressoDaInscricao from '@/components/participante/IngressoDaInscricao.vue';
 import LinhaDoTempo from '@/components/participante/LinhaDoTempo.vue';
 import ResumoDaInscricao from '@/components/participante/ResumoDaInscricao.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -175,6 +176,16 @@ function pedirSegundaVia(): void {
                     Se você quiser participar, faça uma nova inscrição na página do evento enquanto houver vagas.
                 </AlertDescription>
             </Alert>
+
+            <!-- O ingresso vem logo depois dos avisos de situacao, e nao no fim
+                 da pagina: quem abre esta tela no dia do evento esta na fila do
+                 portao, com o celular numa mao so, e o que ele precisa e o
+                 codigo — nao a linha do tempo nem o historico da cobranca.
+
+                 Fica FORA da cadeia v-if/v-else-if/v-else acima de proposito:
+                 aquele encadeamento exige irmaos imediatos, e um componente no
+                 meio dele quebraria o "v-else". -->
+            <IngressoDaInscricao v-if="inscricao.ingresso" :ingresso="inscricao.ingresso" :qr-svg="qr_ingresso" :url-pdf="url_ingresso_pdf" />
 
             <Card>
                 <CardHeader class="pb-3">

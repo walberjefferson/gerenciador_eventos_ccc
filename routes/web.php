@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\PapelController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\IngressoParticipanteController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
 use App\Http\Controllers\PagamentoController;
@@ -68,6 +69,12 @@ Route::get('inscricoes/{codigo_publico}/situacao', [PagamentoController::class, 
 Route::get('inscricoes/{codigo_publico}/acompanhar', [AcompanhamentoController::class, 'show'])
     ->middleware('signed')
     ->name('inscricoes.acompanhar');
+
+// O ingresso em PDF, para imprimir e levar. Assinada, como todas as do
+// participante — e, dentro do controller, so entrega a quem esta confirmado.
+Route::get('inscricoes/{codigo_publico}/ingresso', [IngressoParticipanteController::class, 'show'])
+    ->middleware('signed')
+    ->name('inscricoes.ingresso');
 
 // Segunda via do Pix, a pedido do participante. Assinada e com limite de
 // tentativas: a Action e idempotente, mas ninguem pede cobranca em serie.

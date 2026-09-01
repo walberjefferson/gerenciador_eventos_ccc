@@ -10,7 +10,7 @@ use App\Mail\EmailDaInscricao;
 use App\Mail\PagamentoConfirmadoMail;
 
 /**
- * Manda o comprovante quando o dinheiro e reconhecido.
+ * Manda o comprovante quando o dinheiro e reconhecido — com o ingresso dentro.
  *
  * Serve tanto para o pagamento reconhecido pelo provedor quanto para a
  * confirmacao feita a mao pela organizacao: para quem se inscreveu, o fato e o
@@ -21,7 +21,7 @@ class EnviarEmailPagamentoConfirmado extends OuvinteDeComunicacao
 {
     public function handle(InscricaoConfirmada $evento): void
     {
-        $inscricao = $evento->inscricao->loadMissing(['evento', 'atividades']);
+        $inscricao = $evento->inscricao->loadMissing(['evento', 'atividades', 'ingresso']);
         $pagamento = $evento->pagamento;
 
         $atividades = $inscricao->atividades
@@ -37,6 +37,12 @@ class EnviarEmailPagamentoConfirmado extends OuvinteDeComunicacao
             codigo: (string) $inscricao->codigo_publico,
             atividades: $atividades,
             link: $this->links->para($inscricao),
+            // O ingresso ja existe quando esta mensagem e montada: quem o
+            // emite e um ouvinte do MESMO anuncio, registrado antes deste e
+            // rodando fora da fila (AppServiceProvider). Se ainda assim ele
+            // faltar, a mensagem sai sem o ingresso em vez de nao sair — o
+            // comprovante do pagamento nao pode depender do desenho de um QR.
+            codigoIngresso: $inscricao->ingresso?->codigo,
         ));
     }
 }

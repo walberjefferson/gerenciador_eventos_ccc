@@ -6,6 +6,8 @@
  * provedor, nem contador interno de vagas.
  */
 
+import type { IngressoDoParticipante } from './ingresso';
+
 /** Como cada marco da linha do tempo se apresenta. */
 export type EstadoDoMarco = 'concluido' | 'atual' | 'futuro' | 'encerrado';
 
@@ -55,6 +57,8 @@ export interface InscricaoAcompanhada {
     expirada_em: string | null;
     cancelada_em: string | null;
     motivo_cancelamento: string | null;
+    /** So existe quando a inscricao esta confirmada. */
+    ingresso: IngressoDoParticipante | null;
     evento: EventoDoAcompanhamento;
     grupo_participante: GrupoDoParticipante | null;
     atividades: AtividadeEscolhida[];
@@ -86,6 +90,10 @@ export interface PropsDoAcompanhamento {
     url_pagamento: string | null;
     /** URL assinada que pede a segunda via do Pix; null quando nao ha o que pagar. */
     url_segunda_via: string | null;
+    /** O desenho do QR do ingresso, em SVG, pronto do servidor. Null se nao ha ingresso a mostrar. */
+    qr_ingresso: string | null;
+    /** URL assinada do ingresso em PDF; null quando nao ha ingresso a mostrar. */
+    url_ingresso_pdf: string | null;
     /** Explicacao deixada por quem redirecionou para esta tela. */
     aviso: string | null;
 }

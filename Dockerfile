@@ -78,6 +78,9 @@ WORKDIR /app
 # - opcache: o codigo compilado uma vez so.
 # - intl, bcmath: formatacao e dinheiro em centavos.
 # - zip: leitura do certificado .p12 da Efi e afins.
+# - gd: o QR Code do INGRESSO em PNG. Sem ela o ingresso nao aparece no e-mail
+#   nem no PDF — Gmail e Outlook nao exibem SVG, e o dompdf nao e confiavel com
+#   SVG. O QR do Pix continua em SVG puro-PHP e nao depende dela.
 # openssl e curl ja vem no PHP da imagem base — o SDK da Efi depende dos dois
 # para o mTLS com a instituicao financeira.
 RUN install-php-extensions \
@@ -88,6 +91,7 @@ RUN install-php-extensions \
       opcache \
       intl \
       zip \
+      gd \
       bcmath
 
 # Configuracao de producao do PHP/OPcache.

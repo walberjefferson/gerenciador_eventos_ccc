@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Enums\SituacaoInscricao;
 use App\Models\Atividade;
 use App\Models\Inscricao;
 use Illuminate\Http\Request;
@@ -42,6 +43,10 @@ class InscricaoAcompanhamentoResource extends JsonResource
             'expirada_em' => $this->expirada_em?->toIso8601String(),
             'cancelada_em' => $this->cancelada_em?->toIso8601String(),
             'motivo_cancelamento' => $this->motivo_cancelamento,
+            // O ingresso so existe no payload de quem esta confirmado. A
+            // situacao e conferida aqui, e nao so na tela: props do Inertia
+            // viajam no HTML, e o que nao pode ser visto nao pode ser enviado.
+            'ingresso' => $this->ingressoDoPayload(),
             'evento' => [
                 'nome' => $this->evento?->nome,
                 'slug' => $this->evento?->slug,
@@ -63,6 +68,37 @@ class InscricaoAcompanhamentoResource extends JsonResource
                 'termina_em' => $atividade->termina_em->toIso8601String(),
                 'horario_rotulo' => $atividade->comeca_em->format('H:i').' às '.$atividade->termina_em->format('H:i'),
             ])->values()->all(),
+        ];
+    }
+
+    /**
+     * O ingresso como o participante o ve: o codigo em grupos de quatro e
+     * quando ele foi emitido.
+     *
+     * O codigo cru NAO vai junto de proposito — a tela mostra o formatado e o
+     * QR ja carrega o valor de verdade. Duas escritas do mesmo segredo no
+     * mesmo payload sao uma a mais.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function ingressoDoPayload(): ?array
+    {
+        if ($this->situacao !== SituacaoInscricao::Confirmada || $this->ingresso === null) {
+            return null;
+        }
+
+        $ingresso = $this->ingresso;
+
+        // A situacao do ingresso depende da situacao da inscricao, e a
+        // inscricao esta aqui na mao: entregamos a relacao pronta em vez de
+        // deixar o model ir buscar de novo no banco a linha que ja temos.
+        $ingresso->setRelation('inscricao', $this->resource);
+
+        return [
+            'codigo_formatado' => $ingresso->codigoFormatado(),
+            'emitido_em' => $ingresso->emitido_em?->toIso8601String(),
+            'situacao' => $ingresso->situacao()->value,
+            'situacao_rotulo' => $ingresso->situacao()->rotulo(),
         ];
     }
 }

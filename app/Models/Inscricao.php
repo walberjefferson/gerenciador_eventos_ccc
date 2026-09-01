@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -101,6 +102,20 @@ class Inscricao extends Model
         return $this->belongsToMany(Atividade::class, 'inscricoes_atividades')
             ->withTimestamps()
             ->orderBy('atividades.id');
+    }
+
+    /**
+     * O ingresso desta inscricao, quando ela ja foi confirmada.
+     *
+     * E sempre um so — a unicidade de "inscricao_id" na tabela "ingressos"
+     * garante isso no banco. Fica nulo enquanto o pagamento nao e reconhecido:
+     * quem nao pagou nao tem o que apresentar na entrada.
+     *
+     * @return HasOne<Ingresso, $this>
+     */
+    public function ingresso(): HasOne
+    {
+        return $this->hasOne(Ingresso::class);
     }
 
     /**
