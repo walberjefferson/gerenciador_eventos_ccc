@@ -42,13 +42,20 @@ import { computed } from 'vue';
  * recebe o botão seguro. Descer disso é decisão explícita de quem escreve a
  * tela, tomada uma vez, no lugar onde se vê o contexto.
  *
- * As listagens do painel usam `sm`. Ali quem aciona é um ponteiro de poucos
- * pixels num computador, e o custo se inverte: numa tabela densa, com três
- * botões por linha e vinte linhas na tela, o botão de 44px empurra a linha para
- * baixo e a lista deixa de caber. É um desvio consciente da regra dos 44px, e
- * ele vale para o painel — NÃO para as telas públicas de inscrição, que são
- * mobile-first de verdade e usam o `Button`, não este componente. Mesmo o `xs`
- * fica bem acima do mínimo de 24px que a WCAG 2.2 AA (2.5.8) exige.
+ * As listagens do painel usam `xs`, e SÓ elas. Ali quem aciona é um ponteiro de
+ * poucos pixels num computador, e o custo se inverte: numa tabela densa, com
+ * três botões por linha e vinte linhas na tela, o botão de 44px empurra a linha
+ * para baixo e a lista deixa de caber.
+ *
+ * É um desvio consciente da regra dos 44px, e o limite dele é estreito: vale
+ * para o botão que mora dentro de uma célula de tabela do painel, e não para
+ * ação isolada em cabeçalho de tela, formulário ou ficha — essas continuam no
+ * `md`. E não vale de forma alguma para as telas públicas de inscrição, que são
+ * mobile-first de verdade e usam o `Button`, não este componente.
+ *
+ * Os 32px do `xs` seguem acima do mínimo de 24px que a WCAG 2.2 AA (2.5.8)
+ * exige, mas é o degrau mais baixo que este componente deve ver numa tabela:
+ * abaixo disso o alvo deixa de ser confortável até com mouse.
  */
 type Intencao = 'ver' | 'editar' | 'excluir' | 'neutra';
 

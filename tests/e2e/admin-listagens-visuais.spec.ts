@@ -153,9 +153,8 @@ async function posicaoDaLinha(page: Page, nome: string): Promise<number> {
 /**
  * A altura minima que um botao de acao de LINHA precisa ter.
  *
- * As listagens do painel usam `tamanho="sm"` do BotaoDeAcao: 36 px, a altura do
- * `size: default` do Button do projeto. Nao e responsivo — e o mesmo botao no
- * celular e no computador.
+ * As listagens do painel usam `tamanho="xs"` do BotaoDeAcao: 32 px. Nao e
+ * responsivo — e o mesmo botao no celular e no computador.
  *
  * ISSO E UM DESVIO CONSCIENTE dos 44 px que o projeto cobra como alvo de toque,
  * e ele vale so aqui: o painel e operado no computador, com ponteiro, e numa
@@ -164,11 +163,11 @@ async function posicaoDaLinha(page: Page, nome: string): Promise<number> {
  * o dedo e o unico apontador, nao usam este componente — elas usam o Button, e
  * la os 44 px continuam cobrados pelos cenarios de sempre.
  *
- * O numero segue medido, e nao apenas assumido: 36 px fica bem acima do minimo
- * de 24 px que a WCAG 2.2 AA (2.5.8) exige, e o cenario falha se alguem baixar
- * o tamanho da listagem sem pensar.
+ * O numero segue medido, e nao apenas assumido: 32 px ainda fica acima do
+ * minimo de 24 px que a WCAG 2.2 AA (2.5.8) exige. E o piso — o cenario falha
+ * se alguem descer daqui, e nao ha degrau menor para descer sem sair da regra.
  */
-const ALTURA_MINIMA_DA_LINHA = 36;
+const ALTURA_MINIMA_DA_LINHA = 32;
 
 /**
  * A cor de fundo realmente pintada de um elemento, como o navegador a calculou.

@@ -391,7 +391,7 @@ function rotuloDoPapel(papel: string | null): string {
                                      motivo fica escrito — espaço vazio sem
                                      explicação pareceria defeito. -->
                                 <BotaoDeAcao
-                                    tamanho="sm"
+                                    tamanho="xs"
                                     intencao="editar"
                                     :icone="Pencil"
                                     :data-testid="`editar-${usuario.id}`"
@@ -408,7 +408,7 @@ function rotuloDoPapel(papel: string | null): string {
 
                             <div v-else class="flex flex-wrap items-center gap-2">
                                 <BotaoDeAcao
-                                    tamanho="sm"
+                                    tamanho="xs"
                                     intencao="editar"
                                     :icone="Pencil"
                                     :data-testid="`editar-${usuario.id}`"
@@ -421,7 +421,7 @@ function rotuloDoPapel(papel: string | null): string {
                                      entrar": resolve sem que quem administra
                                      chegue a saber a senha de ninguém. -->
                                 <BotaoDeAcao
-                                    tamanho="sm"
+                                    tamanho="xs"
                                     :icone="KeyRound"
                                     :disabled="emAndamento === usuario.id"
                                     :data-testid="`redefinir-senha-${usuario.id}`"
@@ -438,7 +438,7 @@ function rotuloDoPapel(papel: string | null): string {
                                          ela. A cor é a de ação irreversível porque a
                                          pessoa deixa de entrar na hora. -->
                                     <BotaoDeAcao
-                                        tamanho="sm"
+                                        tamanho="xs"
                                         intencao="excluir"
                                         :icone="UserMinus"
                                         :disabled="emAndamento === usuario.id"
@@ -447,11 +447,11 @@ function rotuloDoPapel(papel: string | null): string {
                                     >
                                         Sim, desativar
                                     </BotaoDeAcao>
-                                    <BotaoDeAcao tamanho="sm" @click="confirmandoDesativacao = null">Não</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="xs" @click="confirmandoDesativacao = null">Não</BotaoDeAcao>
                                 </template>
 
                                 <BotaoDeAcao
-                                    tamanho="sm"
+                                    tamanho="xs"
                                     v-else-if="usuario.ativo"
                                     intencao="excluir"
                                     :icone="UserMinus"
@@ -463,7 +463,7 @@ function rotuloDoPapel(papel: string | null): string {
 
                                 <BotaoDeAcao
                                     v-else
-                                    tamanho="sm"
+                                    tamanho="xs"
                                     :icone="UserCheck"
                                     :disabled="emAndamento === usuario.id"
                                     :data-testid="`reativar-${usuario.id}`"

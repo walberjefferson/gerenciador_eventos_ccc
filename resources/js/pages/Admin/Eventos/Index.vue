@@ -119,7 +119,7 @@ function excluir(evento: EventoDaLista): void {
                                 -->
                                 <div class="flex flex-wrap items-center gap-2">
                                     <BotaoDeAcao
-                                        tamanho="sm"
+                                        tamanho="xs"
                                         intencao="editar"
                                         :icone="Pencil"
                                         :href="route('admin.eventos.edit', { evento: evento.id })"
@@ -127,7 +127,7 @@ function excluir(evento: EventoDaLista): void {
                                         Editar
                                     </BotaoDeAcao>
                                     <BotaoDeAcao
-                                        tamanho="sm"
+                                        tamanho="xs"
                                         :icone="CalendarDays"
                                         :href="route('admin.eventos.estrutura', { evento: evento.id })"
                                     >
@@ -138,7 +138,7 @@ function excluir(evento: EventoDaLista): void {
                                     <template v-else-if="confirmandoExclusao === evento.id">
                                         <span class="text-muted-foreground">Excluir mesmo?</span>
                                         <BotaoDeAcao
-                                            tamanho="sm"
+                                            tamanho="xs"
                                             intencao="excluir"
                                             :icone="Trash2"
                                             :disabled="excluindo"
@@ -146,11 +146,11 @@ function excluir(evento: EventoDaLista): void {
                                         >
                                             Sim, excluir
                                         </BotaoDeAcao>
-                                        <BotaoDeAcao tamanho="sm" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
+                                        <BotaoDeAcao tamanho="xs" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                     </template>
                                     <BotaoDeAcao
                                         v-else
-                                        tamanho="sm"
+                                        tamanho="xs"
                                         intencao="excluir"
                                         :icone="Trash2"
                                         @click="confirmandoExclusao = evento.id"
