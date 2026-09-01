@@ -8,9 +8,11 @@ name: Publicar imagem Docker (GHCR)
 #   que permite testar a imagem no servidor ANTES do merge na main
 # - manualmente         -> Actions > Publicar imagem Docker > Run workflow
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed
     tags:
       - "v*"
   workflow_dispatch:
@@ -21,6 +23,7 @@ env:
 
 jobs:
   build-and-push:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: read

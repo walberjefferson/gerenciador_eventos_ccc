@@ -99,6 +99,7 @@ Route::middleware(['auth', 'verified'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
+        Route::redirect('/', 'painel');
         Route::get('painel', [PainelController::class, 'index'])
             ->middleware('permission:painel.ver')
             ->name('painel');
