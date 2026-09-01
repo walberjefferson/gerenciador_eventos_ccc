@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Evento;
 use App\Models\WebhookPagamento;
 use App\Services\Admin\NumerosDoEvento;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -26,6 +27,46 @@ use Inertia\Response;
  */
 class PainelController extends Controller
 {
+    /**
+     * A porta de entrada do lado administrativo: quem digita "/admin" cai
+     * aqui, e daqui vai para a tela que a sua permissao abre.
+     *
+     * ATE A FASE ANTERIOR isto era um `Route::redirect('/', 'painel')` fixo, e
+     * ele funcionava porque todo mundo que entrava tinha "painel.ver". Com o
+     * papel "portaria" isso deixou de ser verdade: o voluntario do portao
+     * entraria pelo endereco mais obvio do sistema e receberia um 403 na cara,
+     * sem nenhuma pista de que existe uma tela para ele.
+     *
+     * O redirecionamento fixo tinha ainda um segundo defeito, este mais
+     * silencioso: por ser criado dentro do grupo `admin.`, ele herdava o
+     * prefixo de nome e virava uma rota administrativa SEM exigencia de
+     * permissao nenhuma — o `AutorizacaoTest` acusa exatamente isso. Ao virar
+     * uma rota de verdade, ele passa a cobrar as permissoes dos dois destinos
+     * possiveis, e quem nao tem nenhuma das duas nao tem o que fazer no painel
+     * mesmo.
+     *
+     * A ordem importa: quem tem as duas permissoes — administrador e
+     * organizador — vai para o painel, porque e a tela que responde a pergunta
+     * de quem administra. A portaria e o destino de quem SO tem o portao.
+     */
+    public function entrada(Request $request): RedirectResponse
+    {
+        $usuario = $request->user();
+
+        if ($usuario?->can('painel.ver') === true) {
+            return redirect()->route('admin.painel');
+        }
+
+        if ($usuario?->can('presenca.registrar') === true) {
+            return redirect()->route('admin.portaria.index');
+        }
+
+        // A rota ja cobra uma das duas permissoes; chegar aqui significa que o
+        // middleware mudou e alguem sem destino nenhum passou. Melhor a porta
+        // fechada do que um desvio para uma tela que responderia 403.
+        abort(403);
+    }
+
     public function index(Request $request, NumerosDoEvento $numeros): Response
     {
         $eventos = $this->eventosDisponiveis();

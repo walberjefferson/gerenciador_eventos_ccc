@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\Admin\PapelController;
+use App\Http\Controllers\Admin\PortariaController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\HomeController;
@@ -106,10 +107,56 @@ Route::middleware(['auth', 'verified'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
-        Route::redirect('/', 'painel');
+        // A porta de entrada do painel. Ela EXISTE como rota, e nao como um
+        // `Route::redirect` fixo, por duas razoes:
+        //
+        // 1. O destino depende do papel. Quem tem "painel.ver" vai para os
+        //    numeros do evento; quem so tem o portao vai para a portaria. Com o
+        //    desvio fixo, o voluntario da portaria entrava pelo endereco mais
+        //    obvio do sistema e levava 403.
+        // 2. O `Route::redirect` herdava o prefixo de nome do grupo e virava
+        //    uma rota `admin.` sem permissao nenhuma — a unica do painel nessa
+        //    condicao. O AutorizacaoTest existe justamente para pegar isso.
+        //
+        // O `permission:` com barra vertical e um OU: basta uma das duas. Quem
+        // nao tem nenhuma nao tem destino no painel, e recebe 403 aqui mesmo.
+        Route::get('/', [PainelController::class, 'entrada'])
+            ->middleware('permission:painel.ver|presenca.registrar')
+            ->name('inicio');
+
         Route::get('painel', [PainelController::class, 'index'])
             ->middleware('permission:painel.ver')
             ->name('painel');
+
+        // O portao, no dia do evento. E a unica tela que o papel "portaria"
+        // alcanca, e ela cobra permissoes diferentes em cada acao:
+        //
+        // - ver e conferir pedem "presenca.registrar";
+        // - desfazer pede "presenca.desfazer", que a portaria NAO tem (o
+        //   motivo esta escrito no PapeisSeeder).
+        //
+        // A conferencia leva throttle. O codigo tem ~60 bits de entropia e
+        // adivinhar um valido por tentativa e inviavel, mas rota de conferencia
+        // sem limite e convite a varredura — e o teto e alto o bastante para
+        // dois voluntarios conferindo sem parar no mesmo portao.
+        Route::prefix('portaria')
+            ->name('portaria.')
+            ->group(function (): void {
+                Route::get('/', [PortariaController::class, 'index'])
+                    ->middleware('permission:presenca.registrar')
+                    ->name('index');
+
+                Route::post('validar', [PortariaController::class, 'validar'])
+                    ->middleware([
+                        'permission:presenca.registrar',
+                        'throttle:'.config('inscricoes.limites.validar_ingresso'),
+                    ])
+                    ->name('validar');
+
+                Route::post('ingressos/{ingresso}/desfazer', [PortariaController::class, 'desfazer'])
+                    ->middleware('permission:presenca.desfazer')
+                    ->name('desfazer');
+            });
 
         // Catalogo global: setores e grupos de participantes. Sao listas que
         // valem para todos os eventos, por isso vivem sob a mesma permissao.

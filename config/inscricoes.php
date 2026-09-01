@@ -59,6 +59,21 @@ return [
         // aqui pega quem tenta muitos e-mails diferentes do mesmo lugar.
         'login_por_minuto' => (int) env('ADMIN_LIMITE_LOGIN_MINUTO', 20),
 
+        // Conferencia de ingresso na portaria, por endereco de internet.
+        //
+        // O teto e alto de proposito, e pelo mesmo motivo do limite de criar
+        // inscricao: no dia do evento o portao inteiro sai por UM endereco — o
+        // wi-fi do salao, ou o celular de alguem repartindo internet — e sao
+        // varios voluntarios conferindo ao mesmo tempo, cada um com a fila na
+        // frente. Um teto justo transformaria a defesa em porta trancada
+        // justamente na hora em que a tela precisa funcionar.
+        //
+        // Ele existe mesmo assim porque rota de conferencia sem limite nenhum
+        // e convite a varredura. Com ~60 bits de entropia no codigo, 240
+        // tentativas por minuto levariam bilhoes de anos para acertar um
+        // ingresso — e ainda assim o limite corta o script que tentasse.
+        'validar_ingresso' => env('PORTARIA_LIMITE_VALIDAR_INGRESSO', '240,1'),
+
         'segunda_via' => env('INSCRICOES_LIMITE_SEGUNDA_VIA', '5,1'),
         'acesso_por_minuto' => env('INSCRICOES_LIMITE_ACESSO_MINUTO', '5,1'),
         'acesso_por_hora' => env('INSCRICOES_LIMITE_ACESSO_HORA', '15,60'),

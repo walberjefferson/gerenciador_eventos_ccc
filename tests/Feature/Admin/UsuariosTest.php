@@ -200,7 +200,11 @@ describe('a lista', function (): void {
             ->assertInertia(fn (Assert $pagina) => $pagina
                 ->component('Admin/Usuarios/Index')
                 ->has('usuarios.dados', 2)
-                ->has('opcoes.papeis', 2)
+                // Tres papeis atribuiveis desde o controle de presenca:
+                // administrador, organizador e portaria. A lista sai da tabela,
+                // e nao de um rol escrito a mao (D-50) — por isso o papel novo
+                // aparece aqui sem ninguem ter mexido na tela.
+                ->has('opcoes.papeis', 3)
             );
     });
 
@@ -287,13 +291,18 @@ describe('quem alcanca a tela', function (): void {
 
         expect($props['permissoes'])->toHaveCount(count(PapeisSeeder::PERMISSOES))
             ->and($props['permissoes'][0]['explicacao'])->toBe(PapeisSeeder::PERMISSOES['painel.ver'])
-            ->and($props['papeis'])->toHaveCount(2);
+            ->and($props['papeis'])->toHaveCount(3);
 
         $porNome = collect($props['papeis'])->keyBy('nome');
 
         expect($porNome[PapeisSeeder::PAPEL_ADMINISTRADOR]['quantas'])->toBe(count(PapeisSeeder::PERMISSOES))
             ->and($porNome[PapeisSeeder::PAPEL_ORGANIZADOR]['permissoes'])
             ->not->toContain('usuarios.gerenciar');
+
+        // A portaria e o papel mais estreito do sistema: uma permissao, e a
+        // de desfazer entrada NAO e ela. Esta linha esta aqui porque a matriz
+        // e a unica tela onde alguem confere isso sem abrir o codigo.
+        expect($porNome[PapeisSeeder::PAPEL_PORTARIA]['permissoes'])->toBe(['presenca.registrar']);
     });
 });
 

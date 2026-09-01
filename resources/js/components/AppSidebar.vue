@@ -4,30 +4,30 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BellRing, CalendarDays, KeyRound, LayoutGrid, MapPin, ScrollText, ShieldCheck, Users, UsersRound } from 'lucide-vue-next';
+import { BellRing, CalendarDays, KeyRound, LayoutGrid, MapPin, ScanLine, ScrollText, ShieldCheck, Users, UsersRound } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
 const page = usePage<SharedData>();
 
-// A navegação administrativa de verdade. Cada fase acrescenta o seu item aqui,
-// e não em um menu paralelo.
-const itensFixos: NavItem[] = [
-    {
-        title: 'Painel',
-        href: '/admin/painel',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Eventos',
-        href: '/admin/eventos',
-        icon: CalendarDays,
-    },
-    {
-        title: 'Inscrições',
-        href: '/admin/inscricoes',
-        icon: Users,
-    },
+/**
+ * A navegação administrativa de verdade. Cada fase acrescenta o seu item aqui,
+ * e não em um menu paralelo.
+ *
+ * NENHUM ITEM É FIXO, e isso mudou com o papel `portaria`. Até esta entrega,
+ * Painel, Eventos e Inscrições apareciam para todo mundo, e funcionava porque
+ * todo mundo que entrava no painel tinha as três permissões. O voluntário do
+ * portão tem UMA permissão: com a lista fixa, ele veria três itens que só o
+ * levariam a 403 — exatamente o que o resto deste arquivo passou seis fases
+ * evitando.
+ */
+const itensPorPermissao: { permissao: string; item: NavItem }[] = [
+    { permissao: 'painel.ver', item: { title: 'Painel', href: '/admin/painel', icon: LayoutGrid } },
+    { permissao: 'eventos.gerenciar', item: { title: 'Eventos', href: '/admin/eventos', icon: CalendarDays } },
+    { permissao: 'inscricoes.ver', item: { title: 'Inscrições', href: '/admin/inscricoes', icon: Users } },
+    // A portaria vem logo depois das três de sempre: no dia do evento ela é a
+    // tela mais usada do sistema, e para quem tem só ela é a única.
+    { permissao: 'presenca.registrar', item: { title: 'Portaria', href: '/admin/portaria', icon: ScanLine } },
 ];
 
 /**
@@ -39,7 +39,7 @@ const itensFixos: NavItem[] = [
  */
 const itensDoPainel = computed<NavItem[]>(() => {
     const permissoes = page.props.auth?.permissoes ?? [];
-    const itens = [...itensFixos];
+    const itens = itensPorPermissao.filter(({ permissao }) => permissoes.includes(permissao)).map(({ item }) => item);
 
     // O catalogo: setores e grupos. As duas telas existiam desde a Fase 6b, com
     // cadastro, edicao e exclusao completos — mas SEM nenhum link apontando
@@ -92,7 +92,13 @@ const itensDoPainel = computed<NavItem[]>(() => {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="route('admin.painel')" aria-label="Ir para o painel">
+                        <!--
+                            O logotipo aponta para a ENTRADA do painel, e não
+                            para a tela do painel: é o servidor que decide o
+                            destino conforme o papel. Apontar direto para
+                            `admin.painel` daria 403 a quem só tem o portão.
+                        -->
+                        <Link :href="route('admin.inicio')" aria-label="Ir para o início do painel">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>

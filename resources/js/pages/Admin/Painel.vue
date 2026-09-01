@@ -84,6 +84,15 @@ const eventoAindaSemInscricao = computed<boolean>(() => props.numeros !== null &
 const dinheiro = computed(() => props.numeros?.dinheiro ?? null);
 
 /**
+ * Quem já entrou pelo portão e quem ainda falta.
+ *
+ * Fica ao lado das inscrições, e não junto do dinheiro, porque responde à mesma
+ * pergunta que elas — "quanta gente?" —, só que no dia do evento em vez de
+ * antes dele. Os três números sempre fecham: presentes + faltantes = esperados.
+ */
+const presenca = computed(() => props.numeros?.presenca ?? null);
+
+/**
  * O último aviso do provedor de pagamento.
  *
  * Ele é global, e não do evento escolhido no seletor: aviso de provedor fala de
@@ -183,6 +192,42 @@ function haQuantoTempo(minutos: number | null): string {
                             :valor="String(linha.total)"
                             :tom="tomDe(linha)"
                             :significado="significadoDe(linha)"
+                        />
+                    </div>
+                </section>
+
+                <!--
+                    A presença no portão. Aparece sempre, inclusive zerada:
+                    antes do evento "0 já entraram, 40 ainda faltam" é a
+                    resposta certa, e não uma tela faltando.
+                -->
+                <section v-if="presenca" aria-labelledby="titulo-presenca" class="flex flex-col gap-3" data-testid="painel-presenca">
+                    <!--
+                        "Presença no portão", e não "presença no evento": o
+                        `<section>` tem nome acessível, e um título com a
+                        palavra "evento" faz o rótulo desta seção competir com o
+                        do seletor de evento — para o leitor de tela e para
+                        quem procura o campo pelo nome.
+                    -->
+                    <h2 id="titulo-presenca" class="text-lg font-semibold">Presença no portão</h2>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <CartaoDeNumero
+                            rotulo="Já entraram"
+                            :valor="String(presenca.presentes)"
+                            tom="sucesso"
+                            significado="Ingressos conferidos na portaria."
+                        />
+                        <CartaoDeNumero
+                            rotulo="Ainda faltam"
+                            :valor="String(presenca.faltantes)"
+                            tom="informacao"
+                            significado="Inscrições confirmadas que ainda não passaram pelo portão."
+                        />
+                        <CartaoDeNumero
+                            rotulo="Esperados"
+                            :valor="String(presenca.confirmadas)"
+                            significado="Todo mundo com inscrição confirmada neste evento."
                         />
                     </div>
                 </section>

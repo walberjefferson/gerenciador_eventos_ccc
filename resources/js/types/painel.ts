@@ -45,6 +45,19 @@ export interface DinheiroDoEvento {
     pagamentos_pendentes: number;
 }
 
+/**
+ * Quem entrou pelo portão e quem ainda falta.
+ *
+ * `confirmadas` vem junto de propósito: sem ela, "12 presentes" não diz se o
+ * evento está cheio ou vazio. Os três números sempre fecham —
+ * `presentes + faltantes === confirmadas`.
+ */
+export interface PresencaDoEvento {
+    presentes: number;
+    faltantes: number;
+    confirmadas: number;
+}
+
 export interface NumerosDoEvento {
     inscricoes: {
         total: number;
@@ -52,4 +65,5 @@ export interface NumerosDoEvento {
     };
     vagas: VagaDaAtividade[];
     dinheiro: DinheiroDoEvento;
+    presenca: PresencaDoEvento;
 }

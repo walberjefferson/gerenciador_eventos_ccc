@@ -65,6 +65,31 @@ enum AcaoAuditada: string
      */
     case AlterouCredencialPagamento = 'alterou-credencial-pagamento';
 
+    /**
+     * Alguem entrou no evento com um ingresso.
+     *
+     * Tem verbo proprio pelo mesmo motivo de MudouSituacaoDoUsuario: nao e
+     * cadastro. Quem le a auditoria depois de uma discussao no portao — "a
+     * fulana entrou ou nao entrou?" — procura por isto, e nao por "alterou o
+     * ingresso numero 412".
+     *
+     * FICA FORA das acoes sensiveis de proposito. Um evento de mil pessoas
+     * gera mil registros deste verbo num dia, e o filtro de acoes sensiveis
+     * existe justamente para que o excepcional nao se perca no rotineiro.
+     */
+    case RegistrouPresenca = 'registrou-presenca';
+
+    /**
+     * Alguem apagou uma entrada que ja estava registrada.
+     *
+     * ESTE e sensivel, e a diferenca em relacao ao de cima e a razao de os
+     * dois existirem separados: desfazer devolve validade a um ingresso ja
+     * usado, ou seja, e o caminho pelo qual um ingresso vira carona para outra
+     * pessoa. Acontece poucas vezes por evento e alguem precisa poder olhar
+     * todas elas.
+     */
+    case DesfezPresenca = 'desfez-presenca';
+
     public function rotulo(): string
     {
         return match ($this) {
@@ -79,6 +104,8 @@ enum AcaoAuditada: string
             self::AlterouDadosDoUsuario => 'Alterou o nome ou o e-mail de uma conta',
             self::RedefiniuSenhaDeUsuario => 'Redefiniu a senha de uma conta',
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
+            self::RegistrouPresenca => 'Registrou entrada no evento',
+            self::DesfezPresenca => 'Desfez uma entrada registrada',
         };
     }
 
@@ -99,6 +126,9 @@ enum AcaoAuditada: string
             self::AlterouDadosDoUsuario,
             self::RedefiniuSenhaDeUsuario,
             self::AlterouCredencialPagamento,
+            // "Registrou presenca" NAO entra: e o verbo mais frequente do
+            // sistema no dia do evento, e afogaria os outros oito.
+            self::DesfezPresenca,
         ];
     }
 }

@@ -15,24 +15,35 @@ use Tests\Feature\Admin\Cenario;
  * O numero e escrito a mao de proposito: contar `PapeisSeeder::PERMISSOES`
  * faria o teste concordar com qualquer coisa que alguem acrescentasse. Ele
  * subiu de 10 para 11 na tela dos avisos do provedor (permissao
- * "pagamentos.avisos-ver", so do administrador). Quem mexer neste numero esta
- * dizendo, por escrito, que criou ou tirou uma permissao.
+ * "pagamentos.avisos-ver", so do administrador) e de 11 para 13 no controle de
+ * presenca ("presenca.registrar" e "presenca.desfazer"). Quem mexer neste
+ * numero esta dizendo, por escrito, que criou ou tirou uma permissao.
  */
-const TOTAL_DE_PERMISSOES = 11;
+const TOTAL_DE_PERMISSOES = 13;
 
-it('cria os dois papeis e as onze permissoes', function (): void {
+/**
+ * Quantos papeis existem.
+ *
+ * Foram dois durante seis fases, e o comentario do `PapeisSeeder` explica por
+ * que: perfil sem ninguem para ocupar e complexidade sem dono. O terceiro
+ * ("portaria") nasceu com gente de verdade para ocupa-lo — o voluntario do
+ * portao no dia do evento — e com uma permissao so.
+ */
+const TOTAL_DE_PAPEIS = 3;
+
+it('cria os tres papeis e as treze permissoes', function (): void {
     Cenario::semearPapeis();
 
-    expect(Role::count())->toBe(2)
+    expect(Role::count())->toBe(TOTAL_DE_PAPEIS)
         ->and(Permission::count())->toBe(TOTAL_DE_PERMISSOES)
-        ->and(Role::pluck('name')->sort()->values()->all())->toBe(['administrador', 'organizador']);
+        ->and(Role::pluck('name')->sort()->values()->all())->toBe(['administrador', 'organizador', 'portaria']);
 });
 
 it('roda duas vezes sem duplicar papel nem permissao', function (): void {
     Cenario::semearPapeis();
     Cenario::semearPapeis();
 
-    expect(Role::count())->toBe(2)
+    expect(Role::count())->toBe(TOTAL_DE_PAPEIS)
         ->and(Permission::count())->toBe(TOTAL_DE_PERMISSOES);
 
     $administrador = Role::findByName('administrador');
@@ -172,6 +183,28 @@ it('abre o painel para o organizador', function (): void {
     $this->actingAs(Cenario::usuarioCom('organizador'))
         ->get('/admin/painel')
         ->assertOk();
+});
+
+it('leva cada papel para a tela que ele alcanca ao entrar em /admin', function (): void {
+    Cenario::semearPapeis();
+
+    // A entrada do painel foi um `Route::redirect('/', 'painel')` fixo ate a
+    // fase do controle de presenca, e ele tinha DOIS defeitos.
+    //
+    // O primeiro e o que o teste seguinte pegava: por nascer dentro do grupo
+    // `admin.`, o desvio herdava o prefixo de nome e virava uma rota
+    // administrativa SEM exigir permissao nenhuma — a unica do painel nessa
+    // condicao.
+    //
+    // O segundo so apareceu com o papel "portaria": o destino era sempre uma
+    // tela que exige "painel.ver", que o voluntario do portao nao tem. Ele
+    // entraria pelo endereco mais obvio do sistema e levaria 403.
+    $this->actingAs(Cenario::usuarioCom('administrador'))->get('/admin')->assertRedirect('/admin/painel');
+    $this->actingAs(Cenario::usuarioCom('organizador'))->get('/admin')->assertRedirect('/admin/painel');
+    $this->actingAs(Cenario::usuarioCom('portaria'))->get('/admin')->assertRedirect('/admin/portaria');
+
+    // E quem nao tem destino nenhum no painel continua batendo na porta.
+    $this->actingAs(Cenario::usuarioCom())->get('/admin')->assertForbidden();
 });
 
 it('nao deixa nenhuma rota administrativa protegida apenas por login', function (): void {

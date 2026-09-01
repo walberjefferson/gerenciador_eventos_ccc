@@ -100,6 +100,23 @@ const WEBHOOK: Record<string, Variante> = {
     falhou: 'erroSuave',
 };
 
+/**
+ * Ingresso.
+ *
+ * `usado` e NEUTRO, e nao verde: no portao, verde quer dizer "pode entrar", e
+ * um ingresso ja utilizado e exatamente o contrario disso. Pintar de verde o
+ * que a portaria precisa recusar seria o pior erro de cor do sistema inteiro.
+ *
+ * `invalido` e ERRO porque e o unico dos tres que exige alguem fazer alguma
+ * coisa: a inscricao por tras dele deixou de estar confirmada, e a pessoa que
+ * esta com esse ingresso na mao vai precisar de uma explicacao.
+ */
+const INGRESSO: Record<string, Variante> = {
+    emitido: 'sucessoSuave',
+    usado: 'neutra',
+    invalido: 'erroSuave',
+};
+
 export function varianteDaInscricao(situacao: string): Variante {
     return INSCRICAO[situacao] ?? NEUTRA;
 }
@@ -116,6 +133,10 @@ export function varianteDoWebhook(situacao: string): Variante {
     return WEBHOOK[situacao] ?? NEUTRA;
 }
 
+export function varianteDoIngresso(situacao: string): Variante {
+    return INGRESSO[situacao] ?? NEUTRA;
+}
+
 /**
  * Ativo/inativo dos cadastros — setores, grupos, dias, atividades, contas.
  *
@@ -128,7 +149,7 @@ export function varianteDeAtivo(ativo: boolean): Variante {
 }
 
 /** Os dominios que a `EtiquetaDeSituacao` sabe pintar. */
-export type DominioDeSituacao = 'inscricao' | 'pagamento' | 'evento' | 'webhook';
+export type DominioDeSituacao = 'inscricao' | 'pagamento' | 'evento' | 'webhook' | 'ingresso';
 
 /** O despachante do componente de etiqueta. Nao decide nada: so escolhe o mapa. */
 export function varianteDoDominio(dominio: DominioDeSituacao, situacao: string): Variante {
@@ -141,5 +162,7 @@ export function varianteDoDominio(dominio: DominioDeSituacao, situacao: string):
             return varianteDoEvento(situacao);
         case 'webhook':
             return varianteDoWebhook(situacao);
+        case 'ingresso':
+            return varianteDoIngresso(situacao);
     }
 }
