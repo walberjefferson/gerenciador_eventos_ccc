@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { FiltrosDeUsuarios, OpcoesDeUsuarios, PaginaDeUsuarios, UsuarioAdministrativo } from '@/types/admin';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { KeyRound, Pencil, UserCheck, UserMinus } from 'lucide-vue-next';
 import { computed, reactive, ref } from 'vue';
 
 /**
@@ -342,12 +346,7 @@ function rotuloDoPapel(papel: string | null): string {
                     >
                         <th scope="row" class="px-4 py-3 text-left font-medium">
                             {{ usuario.nome }}
-                            <span
-                                v-if="usuario.sou_eu"
-                                class="bg-secondary text-secondary-foreground ml-2 rounded-full px-2 py-0.5 text-xs font-medium"
-                            >
-                                você
-                            </span>
+                            <Badge v-if="usuario.sou_eu" variant="secondary" class="ml-2">você</Badge>
                         </th>
                         <td class="px-4 py-3">{{ usuario.email }}</td>
                         <td class="px-4 py-3">
@@ -372,16 +371,12 @@ function rotuloDoPapel(papel: string | null): string {
                         <td class="px-4 py-3">
                             <!-- A palavra escrita, e não só a cor: quem não
                                  distingue as duas cores precisa ler o estado
-                                 (WCAG 1.4.1). -->
-                            <span
-                                :class="
-                                    usuario.ativo
-                                        ? 'bg-sucesso-suave text-sucesso-suave-foreground rounded-full px-2 py-0.5 text-xs font-medium'
-                                        : 'bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium'
-                                "
-                            >
-                                {{ usuario.ativo ? 'Ativo' : 'Desativado' }}
-                            </span>
+                                 (WCAG 1.4.1). A cor vem do mapeamento central,
+                                 e não mais de duas strings de classe escritas
+                                 aqui — inclusive o cinza de "Desativado", que
+                                 usava `muted-foreground` sobre `muted` e rendia
+                                 4.39:1. -->
+                            <EtiquetaDeSituacao dominio="ativo" :situacao="usuario.ativo" :rotulo="usuario.ativo ? 'Ativo' : 'Desativado'" />
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap">{{ usuario.entrou_em ?? '—' }}</td>
                         <td class="px-4 py-3">
@@ -395,14 +390,15 @@ function rotuloDoPapel(papel: string | null): string {
                                      próprio papel e desativar a si mesmo, e o
                                      motivo fica escrito — espaço vazio sem
                                      explicação pareceria defeito. -->
-                                <button
-                                    type="button"
+                                <BotaoDeAcao
+                                    tamanho="compacto"
+                                    intencao="editar"
+                                    :icone="Pencil"
                                     :data-testid="`editar-${usuario.id}`"
-                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                                     @click="abrirEdicao(usuario)"
                                 >
                                     Editar
-                                </button>
+                                </BotaoDeAcao>
 
                                 <p class="text-muted-foreground max-w-xs text-sm">
                                     Esta é a sua conta. Ninguém muda o próprio papel nem desativa a si mesmo — peça a outra pessoa com acesso de
@@ -411,68 +407,70 @@ function rotuloDoPapel(papel: string | null): string {
                             </div>
 
                             <div v-else class="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
+                                <BotaoDeAcao
+                                    tamanho="compacto"
+                                    intencao="editar"
+                                    :icone="Pencil"
                                     :data-testid="`editar-${usuario.id}`"
-                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                                     @click="abrirEdicao(usuario)"
                                 >
                                     Editar
-                                </button>
+                                </BotaoDeAcao>
 
                                 <!-- O caminho preferido para "não consigo
                                      entrar": resolve sem que quem administra
                                      chegue a saber a senha de ninguém. -->
-                                <button
-                                    type="button"
+                                <BotaoDeAcao
+                                    tamanho="compacto"
+                                    :icone="KeyRound"
                                     :disabled="emAndamento === usuario.id"
                                     :data-testid="`redefinir-senha-${usuario.id}`"
-                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                     @click="enviarRedefinicao(usuario)"
                                 >
                                     Enviar link de senha
-                                </button>
+                                </BotaoDeAcao>
 
                                 <template v-if="confirmandoDesativacao === usuario.id">
                                     <span class="text-muted-foreground">Desativar mesmo? Ela deixa de entrar na hora.</span>
-                                    <button
-                                        type="button"
+                                    <!-- O ícone é de "tirar do time", e não uma lixeira: nada
+                                         aqui é apagado. Conta desativada continua no
+                                         banco, e a auditoria continua apontando para
+                                         ela. A cor é a de ação irreversível porque a
+                                         pessoa deixa de entrar na hora. -->
+                                    <BotaoDeAcao
+                                        tamanho="compacto"
+                                        intencao="excluir"
+                                        :icone="UserMinus"
                                         :disabled="emAndamento === usuario.id"
                                         :data-testid="`confirmar-desativacao-${usuario.id}`"
-                                        class="border-destructive text-destructive focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                         @click="trocarSituacao(usuario, false)"
                                     >
                                         Sim, desativar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="confirmandoDesativacao = null"
-                                    >
-                                        Não
-                                    </button>
+                                    </BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="compacto" @click="confirmandoDesativacao = null">Não</BotaoDeAcao>
                                 </template>
 
-                                <button
+                                <BotaoDeAcao
+                                    tamanho="compacto"
                                     v-else-if="usuario.ativo"
-                                    type="button"
+                                    intencao="excluir"
+                                    :icone="UserMinus"
                                     :data-testid="`desativar-${usuario.id}`"
-                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                                     @click="confirmandoDesativacao = usuario.id"
                                 >
                                     Desativar
-                                </button>
+                                </BotaoDeAcao>
 
-                                <button
+                                <BotaoDeAcao
                                     v-else
-                                    type="button"
+                                    tamanho="compacto"
+                                    :icone="UserCheck"
                                     :disabled="emAndamento === usuario.id"
                                     :data-testid="`reativar-${usuario.id}`"
-                                    class="border-border focus-visible:ring-ring min-h-11 rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                     @click="trocarSituacao(usuario, true)"
                                 >
                                     Reativar
-                                </button>
+                                </BotaoDeAcao>
                             </div>
                         </td>
                     </tr>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { AvisoDoProvedor, FiltrosDeAvisos, OpcoesDeAvisos, PaginaDeAvisos } from '@/types/admin';
@@ -83,30 +85,14 @@ const resumo = computed(() => {
 /** Verdadeiro só quando a tabela inteira está vazia, e não por causa de filtro. */
 const nenhumAvisoJamais = computed<boolean>(() => props.avisos.total === 0 && Object.values(props.filtros).every((valor) => valor === null));
 
-/**
- * A cor de cada situação, decidida de uma vez só.
+/*
+ * A cor de cada situação saiu daqui.
  *
- * Fundo, borda e texto saem da mesma linha de propósito: classe fixa disputando
- * com classe condicional já custou dois defeitos neste projeto, e quem decide o
- * vencedor é a ordem no arquivo de estilo, não a intenção de quem escreveu.
- *
- * A cor nunca é a informação: a palavra da situação está escrita ao lado, e é
- * ela que um leitor de tela lê.
- *
- * "Ignorado" é neutro por decisão: não é erro, é o aviso que falava de cobrança
- * que não existe aqui ou que repetia algo já resolvido. Pintar de vermelho o
- * que é normal ensina a ignorar o vermelho.
+ * O mapa desta tela era um dos três iguais espalhados pelo sistema, e o
+ * raciocínio que ele carregava — "ignorado" é neutro porque não é erro — agora
+ * mora em `resources/js/lib/situacoes.ts`, com a justificativa por escrito, ao
+ * lado dos outros quatro domínios. A tela só diz de que domínio é a situação.
  */
-const corDaSituacao: Record<string, string> = {
-    recebido: 'border-border bg-muted text-foreground',
-    processado: 'border-sucesso/40 bg-sucesso-suave text-sucesso-suave-foreground',
-    ignorado: 'border-border bg-muted text-foreground',
-    falhou: 'border-destructive/40 bg-destructive/10 text-destructive',
-};
-
-function classeDaSituacao(situacao: string): string {
-    return corDaSituacao[situacao] ?? 'border-border bg-muted text-foreground';
-}
 
 /** O payload formatado, com indentação, do jeito que se lê um aviso. */
 function payloadLegivel(aviso: AvisoDoProvedor): string {
@@ -257,12 +243,7 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                             <td class="px-4 py-3 font-mono break-all" :data-testid="`avisos-txid-${aviso.id}`">{{ aviso.id_externo ?? '—' }}</td>
                             <td class="px-4 py-3 font-mono break-all">{{ aviso.id_evento_externo ?? '—' }}</td>
                             <td class="px-4 py-3">
-                                <span
-                                    class="inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium"
-                                    :class="classeDaSituacao(aviso.situacao)"
-                                >
-                                    {{ aviso.situacao_rotulo }}
-                                </span>
+                                <EtiquetaDeSituacao dominio="webhook" :situacao="aviso.situacao" :rotulo="aviso.situacao_rotulo" />
                             </td>
                             <td class="px-4 py-3">
                                 <!-- Assinatura inválida é informação de segurança, não de erro: alguém bateu na porta com a chave errada. Por isso o destaque é de atenção, e não o vermelho de falha. -->
@@ -280,16 +261,17 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                             <td class="px-4 py-3 whitespace-nowrap">{{ aviso.processado_em ?? '—' }}</td>
                             <td class="px-4 py-3">{{ aviso.erro ?? '—' }}</td>
                             <td class="px-4 py-3">
-                                <button
-                                    type="button"
+                                <!-- Neutro, e não `ver`: a cor de "abrir a ficha" fica reservada para a ação que leva a outra tela. Aqui a linha só se desdobra. -->
+                                <BotaoDeAcao
+                                    tamanho="compacto"
                                     :data-testid="`avisos-expandir-${aviso.id}`"
                                     :aria-expanded="estaAberto(aviso.id)"
                                     :aria-controls="`avisos-payload-${aviso.id}`"
-                                    class="border-border focus-visible:ring-ring inline-flex h-11 min-w-11 items-center rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                    class="min-w-11"
                                     @click="alternar(aviso.id)"
                                 >
                                     {{ estaAberto(aviso.id) ? 'Ocultar conteúdo do aviso' : 'Ver conteúdo do aviso' }}
-                                </button>
+                                </BotaoDeAcao>
                             </td>
                         </tr>
 

@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatarValor } from '@/lib/formato';
+import { varianteDaInscricao } from '@/lib/situacoes';
 import type { InscricaoAcompanhada } from '@/types/participante';
 import { computed } from 'vue';
 
@@ -17,16 +18,15 @@ const props = defineProps<{
 
 const valor = computed(() => formatarValor(props.inscricao.valor_centavos, props.inscricao.moeda));
 
-const variante = computed(() => {
-    switch (props.inscricao.situacao) {
-        case 'confirmada':
-            return 'sucesso' as const;
-        case 'aguardando_pagamento':
-            return 'informacao' as const;
-        default:
-            return 'secondary' as const;
-    }
-});
+/*
+ * A cor da situação vem do mapeamento central, e não de um `switch` daqui.
+ *
+ * Havia três cópias desse mapa no sistema, e elas já discordavam entre si:
+ * "aguardando pagamento" era azul nesta tela e cinza na do painel, para a mesma
+ * inscrição. Agora as duas leem a mesma linha de `lib/situacoes.ts` — e é ela
+ * que diz que esperar pagamento é ATENÇÃO, porque o prazo está correndo.
+ */
+const variante = computed(() => varianteDaInscricao(props.inscricao.situacao));
 
 const grupo = computed(() => {
     const dados = props.inscricao.grupo_participante;
@@ -49,11 +49,11 @@ const grupo = computed(() => {
 <template>
     <Card data-testid="resumo-da-inscricao">
         <CardHeader class="pb-3">
-            <h2 class="text-base font-medium leading-none tracking-tight text-muted-foreground">Sua inscrição</h2>
+            <h2 class="text-muted-foreground text-base leading-none font-medium tracking-tight">Sua inscrição</h2>
 
             <div class="flex flex-wrap items-center gap-2">
                 <Badge :variant="variante" data-testid="situacao-da-inscricao">{{ inscricao.situacao_rotulo }}</Badge>
-                <span class="text-sm text-muted-foreground">
+                <span class="text-muted-foreground text-sm">
                     código <span class="font-mono">{{ inscricao.codigo_publico }}</span>
                 </span>
             </div>
@@ -83,7 +83,7 @@ const grupo = computed(() => {
                 <h3 class="text-sm font-semibold">O que você escolheu</h3>
 
                 <ul class="mt-2 space-y-2" data-testid="atividades-escolhidas">
-                    <li v-for="atividade in inscricao.atividades" :key="atividade.nome" class="rounded-lg border border-border p-3 text-sm">
+                    <li v-for="atividade in inscricao.atividades" :key="atividade.nome" class="border-border rounded-lg border p-3 text-sm">
                         <p class="font-medium">{{ atividade.nome }}</p>
                         <p class="text-muted-foreground">
                             <template v-if="atividade.dia">{{ atividade.dia }} · </template>{{ atividade.horario_rotulo }}

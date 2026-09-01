@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import type { InscricaoDaLista } from '@/types/admin';
-import { Link } from '@inertiajs/vue3';
+import { Eye } from 'lucide-vue-next';
 
 /**
  * A tabela de inscrições encontradas.
@@ -26,13 +28,13 @@ function momento(iso: string | null): string {
 </script>
 
 <template>
-    <div class="overflow-x-auto rounded-lg border border-border">
+    <div class="border-border overflow-x-auto rounded-lg border">
         <table class="w-full text-sm">
             <caption class="sr-only">
                 Inscrições encontradas, com o evento, o setor, o grupo, a situação, o valor e o prazo de pagamento de cada uma.
             </caption>
             <thead>
-                <tr class="border-b border-border text-left">
+                <tr class="border-border border-b text-left">
                     <th scope="col" class="px-4 py-2 font-medium">Pessoa</th>
                     <th scope="col" class="px-4 py-2 font-medium">Evento</th>
                     <th scope="col" class="px-4 py-2 font-medium">Setor</th>
@@ -45,33 +47,47 @@ function momento(iso: string | null): string {
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="inscricao in props.inscricoes" :key="inscricao.id" class="border-b border-border last:border-0">
+                <tr v-for="inscricao in props.inscricoes" :key="inscricao.id" class="border-border border-b last:border-0">
                     <th scope="row" class="px-4 py-2 text-left font-normal">
                         <span class="block">{{ inscricao.nome_completo }}</span>
-                        <span class="block text-muted-foreground">{{ inscricao.email }}</span>
+                        <span class="text-muted-foreground block">{{ inscricao.email }}</span>
                     </th>
                     <td class="px-4 py-2">{{ inscricao.evento }}</td>
                     <td class="px-4 py-2">{{ inscricao.cidade || '—' }}</td>
                     <td class="px-4 py-2">{{ inscricao.grupo || '—' }}</td>
-                    <td class="px-4 py-2">{{ inscricao.situacao_rotulo }}</td>
-                    <td class="px-4 py-2">{{ inscricao.situacao_pagamento_rotulo ?? '—' }}</td>
+                    <td class="px-4 py-2">
+                        <EtiquetaDeSituacao dominio="inscricao" :situacao="inscricao.situacao" :rotulo="inscricao.situacao_rotulo" />
+                    </td>
+                    <td class="px-4 py-2">
+                        <!-- Inscrição sem cobrança emitida não tem situação de pagamento: a etiqueta vira travessão em vez de inventar um estado. -->
+                        <EtiquetaDeSituacao
+                            dominio="pagamento"
+                            :situacao="inscricao.situacao_pagamento"
+                            :rotulo="inscricao.situacao_pagamento_rotulo"
+                        />
+                    </td>
                     <td class="px-4 py-2 whitespace-nowrap">{{ moeda(inscricao.valor_centavos) }}</td>
                     <td class="px-4 py-2 whitespace-nowrap">{{ momento(inscricao.prazo_pagamento) }}</td>
                     <td class="px-4 py-2">
                         <!--
-                            "relative": o texto que só o leitor de tela ouve fica
-                            posicionado de forma absoluta. Sem uma âncora aqui, ele
-                            se prende à moldura da página inteira, escapa da caixa
-                            que rola e estica o documento para a largura da tabela —
-                            no celular, a página inteira encolhe por causa disso.
+                            O nome da pessoa vai no texto que só o leitor de tela
+                            ouve: numa tabela de trinta linhas, trinta links
+                            chamados "Abrir" não dizem abrir o quê.
+
+                            O "relative" que ancora esse texto mora na base do
+                            BotaoDeAcao, e o comentário de lá explica por quê —
+                            sem âncora, o `sr-only` estica o documento e a página
+                            inteira encolhe no celular.
                         -->
-                        <Link
+                        <BotaoDeAcao
+                            tamanho="compacto"
+                            intencao="ver"
+                            :icone="Eye"
                             :href="route('admin.inscricoes.show', { inscricao: inscricao.id })"
-                            class="relative rounded-md border border-border px-3 py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <span class="sr-only">Abrir a ficha de {{ inscricao.nome_completo }}</span>
                             <span aria-hidden="true">Abrir</span>
-                        </Link>
+                        </BotaoDeAcao>
                     </td>
                 </tr>
             </tbody>

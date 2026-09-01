@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DialogoDeAcao from '@/components/admin/DialogoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { CobrancaDaFicha, FichaDaInscricao, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
@@ -83,69 +84,71 @@ function confirmarPagamento(): void {
         :titulo="props.inscricao.nome_completo"
         :descricao="`Inscrição ${props.inscricao.codigo_publico} no evento ${props.inscricao.evento}.`"
     >
-        <p v-if="props.sucesso" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">{{ props.sucesso }}</p>
+        <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">{{ props.sucesso }}</p>
 
         <div>
             <Link
                 :href="route('admin.inscricoes.index')"
-                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring inline-flex h-10 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Voltar para a lista
             </Link>
         </div>
 
-        <section aria-labelledby="titulo-dados" class="grid gap-3 rounded-lg border border-border p-4">
+        <section aria-labelledby="titulo-dados" class="border-border grid gap-3 rounded-lg border p-4">
             <h2 id="titulo-dados" class="text-lg font-semibold">Dados da inscrição</h2>
 
             <dl class="grid gap-3 md:grid-cols-3">
                 <div>
-                    <dt class="text-sm text-muted-foreground">Situação</dt>
-                    <dd class="text-sm font-medium">{{ props.inscricao.situacao_rotulo }}</dd>
+                    <dt class="text-muted-foreground text-sm">Situação</dt>
+                    <dd class="text-sm font-medium">
+                        <EtiquetaDeSituacao dominio="inscricao" :situacao="props.inscricao.situacao" :rotulo="props.inscricao.situacao_rotulo" />
+                    </dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">E-mail</dt>
+                    <dt class="text-muted-foreground text-sm">E-mail</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.email }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Telefone</dt>
+                    <dt class="text-muted-foreground text-sm">Telefone</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.telefone ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Setor</dt>
+                    <dt class="text-muted-foreground text-sm">Setor</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.cidade || '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Grupo</dt>
+                    <dt class="text-muted-foreground text-sm">Grupo</dt>
                     <dd class="text-sm font-medium">{{ props.inscricao.grupo || '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Valor</dt>
+                    <dt class="text-muted-foreground text-sm">Valor</dt>
                     <dd class="text-sm font-medium">{{ moeda(props.inscricao.valor_centavos) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Inscrita em</dt>
+                    <dt class="text-muted-foreground text-sm">Inscrita em</dt>
                     <dd class="text-sm font-medium">{{ momento(props.inscricao.criada_em) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Prazo de pagamento</dt>
+                    <dt class="text-muted-foreground text-sm">Prazo de pagamento</dt>
                     <dd class="text-sm font-medium">{{ momento(props.inscricao.prazo_pagamento) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm text-muted-foreground">Confirmada em</dt>
+                    <dt class="text-muted-foreground text-sm">Confirmada em</dt>
                     <dd class="text-sm font-medium">{{ momento(props.inscricao.confirmada_em) }}</dd>
                 </div>
             </dl>
 
-            <p v-if="props.inscricao.motivo_cancelamento" class="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+            <p v-if="props.inscricao.motivo_cancelamento" class="border-border bg-muted/40 rounded-md border px-3 py-2 text-sm">
                 <strong>Cancelada em {{ momento(props.inscricao.cancelada_em) }}.</strong> Motivo registrado:
                 {{ props.inscricao.motivo_cancelamento }}
             </p>
         </section>
 
-        <section aria-labelledby="titulo-atividades" class="grid gap-3 rounded-lg border border-border p-4">
+        <section aria-labelledby="titulo-atividades" class="border-border grid gap-3 rounded-lg border p-4">
             <h2 id="titulo-atividades" class="text-lg font-semibold">Atividades escolhidas</h2>
 
-            <p v-if="props.inscricao.atividades.length === 0" class="text-sm text-muted-foreground">Nenhuma atividade escolhida.</p>
+            <p v-if="props.inscricao.atividades.length === 0" class="text-muted-foreground text-sm">Nenhuma atividade escolhida.</p>
 
             <ul v-else class="grid gap-1">
                 <li v-for="atividade in props.inscricao.atividades" :key="atividade.id" class="text-sm">
@@ -154,10 +157,10 @@ function confirmarPagamento(): void {
             </ul>
         </section>
 
-        <section aria-labelledby="titulo-cobrancas" class="grid gap-3 rounded-lg border border-border p-4">
+        <section aria-labelledby="titulo-cobrancas" class="border-border grid gap-3 rounded-lg border p-4">
             <h2 id="titulo-cobrancas" class="text-lg font-semibold">Histórico da cobrança</h2>
 
-            <p v-if="props.cobrancas.length === 0" class="text-sm text-muted-foreground">Nenhuma cobrança emitida.</p>
+            <p v-if="props.cobrancas.length === 0" class="text-muted-foreground text-sm">Nenhuma cobrança emitida.</p>
 
             <div v-else class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -165,7 +168,7 @@ function confirmarPagamento(): void {
                         Cobranças emitidas para esta inscrição, da mais recente para a mais antiga.
                     </caption>
                     <thead>
-                        <tr class="border-b border-border text-left">
+                        <tr class="border-border border-b text-left">
                             <!-- Dois códigos, e eles nunca coincidem: o da esquerda é o que este sistema deu à cobrança; o txid é o que a Efí usa e o único que serve para procurar no painel dela. Antes esta coluna se chamava só "Cobrança", e era exatamente essa ambiguidade que fazia procurar o código errado do lado de lá. -->
                             <th scope="col" class="px-2 py-2 font-medium">Código interno</th>
                             <th scope="col" class="px-2 py-2 font-medium">txid (Efí)</th>
@@ -178,30 +181,33 @@ function confirmarPagamento(): void {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="cobranca in props.cobrancas" :key="cobranca.id" class="border-b border-border last:border-0 align-top">
+                        <tr v-for="cobranca in props.cobrancas" :key="cobranca.id" class="border-border border-b align-top last:border-0">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ cobranca.codigo_publico }}</th>
                             <!-- Vazio quando o pagamento foi reconhecido na mão: não houve provedor, e portanto não há txid. -->
-                            <td class="px-2 py-2 font-mono break-all" :data-testid="`cobranca-txid-${cobranca.id}`">{{ cobranca.id_externo ?? '—' }}</td>
+                            <td class="px-2 py-2 font-mono break-all" :data-testid="`cobranca-txid-${cobranca.id}`">
+                                {{ cobranca.id_externo ?? '—' }}
+                            </td>
                             <td class="px-2 py-2">{{ cobranca.metodo_rotulo }}</td>
-                            <td class="px-2 py-2">{{ cobranca.situacao_rotulo }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="pagamento" :situacao="cobranca.situacao" :rotulo="cobranca.situacao_rotulo" />
+                            </td>
                             <td class="px-2 py-2 whitespace-nowrap">{{ moeda(cobranca.valor_centavos) }}</td>
                             <td class="px-2 py-2 whitespace-nowrap">{{ momento(cobranca.criada_em) }}</td>
                             <td class="px-2 py-2 whitespace-nowrap">{{ momento(cobranca.pago_em) }}</td>
                             <td class="px-2 py-2">
                                 <template v-if="cobranca.origem_manual">
                                     <span class="block">Reconhecida na mão{{ cobranca.responsavel ? ` por ${cobranca.responsavel}` : '' }}</span>
-                                    <span v-if="cobranca.observacao" class="block text-muted-foreground">{{ cobranca.observacao }}</span>
+                                    <span v-if="cobranca.observacao" class="text-muted-foreground block">{{ cobranca.observacao }}</span>
                                 </template>
                                 <template v-else>
                                     <span class="block">{{ cobranca.gateway }}</span>
-                                    <span v-if="cobranca.pagador" class="block text-muted-foreground">
+                                    <span v-if="cobranca.pagador" class="text-muted-foreground block">
                                         Pago por {{ cobranca.pagador.nome ?? 'quem não se identificou' }}
                                         <template v-if="cobranca.pagador.documento">
-                                            ({{ cobranca.pagador.tipo_documento === 'cnpj' ? 'CNPJ' : 'CPF' }}
-                                            {{ cobranca.pagador.documento }})
+                                            ({{ cobranca.pagador.tipo_documento === 'cnpj' ? 'CNPJ' : 'CPF' }} {{ cobranca.pagador.documento }})
                                         </template>
                                     </span>
-                                    <span v-if="cobranca.pagador?.mensagem" class="block text-muted-foreground">
+                                    <span v-if="cobranca.pagador?.mensagem" class="text-muted-foreground block">
                                         “{{ cobranca.pagador.mensagem }}”
                                     </span>
                                 </template>
@@ -212,12 +218,12 @@ function confirmarPagamento(): void {
             </div>
         </section>
 
-        <section aria-labelledby="titulo-acoes" class="grid gap-3 rounded-lg border border-border p-4">
+        <section aria-labelledby="titulo-acoes" class="border-border grid gap-3 rounded-lg border p-4">
             <h2 id="titulo-acoes" class="text-lg font-semibold">Ações</h2>
 
-            <p class="max-w-3xl text-sm text-muted-foreground">
-                As duas ações ficam registradas com o motivo que você escrever. Cancelar devolve a vaga na hora — inclusive as vagas das
-                atividades escolhidas.
+            <p class="text-muted-foreground max-w-3xl text-sm">
+                As duas ações ficam registradas com o motivo que você escrever. Cancelar devolve a vaga na hora — inclusive as vagas das atividades
+                escolhidas.
             </p>
 
             <div class="flex flex-wrap gap-3">
@@ -225,7 +231,7 @@ function confirmarPagamento(): void {
                     v-if="podeCancelarAgora"
                     type="button"
                     data-testid="abrir-cancelamento"
-                    class="h-10 rounded-md border border-destructive px-4 text-sm text-destructive focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    class="border-destructive text-destructive focus-visible:ring-ring h-10 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                     @click="cancelamentoAberto = true"
                 >
                     Cancelar inscrição
@@ -235,13 +241,13 @@ function confirmarPagamento(): void {
                     v-if="podeConfirmarAgora"
                     type="button"
                     data-testid="abrir-confirmacao-manual"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    class="bg-acao text-acao-foreground focus-visible:ring-ring h-10 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
                     @click="confirmacaoAberta = true"
                 >
                     Confirmar pagamento recebido
                 </button>
 
-                <p v-if="!podeCancelarAgora && !podeConfirmarAgora" class="text-sm text-muted-foreground">
+                <p v-if="!podeCancelarAgora && !podeConfirmarAgora" class="text-muted-foreground text-sm">
                     Nenhuma ação disponível para esta inscrição.
                 </p>
             </div>
@@ -278,11 +284,11 @@ function confirmarPagamento(): void {
                     <select
                         id="metodo-manual"
                         v-model="formularioConfirmacao.metodo"
-                        class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring w-full"
+                        class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                     >
                         <option v-for="metodo in props.metodos_manuais" :key="metodo.valor" :value="metodo.valor">{{ metodo.rotulo }}</option>
                     </select>
-                    <p v-if="formularioConfirmacao.errors.metodo" role="alert" class="text-sm text-destructive">
+                    <p v-if="formularioConfirmacao.errors.metodo" role="alert" class="text-destructive text-sm">
                         {{ formularioConfirmacao.errors.metodo }}
                     </p>
                 </div>

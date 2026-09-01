@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
 import CampoDeDataHora from '@/components/admin/CampoDeDataHora.vue';
 import CampoDeMarcar from '@/components/admin/CampoDeMarcar.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import { DateField } from '@/components/ui/date-field';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { AtividadeDaEstrutura, ConflitoDaEstrutura, DiaDaEstrutura, EventoDaEstrutura, GrupoDaEstrutura, OpcaoDeAtividade } from '@/types/admin';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /**
@@ -510,25 +513,16 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <th scope="row" class="px-2 py-2 text-left font-normal">{{ dia.nome }}</th>
                         <td class="px-2 py-2">{{ dataEmPortugues(dia.data) }}</td>
                         <td class="px-2 py-2">{{ dia.posicao }}</td>
-                        <td class="px-2 py-2">{{ dia.ativo ? 'Ativo' : 'Desativado' }}</td>
+                        <td class="px-2 py-2">
+                            <EtiquetaDeSituacao dominio="ativo" :situacao="dia.ativo" :rotulo="dia.ativo ? 'Ativo' : 'Desativado'" />
+                        </td>
                         <td class="px-2 py-2">{{ dia.grupos.length }}</td>
                         <td class="px-2 py-2">
                             <div class="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="editarDia(dia)"
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    type="button"
-                                    :disabled="excluindo"
-                                    class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                    @click="excluirDia(dia)"
-                                >
+                                <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
+                                <BotaoDeAcao tamanho="compacto" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
                                     Excluir
-                                </button>
+                                </BotaoDeAcao>
                             </div>
                         </td>
                     </tr>
@@ -693,25 +687,22 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <tr v-for="grupo in dia.grupos" :key="grupo.id" class="border-border border-b last:border-0">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ grupo.nome }}</th>
                             <td class="px-2 py-2">{{ escolhas(grupo) }}</td>
-                            <td class="px-2 py-2">{{ grupo.ativo ? 'Ativo' : 'Desativado' }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="grupo.ativo" :rotulo="grupo.ativo ? 'Ativo' : 'Desativado'" />
+                            </td>
                             <td class="px-2 py-2">{{ grupo.atividades.length }}</td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="editarGrupo(grupo)"
-                                    >
-                                        Editar
-                                    </button>
-                                    <button
-                                        type="button"
+                                    <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarGrupo(grupo)">Editar</BotaoDeAcao>
+                                    <BotaoDeAcao
+                                        tamanho="compacto"
+                                        intencao="excluir"
+                                        :icone="Trash2"
                                         :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                         @click="excluirGrupo(grupo)"
                                     >
                                         Excluir
-                                    </button>
+                                    </BotaoDeAcao>
                                 </div>
                             </td>
                         </tr>
@@ -918,28 +909,27 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 }}
                             </td>
                             <td class="px-2 py-2">{{ atividade.escolhida_por }}</td>
-                            <td class="px-2 py-2">{{ atividade.ativo ? 'Ativa' : 'Desativada' }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="atividade.ativo" :rotulo="atividade.ativo ? 'Ativa' : 'Desativada'" />
+                            </td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="editarAtividade(atividade)"
+                                    <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarAtividade(atividade)"
+                                        >Editar</BotaoDeAcao
                                     >
-                                        Editar
-                                    </button>
                                     <span v-if="atividade.escolhida_por > 0" class="text-muted-foreground">
                                         Já escolhida: desative em vez de excluir.
                                     </span>
-                                    <button
+                                    <BotaoDeAcao
                                         v-else
-                                        type="button"
+                                        tamanho="compacto"
+                                        intencao="excluir"
+                                        :icone="Trash2"
                                         :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                         @click="excluirAtividade(atividade)"
                                     >
                                         Excluir
-                                    </button>
+                                    </BotaoDeAcao>
                                 </div>
                             </td>
                         </tr>
@@ -1062,14 +1052,15 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <td class="px-2 py-2">{{ conflito.atividade_b }}</td>
                         <td class="px-2 py-2">{{ conflito.motivo ?? '—' }}</td>
                         <td class="px-2 py-2">
-                            <button
-                                type="button"
+                            <BotaoDeAcao
+                                tamanho="compacto"
+                                intencao="excluir"
+                                :icone="Trash2"
                                 :disabled="excluindo"
-                                class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                 @click="excluirConflito(conflito)"
                             >
                                 Remover
-                            </button>
+                            </BotaoDeAcao>
                         </td>
                     </tr>
                 </tbody>

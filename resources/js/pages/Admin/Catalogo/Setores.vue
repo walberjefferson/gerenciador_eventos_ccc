@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { CidadeDoCatalogo } from '@/types/admin';
 import { router, useForm, usePage } from '@inertiajs/vue3';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, ref } from 'vue';
 
 /**
@@ -338,44 +341,24 @@ function excluir(cidade: CidadeDoCatalogo): void {
                     <tr v-for="cidade in cidadesFiltradas" :key="cidade.id" class="border-border border-b last:border-0">
                         <th scope="row" class="px-4 py-2 text-left font-normal">{{ cidade.nome }}</th>
                         <td class="px-4 py-2">{{ cidade.uf }}</td>
-                        <td class="px-4 py-2">{{ cidade.ativo ? 'Ativo' : 'Desativado' }}</td>
+                        <td class="px-4 py-2">
+                            <EtiquetaDeSituacao dominio="ativo" :situacao="cidade.ativo" :rotulo="cidade.ativo ? 'Ativo' : 'Desativado'" />
+                        </td>
                         <td class="px-4 py-2">{{ cidade.grupos }}</td>
                         <td class="px-4 py-2">
                             <div class="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="editar(cidade)"
-                                >
-                                    Editar
-                                </button>
+                                <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editar(cidade)">Editar</BotaoDeAcao>
 
                                 <template v-if="confirmandoExclusao === cidade.id">
                                     <span class="text-muted-foreground">Excluir mesmo?</span>
-                                    <button
-                                        type="button"
-                                        :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                        @click="excluir(cidade)"
-                                    >
+                                    <BotaoDeAcao tamanho="compacto" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(cidade)">
                                         Sim, excluir
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="confirmandoExclusao = null"
-                                    >
-                                        Não
-                                    </button>
+                                    </BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="compacto" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                 </template>
-                                <button
-                                    v-else
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="confirmandoExclusao = cidade.id"
+                                <BotaoDeAcao v-else tamanho="compacto" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = cidade.id"
+                                    >Excluir</BotaoDeAcao
                                 >
-                                    Excluir
-                                </button>
                             </div>
                         </td>
                     </tr>
