@@ -28,34 +28,38 @@ import { computed } from 'vue';
  * é por isso que "Programação", na lista de eventos, é neutro mesmo sendo
  * navegação: a ação colorida daquela linha já é "Editar".
  *
- * ALVO DE TOQUE, E POR QUE O COMPACTO É RESPONSIVO
- * `min-h-11` são os 44px que o projeto cobra, e é altura MÍNIMA e não fixa: o
- * rótulo que quebra em duas linhas no celular faz o botão crescer, em vez de o
- * texto vazar.
+ * A ESCALA DE TAMANHO
+ * Cinco degraus com os nomes que o Tailwind usa, para não haver um vocabulário
+ * de tamanho só deste componente: `xs` 32px, `sm` 36px, `md` 44px, `lg` 48px,
+ * `xl` 56px. Nenhum é número inventado — `sm` é o `h-9` do `size: default` do
+ * `Button` do projeto, e `lg` é o `min-h-12` que o tema público usa.
  *
- * O tamanho `compacto` NÃO é simplesmente um botão menor — ele é 44px no
- * celular e 36px a partir do `md`. A razão é que os dois contextos têm alvos
- * diferentes: no celular quem aciona é um dedo, e 44px continua sendo o mínimo
- * que a WCAG e o projeto cobram; no computador quem aciona é um ponteiro de
- * poucos pixels, e aí o custo se inverte — numa tabela densa, com três botões
- * por linha e vinte linhas na tela, o botão de 44px empurra a linha para baixo
- * e a lista deixa de caber.
+ * Toda altura é MÍNIMA e nunca fixa: o rótulo que quebra em duas linhas no
+ * celular faz o botão crescer, em vez de o texto vazar.
  *
- * Os 36px não são número inventado: é a altura do `size: default` do `Button`
- * do projeto (`resources/js/components/ui/button/index.ts`, `h-9`), ou seja, o
- * botão de listagem passa a ter no computador exatamente a altura que o resto
- * do painel já tem.
+ * O PADRÃO É `md`, E O MOTIVO IMPORTA
+ * 44px são o alvo de toque que o projeto cobra, então quem NÃO escolhe tamanho
+ * recebe o botão seguro. Descer disso é decisão explícita de quem escreve a
+ * tela, tomada uma vez, no lugar onde se vê o contexto.
+ *
+ * As listagens do painel usam `sm`. Ali quem aciona é um ponteiro de poucos
+ * pixels num computador, e o custo se inverte: numa tabela densa, com três
+ * botões por linha e vinte linhas na tela, o botão de 44px empurra a linha para
+ * baixo e a lista deixa de caber. É um desvio consciente da regra dos 44px, e
+ * ele vale para o painel — NÃO para as telas públicas de inscrição, que são
+ * mobile-first de verdade e usam o `Button`, não este componente. Mesmo o `xs`
+ * fica bem acima do mínimo de 24px que a WCAG 2.2 AA (2.5.8) exige.
  */
 type Intencao = 'ver' | 'editar' | 'excluir' | 'neutra';
 
-/** `padrao` para ação isolada; `compacto` para ação dentro de linha de tabela. */
-type Tamanho = 'padrao' | 'compacto';
+/** A escala do Tailwind. `md` são os 44px do alvo de toque — ver o topo. */
+type Tamanho = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const props = withDefaults(
     defineProps<{
         /** O que a ação faz com a linha. Decide cor, não comportamento. */
         intencao?: Intencao;
-        /** `compacto` encolhe só no computador — ver o comentário do topo. */
+        /** Escala do Tailwind: `xs` 32px … `xl` 56px. Padrão `md` (44px). */
         tamanho?: Tamanho;
         /** Ícone lucide à esquerda do rótulo. Decorativo: o nome acessível vem do texto. */
         icone?: Component;
@@ -65,7 +69,7 @@ const props = withDefaults(
         disabled?: boolean;
         class?: HTMLAttributes['class'];
     }>(),
-    { intencao: 'neutra', tamanho: 'padrao', icone: undefined, href: undefined, disabled: false, class: undefined },
+    { intencao: 'neutra', tamanho: 'md', icone: undefined, href: undefined, disabled: false, class: undefined },
 );
 
 /*
@@ -78,17 +82,24 @@ const props = withDefaults(
  * celular, a página inteira encolhe por causa disso.
  */
 const BASE =
-    'relative inline-flex items-center justify-center gap-2 rounded-md border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0';
+    'relative inline-flex items-center justify-center gap-2 rounded-md border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:shrink-0';
 
 /*
- * Altura e respiro moram AQUI, e não na base, de propósito: com `min-h-11` na
- * base e `md:min-h-9` no tamanho, as duas ficariam disputando, e quem decidiria
- * o vencedor seria a ordem no arquivo de estilo — não a intenção de quem
- * escreveu. Uma fonte só de altura, e o `tailwind-merge` não tem o que resolver.
+ * Altura, respiro, corpo do texto e tamanho do ícone moram AQUI, e nenhum deles
+ * na base, de propósito: uma altura na base e outra no tamanho ficariam
+ * disputando, e quem decidiria o vencedor seria a ordem no arquivo de estilo —
+ * não a intenção de quem escreveu. Uma fonte só por propriedade, e o
+ * `tailwind-merge` não tem o que resolver.
+ *
+ * O ícone acompanha o degrau porque um `size-4` dentro de um botão de 32px
+ * ocupa metade da altura e o rótulo perde o lugar.
  */
 const POR_TAMANHO: Record<Tamanho, string> = {
-    padrao: 'min-h-11 px-3 py-1 text-sm',
-    compacto: 'min-h-11 px-2.5 py-1 text-sm md:min-h-9 md:[&_svg]:size-3.5',
+    xs: 'min-h-8 px-2 py-0.5 text-xs [&_svg]:size-3.5',
+    sm: 'min-h-9 px-2.5 py-1 text-sm [&_svg]:size-3.5',
+    md: 'min-h-11 px-3 py-1 text-sm [&_svg]:size-4',
+    lg: 'min-h-12 px-4 py-2 text-base [&_svg]:size-5',
+    xl: 'min-h-14 px-5 py-2 text-base [&_svg]:size-5',
 };
 
 const POR_INTENCAO: Record<Intencao, string> = {

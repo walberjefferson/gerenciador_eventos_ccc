@@ -519,8 +519,8 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <td class="px-2 py-2">{{ dia.grupos.length }}</td>
                         <td class="px-2 py-2">
                             <div class="flex flex-wrap gap-2">
-                                <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
-                                <BotaoDeAcao tamanho="compacto" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
+                                <BotaoDeAcao tamanho="sm" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
+                                <BotaoDeAcao tamanho="sm" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
                                     Excluir
                                 </BotaoDeAcao>
                             </div>
@@ -693,9 +693,9 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             <td class="px-2 py-2">{{ grupo.atividades.length }}</td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarGrupo(grupo)">Editar</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="sm" intencao="editar" :icone="Pencil" @click="editarGrupo(grupo)">Editar</BotaoDeAcao>
                                     <BotaoDeAcao
-                                        tamanho="compacto"
+                                        tamanho="sm"
                                         intencao="excluir"
                                         :icone="Trash2"
                                         :disabled="excluindo"
@@ -914,7 +914,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             </td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editarAtividade(atividade)"
+                                    <BotaoDeAcao tamanho="sm" intencao="editar" :icone="Pencil" @click="editarAtividade(atividade)"
                                         >Editar</BotaoDeAcao
                                     >
                                     <span v-if="atividade.escolhida_por > 0" class="text-muted-foreground">
@@ -922,7 +922,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                     </span>
                                     <BotaoDeAcao
                                         v-else
-                                        tamanho="compacto"
+                                        tamanho="sm"
                                         intencao="excluir"
                                         :icone="Trash2"
                                         :disabled="excluindo"
@@ -1053,7 +1053,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <td class="px-2 py-2">{{ conflito.motivo ?? '—' }}</td>
                         <td class="px-2 py-2">
                             <BotaoDeAcao
-                                tamanho="compacto"
+                                tamanho="sm"
                                 intencao="excluir"
                                 :icone="Trash2"
                                 :disabled="excluindo"

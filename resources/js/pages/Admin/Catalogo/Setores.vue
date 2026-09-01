@@ -347,16 +347,16 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         <td class="px-4 py-2">{{ cidade.grupos }}</td>
                         <td class="px-4 py-2">
                             <div class="flex flex-wrap items-center gap-2">
-                                <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editar(cidade)">Editar</BotaoDeAcao>
+                                <BotaoDeAcao tamanho="sm" intencao="editar" :icone="Pencil" @click="editar(cidade)">Editar</BotaoDeAcao>
 
                                 <template v-if="confirmandoExclusao === cidade.id">
                                     <span class="text-muted-foreground">Excluir mesmo?</span>
-                                    <BotaoDeAcao tamanho="compacto" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(cidade)">
+                                    <BotaoDeAcao tamanho="sm" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(cidade)">
                                         Sim, excluir
                                     </BotaoDeAcao>
-                                    <BotaoDeAcao tamanho="compacto" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="sm" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                 </template>
-                                <BotaoDeAcao v-else tamanho="compacto" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = cidade.id"
+                                <BotaoDeAcao v-else tamanho="sm" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = cidade.id"
                                     >Excluir</BotaoDeAcao
                                 >
                             </div>

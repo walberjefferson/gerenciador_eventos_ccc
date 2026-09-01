@@ -151,23 +151,24 @@ async function posicaoDaLinha(page: Page, nome: string): Promise<number> {
 }
 
 /**
- * A altura minima que um botao de acao de LINHA precisa ter neste aparelho.
+ * A altura minima que um botao de acao de LINHA precisa ter.
  *
- * O botao de listagem e responsivo de proposito (`tamanho="compacto"` do
- * BotaoDeAcao): 44 px enquanto quem aciona e um dedo, 36 px a partir do `md`,
- * onde quem aciona e um ponteiro e a tabela e densa.
+ * As listagens do painel usam `tamanho="sm"` do BotaoDeAcao: 36 px, a altura do
+ * `size: default` do Button do projeto. Nao e responsivo — e o mesmo botao no
+ * celular e no computador.
  *
- * O cenario NAO afrouxa para "36 px sempre". Fazer isso desligaria justamente a
- * protecao que importa — o alvo de toque no celular, que e onde a organizacao
- * usa o painel entre uma coisa e outra. Aqui a expectativa acompanha a largura
- * da janela, do mesmo jeito que o CSS acompanha.
+ * ISSO E UM DESVIO CONSCIENTE dos 44 px que o projeto cobra como alvo de toque,
+ * e ele vale so aqui: o painel e operado no computador, com ponteiro, e numa
+ * tabela densa o botao de 44 px empurra a linha para baixo ate a lista nao
+ * caber. As telas publicas de inscricao, que sao mobile-first de verdade e onde
+ * o dedo e o unico apontador, nao usam este componente — elas usam o Button, e
+ * la os 44 px continuam cobrados pelos cenarios de sempre.
+ *
+ * O numero segue medido, e nao apenas assumido: 36 px fica bem acima do minimo
+ * de 24 px que a WCAG 2.2 AA (2.5.8) exige, e o cenario falha se alguem baixar
+ * o tamanho da listagem sem pensar.
  */
-function alturaMinimaDaLinha(page: Page): number {
-    const largura = page.viewportSize()?.width ?? 0;
-
-    // 768 px e o `md` do Tailwind, o mesmo ponto em que o botao encolhe.
-    return largura >= 768 ? 36 : 44;
-}
+const ALTURA_MINIMA_DA_LINHA = 36;
 
 /**
  * A cor de fundo realmente pintada de um elemento, como o navegador a calculou.
@@ -303,8 +304,8 @@ test('o botao de acao da linha tem contraste e alvo de dedo na lista de inscrico
 
         expect(razao, `o botao "Abrir" da linha ${linha} rendeu ${razao.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
 
-        // Alvo de acionamento: 44 px no celular, 36 px do `md` para cima.
-        const minima = alturaMinimaDaLinha(page);
+        // Alvo de acionamento do botao de linha — ver ALTURA_MINIMA_DA_LINHA.
+        const minima = ALTURA_MINIMA_DA_LINHA;
         const caixa = await page.locator(seletor).boundingBox();
 
         expect(caixa?.height ?? 0, `o botao "Abrir" da linha ${linha} ficou menor que ${minima} px`).toBeGreaterThanOrEqual(minima);
@@ -326,7 +327,7 @@ test('os tres botoes da lista de eventos tem contraste e a altura do aparelho', 
 
         await expect(botao).toBeVisible();
 
-        const minima = alturaMinimaDaLinha(page);
+        const minima = ALTURA_MINIMA_DA_LINHA;
         const caixa = await botao.boundingBox();
 
         expect(caixa?.height ?? 0, `o botao "${nome}" ficou menor que ${minima} px`).toBeGreaterThanOrEqual(minima);

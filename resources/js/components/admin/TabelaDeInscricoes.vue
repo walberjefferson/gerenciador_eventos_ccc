@@ -80,7 +80,7 @@ function momento(iso: string | null): string {
                             inteira encolhe no celular.
                         -->
                         <BotaoDeAcao
-                            tamanho="compacto"
+                            tamanho="sm"
                             intencao="ver"
                             :icone="Eye"
                             :href="route('admin.inscricoes.show', { inscricao: inscricao.id })"

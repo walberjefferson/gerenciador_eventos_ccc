@@ -263,7 +263,7 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                             <td class="px-4 py-3">
                                 <!-- Neutro, e não `ver`: a cor de "abrir a ficha" fica reservada para a ação que leva a outra tela. Aqui a linha só se desdobra. -->
                                 <BotaoDeAcao
-                                    tamanho="compacto"
+                                    tamanho="sm"
                                     :data-testid="`avisos-expandir-${aviso.id}`"
                                     :aria-expanded="estaAberto(aviso.id)"
                                     :aria-controls="`avisos-payload-${aviso.id}`"

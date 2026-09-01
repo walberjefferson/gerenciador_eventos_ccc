@@ -356,16 +356,16 @@ function excluir(grupo: GrupoDoCatalogo): void {
                         <td class="px-4 py-2">{{ grupo.inscricoes }}</td>
                         <td class="px-4 py-2">
                             <div class="flex flex-wrap items-center gap-2">
-                                <BotaoDeAcao tamanho="compacto" intencao="editar" :icone="Pencil" @click="editar(grupo)">Editar</BotaoDeAcao>
+                                <BotaoDeAcao tamanho="sm" intencao="editar" :icone="Pencil" @click="editar(grupo)">Editar</BotaoDeAcao>
 
                                 <template v-if="confirmandoExclusao === grupo.id">
                                     <span class="text-muted-foreground">Excluir mesmo?</span>
-                                    <BotaoDeAcao tamanho="compacto" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(grupo)">
+                                    <BotaoDeAcao tamanho="sm" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(grupo)">
                                         Sim, excluir
                                     </BotaoDeAcao>
-                                    <BotaoDeAcao tamanho="compacto" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="sm" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                 </template>
-                                <BotaoDeAcao v-else tamanho="compacto" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = grupo.id"
+                                <BotaoDeAcao v-else tamanho="sm" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = grupo.id"
                                     >Excluir</BotaoDeAcao
                                 >
                             </div>
