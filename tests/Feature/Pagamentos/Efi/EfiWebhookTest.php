@@ -131,6 +131,67 @@ it('guarda o identificador da transferencia, que so chega neste aviso', function
         ->and($pagamento->metadados['referencia_externa'])->not->toBeNull();
 });
 
+it('guarda quem pagou, com o CPF reduzido ao que serve para conferir', function () {
+    [, , $pagamento] = cenarioComCobrancaEfi();
+
+    $aviso = pixRecebido($pagamento->id_externo);
+    $aviso['gnExtras'] = ['pagador' => [
+        'cpf' => '12345678901',
+        'nome' => 'MARIA DE SOUZA',
+        'codigoBanco' => '18036150',
+    ]];
+
+    entregarAvisoEfi(['pix' => [$aviso]])->assertOk();
+
+    // Comparacao chave a chave, e nao do array inteiro: o jsonb do Postgres
+    // devolve os campos na ordem DELE (por tamanho do nome, depois alfabetica),
+    // que nunca e a ordem em que foram escritos.
+    $pagador = $pagamento->refresh()->metadados['pagador'];
+
+    expect($pagador['nome'])->toBe('MARIA DE SOUZA')
+        ->and($pagador['documento'])->toBe('***.456.789-**')
+        ->and($pagador['tipo_documento'])->toBe('cpf')
+        ->and($pagador['banco'])->toBe('18036150')
+        ->and($pagador['mensagem'])->toBe('pagando a inscricao');
+
+    // A prova pelo avesso, e a que mais importa: o numero inteiro nao existe em
+    // lugar nenhum do banco. Nem no pagamento, nem no aviso guardado.
+    $guardado = (string) json_encode([
+        WebhookPagamento::query()->sole()->payload,
+        $pagamento->metadados,
+    ]);
+
+    expect($guardado)->not->toContain('12345678901')
+        ->and($guardado)->not->toContain('123.456.789');
+});
+
+it('guarda o CNPJ de quem pagou por inteiro, porque ele e publico', function () {
+    [, , $pagamento] = cenarioComCobrancaEfi();
+
+    $aviso = pixRecebido($pagamento->id_externo);
+    $aviso['gnExtras'] = ['pagador' => [
+        'cnpj' => '09089356000118',
+        'nome' => 'CONSULTORIA TECNICA EFI',
+        'codigoBanco' => '09089356',
+    ]];
+
+    entregarAvisoEfi(['pix' => [$aviso]])->assertOk();
+
+    expect($pagamento->refresh()->metadados['pagador']['documento'])->toBe('09089356000118')
+        ->and($pagamento->metadados['pagador']['tipo_documento'])->toBe('cnpj');
+});
+
+it('nao inventa pagador quando o aviso nao diz quem pagou', function () {
+    [, , $pagamento] = cenarioComCobrancaEfi();
+
+    $aviso = pixRecebido($pagamento->id_externo);
+    unset($aviso['infoPagador']);
+
+    entregarAvisoEfi(['pix' => [$aviso]])->assertOk();
+
+    expect($pagamento->refresh()->metadados)->not->toHaveKey('pagador');
+});
+
 it('nao perde dinheiro quando um unico aviso traz dois pagamentos', function () {
     [$cenario, $primeira, $pagamentoUm] = cenarioComCobrancaEfi();
 
