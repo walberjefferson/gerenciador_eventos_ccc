@@ -5,36 +5,20 @@ declare(strict_types=1);
 use App\Actions\Pagamentos\CancelarPagamento;
 use App\Actions\Pagamentos\CriarPagamentoDaInscricao;
 use App\Contracts\Payments\PaymentGateway;
-use App\DTOs\Payments\CreatePaymentData;
 use App\DTOs\Payments\WebhookRequestData;
 use App\Enums\MetodoPagamento;
 use App\Enums\SituacaoPagamento;
 use App\Models\Pagamento;
 use App\Services\Payments\Fake\FakePaymentGateway;
-use Illuminate\Support\Carbon;
 use Tests\Feature\Inscricoes\Cenario;
 
-/**
+/*
  * O contrato de pagamento e o provedor simulado.
  *
  * O que se prova aqui: o sistema conversa com um contrato, nunca com um
  * fornecedor; e o provedor simulado percorre o ciclo inteiro de uma cobranca
  * sem mover um centavo.
  */
-function cobrancaDeTeste(int $valorCentavos = 12_500): CreatePaymentData
-{
-    return new CreatePaymentData(
-        externalReference: 'INSCRICAO-TESTE',
-        amountCents: $valorCentavos,
-        currency: 'BRL',
-        method: MetodoPagamento::Pix->value,
-        description: 'Inscricao no evento de teste',
-        payerName: 'Maria da Silva',
-        payerEmail: 'maria.silva@example.com',
-        payerDocument: '52998224725',
-        expiresAt: Carbon::now()->addDay(),
-    );
-}
 
 it('resolve o provedor de pagamento a partir da configuracao, sem o dominio citar fornecedor', function () {
     expect(config('payments.default'))->toBe('fake')

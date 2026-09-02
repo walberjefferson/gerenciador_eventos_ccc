@@ -12,7 +12,6 @@ use App\Models\WebhookPagamento;
 use App\Services\Payments\Efi\EfiClient;
 use Illuminate\Database\QueryException;
 use Illuminate\Testing\TestResponse;
-use PDOException;
 use Tests\Feature\Inscricoes\Cenario;
 use Tests\Feature\Pagamentos\Efi\EfiClientFake;
 
