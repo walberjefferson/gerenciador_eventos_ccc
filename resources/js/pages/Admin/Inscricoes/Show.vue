@@ -2,7 +2,7 @@
 import DialogoDeAcao from '@/components/admin/DialogoDeAcao.vue';
 import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { CobrancaDaFicha, FichaDaInscricao, OpcaoDeSituacao } from '@/types/admin';
+import type { AtividadeEscolhida, CobrancaDaFicha, FichaDaInscricao, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -56,6 +56,18 @@ function momento(iso: string | null): string {
     }
 
     return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+/**
+ * "Futebol — 17/10/2026 08:00", ou só "Futebol" quando a atividade não tem
+ * hora marcada.
+ *
+ * O horário passou a ser opcional: atividade sem hora ocupa o dia inteiro. Sem
+ * este cuidado, a linha sairia como "Futebol — —", que é pior do que não dizer
+ * nada — o travessão duplo parece defeito de tela, não ausência de dado.
+ */
+function atividadeComQuando(atividade: AtividadeEscolhida): string {
+    return atividade.comeca_em === null ? atividade.nome : `${atividade.nome} — ${momento(atividade.comeca_em)}`;
 }
 
 function cancelar(): void {
@@ -152,7 +164,7 @@ function confirmarPagamento(): void {
 
             <ul v-else class="grid gap-1">
                 <li v-for="atividade in props.inscricao.atividades" :key="atividade.id" class="text-sm">
-                    {{ atividade.nome }} — {{ momento(atividade.comeca_em) }}
+                    {{ atividadeComQuando(atividade) }}
                 </li>
             </ul>
         </section>

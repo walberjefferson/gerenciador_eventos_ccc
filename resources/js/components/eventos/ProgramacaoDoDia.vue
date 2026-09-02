@@ -94,8 +94,16 @@ function faixaEtaria(atividade: AtividadePublica): string | null {
                     :class="atividade.esgotado ? 'opacity-60' : ''"
                 >
                     <!-- .slot__t — coluna fixa e monoespacada: e ela que alinha
-                         os horarios de linhas diferentes na vertical -->
-                    <span class="text-muted-foreground w-[124px] shrink-0 font-mono text-[13.5px] whitespace-nowrap tabular-nums">
+                         os horarios de linhas diferentes na vertical.
+
+                         Atividade sem hora marcada NÃO ganha a coluna: nada de
+                         "a definir" nem de travessão. Ela acontece no dia
+                         inteiro, e o dia já está escrito no cabeçalho — a linha
+                         só precisa do nome. -->
+                    <span
+                        v-if="atividade.horario_rotulo"
+                        class="text-muted-foreground w-[124px] shrink-0 font-mono text-[13.5px] whitespace-nowrap tabular-nums"
+                    >
                         {{ atividade.horario_rotulo }}
                     </span>
 

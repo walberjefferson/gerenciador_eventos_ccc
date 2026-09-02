@@ -24,9 +24,10 @@ export interface AtividadeEscolhida {
     nome: string;
     dia: string | null;
     grupo: string | null;
-    comeca_em: string;
-    termina_em: string;
-    horario_rotulo: string;
+    /** Nulos quando a atividade não tem hora marcada. */
+    comeca_em: string | null;
+    termina_em: string | null;
+    horario_rotulo: string | null;
 }
 
 export interface EventoDoAcompanhamento {

@@ -50,6 +50,23 @@ const grupos = computed<GrupoDaEstrutura[]>(() => props.dias.flatMap((dia) => di
  * cima. O que esta cadastrado e o que se ve; o que se digita interrompe a tela
  * de proposito, e sai dela quando termina.
  */
+/**
+ * A SEÇÃO DE DIAS COMEÇA RECOLHIDA QUANDO O EVENTO TEM UM DIA SÓ.
+ *
+ * Todo evento novo já nasce com o "Dia 1" pronto, e a maioria deles tem
+ * mesmo um dia só. Deixar a tabela de dias aberta no topo da tela faz a
+ * primeira coisa que se lê ser justamente a que não precisa de trabalho, e
+ * empurra as atividades — o motivo de ter entrado aqui — para baixo da dobra.
+ *
+ * Recolhida não é escondida: o botão diz quantos dias existem e abre a tabela
+ * com um toque. Com dois dias ou mais, a seção começa aberta, como sempre foi:
+ * aí a programação de fato tem estrutura para conferir.
+ */
+const diasExpandidos = ref<boolean>(props.evento.dias_total !== 1);
+
+/** "Dia 1 · 17/10/2026" — o que a seção recolhida mostra no lugar da tabela. */
+const resumoDosDias = computed<string>(() => props.dias.map((dia) => `${dia.nome} · ${dataEmPortugues(dia.data)}`).join(', '));
+
 const modalDiaAberto = ref(false);
 
 const diaEmEdicao = ref<DiaDaEstrutura | null>(null);
@@ -232,8 +249,10 @@ function editarAtividade(atividade: AtividadeDaEstrutura): void {
     formularioAtividade.grupo_atividade_id = atividade.grupo_atividade_id;
     formularioAtividade.nome = atividade.nome;
     formularioAtividade.descricao = atividade.descricao ?? '';
-    formularioAtividade.comeca_em = atividade.comeca_em;
-    formularioAtividade.termina_em = atividade.termina_em;
+    // O horário é opcional: quando não existe, o campo abre vazio — e vazio é
+    // o que o servidor recebe de volta se ninguém preencher.
+    formularioAtividade.comeca_em = atividade.comeca_em ?? '';
+    formularioAtividade.termina_em = atividade.termina_em ?? '';
     formularioAtividade.capacidade = atividade.capacidade;
     formularioAtividade.idade_minima = atividade.idade_minima;
     formularioAtividade.idade_maxima = atividade.idade_maxima;
@@ -369,6 +388,22 @@ function horario(iso: string): string {
     return `${dataEmPortugues(data ?? '')} às ${(hora ?? '').slice(0, 5)}`;
 }
 
+/**
+ * "17/10/2026 às 08:00 — 10:00", ou "—" quando a atividade não tem hora marcada.
+ *
+ * O travessão sozinho vale AQUI, e só aqui: nesta tela a ausência de horário é
+ * informação de trabalho — quem organiza precisa ver, batendo o olho na
+ * listagem, quais atividades ocupam o dia inteiro. Nas telas de quem se
+ * inscreve, a linha do horário simplesmente não existe.
+ */
+function horarioDaAtividade(atividade: AtividadeDaEstrutura): string {
+    if (atividade.comeca_em === null || atividade.termina_em === null) {
+        return '—';
+    }
+
+    return `${horario(atividade.comeca_em)} — ${horario(atividade.termina_em).slice(-5)}`;
+}
+
 function escolhas(grupo: GrupoDaEstrutura): string {
     const maximo = grupo.max_selecoes === null ? 'sem limite' : String(grupo.max_selecoes);
 
@@ -408,12 +443,25 @@ function escolhas(grupo: GrupoDaEstrutura): string {
 
                 <button
                     type="button"
+                    :aria-expanded="diasExpandidos"
+                    aria-controls="lista-de-dias"
+                    data-testid="alternar-dias"
+                    class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    @click="diasExpandidos = !diasExpandidos"
+                >
+                    {{ diasExpandidos ? 'Ocultar os dias' : `Mostrar os dias (${props.dias.length})` }}
+                </button>
+
+                <button
+                    type="button"
                     class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
                     @click="abrirCadastroDia"
                 >
                     Novo dia
                 </button>
             </div>
+
+            <p v-if="!diasExpandidos" class="text-muted-foreground text-sm">{{ resumoDosDias }}</p>
 
             <Dialog :open="modalDiaAberto" @update:open="aoTrocarAberturaDia">
                 <DialogContent class="sm:max-w-2xl">
@@ -494,41 +542,43 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                 </DialogContent>
             </Dialog>
 
-            <table v-if="props.dias.length > 0" class="w-full text-sm">
-                <caption class="sr-only">
-                    Dias da programação, com a data, a posição na leitura e quantos grupos cada um tem.
-                </caption>
-                <thead>
-                    <tr class="border-border border-b text-left">
-                        <th scope="col" class="px-2 py-2 font-medium">Dia</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Data</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Posição</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Situação</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Grupos</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="dia in props.dias" :key="dia.id" class="border-border border-b last:border-0">
-                        <th scope="row" class="px-2 py-2 text-left font-normal">{{ dia.nome }}</th>
-                        <td class="px-2 py-2">{{ dataEmPortugues(dia.data) }}</td>
-                        <td class="px-2 py-2">{{ dia.posicao }}</td>
-                        <td class="px-2 py-2">
-                            <EtiquetaDeSituacao dominio="ativo" :situacao="dia.ativo" :rotulo="dia.ativo ? 'Ativo' : 'Desativado'" />
-                        </td>
-                        <td class="px-2 py-2">{{ dia.grupos.length }}</td>
-                        <td class="px-2 py-2">
-                            <div class="flex flex-wrap gap-2">
-                                <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
-                                <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
-                                    Excluir
-                                </BotaoDeAcao>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <p v-else class="text-muted-foreground text-sm">Nenhum dia cadastrado. Comece por aqui: sem dia não há programação.</p>
+            <div id="lista-de-dias" v-show="diasExpandidos">
+                <table v-if="props.dias.length > 0" class="w-full text-sm">
+                    <caption class="sr-only">
+                        Dias da programação, com a data, a posição na leitura e quantos grupos cada um tem.
+                    </caption>
+                    <thead>
+                        <tr class="border-border border-b text-left">
+                            <th scope="col" class="px-2 py-2 font-medium">Dia</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Data</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Posição</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Situação</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Grupos</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="dia in props.dias" :key="dia.id" class="border-border border-b last:border-0">
+                            <th scope="row" class="px-2 py-2 text-left font-normal">{{ dia.nome }}</th>
+                            <td class="px-2 py-2">{{ dataEmPortugues(dia.data) }}</td>
+                            <td class="px-2 py-2">{{ dia.posicao }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="dia.ativo" :rotulo="dia.ativo ? 'Ativo' : 'Desativado'" />
+                            </td>
+                            <td class="px-2 py-2">{{ dia.grupos.length }}</td>
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
+                                        Excluir
+                                    </BotaoDeAcao>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p v-else class="text-muted-foreground text-sm">Nenhum dia cadastrado. Comece por aqui: sem dia não há programação.</p>
+            </div>
         </section>
 
         <!-- Grupos -->
@@ -708,13 +758,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
                                     <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarGrupo(grupo)">Editar</BotaoDeAcao>
-                                    <BotaoDeAcao
-                                        tamanho="xs"
-                                        intencao="excluir"
-                                        :icone="Trash2"
-                                        :disabled="excluindo"
-                                        @click="excluirGrupo(grupo)"
-                                    >
+                                    <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirGrupo(grupo)">
                                         Excluir
                                     </BotaoDeAcao>
                                 </div>
@@ -802,19 +846,38 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <!-- O HORÁRIO É OPCIONAL, E EM PAR. Nem toda
+                                 programação tem hora marcada: um mutirão, uma
+                                 caminhada, um retiro acontecem "no sábado", e
+                                 obrigar quem cadastra a inventar 08:00 às 17:00
+                                 é pedir um dado que ninguém tem. Deixar os dois
+                                 campos em branco faz a atividade ocupar o dia
+                                 inteiro; preencher só um é recusado, porque
+                                 metade de um horário não descreve nada. -->
+                            <p id="ajuda-atividade-horario" class="text-muted-foreground text-sm sm:col-span-2">
+                                O horário é opcional. Sem hora de início e de término, a atividade ocupa o dia inteiro do dia a que pertence — e não
+                                pode ser escolhida junto com nenhuma outra desse mesmo dia.
+                            </p>
+
                             <div class="flex flex-col gap-1">
-                                <label for="atividade-comeca" class="text-sm font-medium">Começa em</label>
-                                <CampoDeDataHora id="atividade-comeca" v-model="formularioAtividade.comeca_em" />
+                                <label for="atividade-comeca" class="text-sm font-medium">Começa em (opcional)</label>
+                                <CampoDeDataHora
+                                    id="atividade-comeca"
+                                    v-model="formularioAtividade.comeca_em"
+                                    aria-describedby="ajuda-atividade-horario"
+                                    :aria-invalid="formularioAtividade.errors.comeca_em ? true : undefined"
+                                />
                                 <p v-if="formularioAtividade.errors.comeca_em" role="alert" class="text-destructive text-sm">
                                     {{ formularioAtividade.errors.comeca_em }}
                                 </p>
                             </div>
 
                             <div class="flex flex-col gap-1">
-                                <label for="atividade-termina" class="text-sm font-medium">Termina em</label>
+                                <label for="atividade-termina" class="text-sm font-medium">Termina em (opcional)</label>
                                 <CampoDeDataHora
                                     id="atividade-termina"
                                     v-model="formularioAtividade.termina_em"
+                                    aria-describedby="ajuda-atividade-horario"
                                     :aria-invalid="formularioAtividade.errors.termina_em ? true : undefined"
                                 />
                                 <p v-if="formularioAtividade.errors.termina_em" role="alert" class="text-destructive text-sm">
@@ -919,9 +982,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <tbody>
                         <tr v-for="atividade in grupo.atividades" :key="atividade.id" class="border-border border-b last:border-0">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ atividade.nome }}</th>
-                            <td class="px-2 py-2 whitespace-nowrap">
-                                {{ horario(atividade.comeca_em) }} — {{ horario(atividade.termina_em).slice(-5) }}
-                            </td>
+                            <td class="px-2 py-2 whitespace-nowrap">{{ horarioDaAtividade(atividade) }}</td>
                             <td class="px-2 py-2">
                                 {{
                                     atividade.capacidade === null
@@ -1073,13 +1134,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <td class="px-2 py-2">{{ conflito.atividade_b }}</td>
                         <td class="px-2 py-2">{{ conflito.motivo ?? '—' }}</td>
                         <td class="px-2 py-2">
-                            <BotaoDeAcao
-                                tamanho="xs"
-                                intencao="excluir"
-                                :icone="Trash2"
-                                :disabled="excluindo"
-                                @click="excluirConflito(conflito)"
-                            >
+                            <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirConflito(conflito)">
                                 Remover
                             </BotaoDeAcao>
                         </td>

@@ -9,8 +9,11 @@ use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EventoRequest;
 use App\Http\Resources\Admin\EstruturaDoEventoResource;
+use App\Models\DiaEvento;
 use App\Models\Evento;
+use App\Models\GrupoAtividade;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 
 /**
@@ -67,16 +70,58 @@ class EventoController extends Controller
         ]);
     }
 
+    /**
+     * O evento nasce com o primeiro dia e um grupo de atividades prontos.
+     *
+     * Antes, quem cadastrava um evento caía numa tela de programação vazia e
+     * precisava criar um dia e um grupo antes de conseguir cadastrar a
+     * primeira atividade — três formulários para dizer uma coisa só. Para a
+     * maioria dos eventos, o primeiro dia é a data de início e o único grupo é
+     * "as atividades": o sistema já sabe disso e não deveria perguntar.
+     *
+     * Só o PRIMEIRO dia é criado, mesmo em evento de vários dias. Adivinhar os
+     * demais seria inventar programação; acrescentá-los é um gesto do
+     * organizador, que sabe o que acontece em cada um.
+     *
+     * Tudo numa transação: um evento sem o dia (ou com o dia sem o grupo) seria
+     * pior do que um evento não cadastrado, porque ninguém perceberia a falta.
+     */
     public function store(EventoRequest $request): RedirectResponse
     {
         $this->authorize('create', Evento::class);
 
-        $evento = Evento::create($request->dadosDoEvento());
+        $evento = DB::transaction(function () use ($request): Evento {
+            $evento = Evento::create($request->dadosDoEvento());
+
+            $dia = DiaEvento::create([
+                'evento_id' => $evento->id,
+                'nome' => 'Dia 1',
+                'data' => $evento->data_inicio->toDateString(),
+                'posicao' => 1,
+                'ativo' => true,
+            ]);
+
+            GrupoAtividade::create([
+                'dia_evento_id' => $dia->id,
+                'nome' => 'Atividades',
+                // Opcional e sem teto: é o grupo mais permissivo possível, o
+                // que deixa a decisão de fato para quem organiza. Um grupo
+                // obrigatório criado por conta própria travaria as inscrições
+                // de um evento que talvez nem tenha atividades.
+                'obrigatorio' => false,
+                'min_selecoes' => 0,
+                'max_selecoes' => null,
+                'posicao' => 1,
+                'ativo' => true,
+            ]);
+
+            return $evento;
+        });
 
         $this->auditarCriacao($evento, 'evento');
 
         return to_route('admin.eventos.estrutura', $evento)
-            ->with('sucesso', "Evento {$evento->nome} cadastrado. Agora monte a programação.");
+            ->with('sucesso', "Evento {$evento->nome} cadastrado. A programação já começa com o Dia 1 e um grupo de atividades: acrescente as atividades ou ajuste o que precisar.");
     }
 
     public function edit(Evento $evento): Response

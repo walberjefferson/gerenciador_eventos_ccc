@@ -26,7 +26,8 @@ const props = defineProps<{
         id: number;
         nome: string;
         data_rotulo: string;
-        atividades: Array<{ id: number; nome: string; horario_rotulo: string }>;
+        /** `horario_rotulo` é nulo quando a atividade não tem hora marcada. */
+        atividades: Array<{ id: number; nome: string; horario_rotulo: string | null }>;
     }>;
 }>();
 

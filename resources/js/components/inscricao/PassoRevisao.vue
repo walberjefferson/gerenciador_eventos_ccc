@@ -109,7 +109,11 @@ const prazoEmPalavras = 'Depois de confirmar, você verá o código Pix e o praz
                         <span class="text-muted-foreground basis-[148px]">{{ dia.nome }}</span>
                         <span class="min-w-0 flex-1 font-medium">
                             {{ atividade.nome }}
-                            <span class="text-muted-foreground font-mono text-[13px] tabular-nums">· {{ atividade.horario_rotulo }}</span>
+                            <!-- O separador vem junto do horário: sem hora marcada,
+                                 nem o ponto sobra na linha. -->
+                            <span v-if="atividade.horario_rotulo" class="text-muted-foreground font-mono text-[13px] tabular-nums"
+                                >· {{ atividade.horario_rotulo }}</span
+                            >
                         </span>
                     </div>
                 </template>

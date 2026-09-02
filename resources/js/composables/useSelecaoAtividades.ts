@@ -30,8 +30,10 @@ function apenasODia(iso: string): string {
 }
 
 /**
- * Idade completa que a pessoa tera no dia em que a atividade comeca — a mesma
- * conta que o backend faz em Atividade::idadeNaData().
+ * Idade completa que a pessoa terá no dia em que a atividade acontece — a
+ * mesma conta que o backend faz em Atividade::idadeNaData(). A data vem pronta
+ * do servidor (campo `data`), e não do horário, porque nem toda atividade tem
+ * hora marcada.
  */
 export function idadeNaData(dataNascimento: string, dataDaAtividade: string): number | null {
     const nascimento = apenasODia(dataNascimento);
@@ -53,16 +55,30 @@ export function idadeNaData(dataNascimento: string, dataDaAtividade: string): nu
     return idade;
 }
 
+/** A atividade tem hora marcada? O horário é opcional, mas sempre em par. */
+export function temHorario(atividade: AtividadePublica): boolean {
+    return atividade.comeca_em !== null && atividade.termina_em !== null;
+}
+
 /**
  * Duas atividades se sobrepoem quando uma comeca antes de a outra terminar,
  * dos dois lados. Limites que apenas se encostam — uma termina exatamente
  * quando a outra comeca — NAO se sobrepoem, e continuam permitidos.
+ *
+ * Atividade SEM horário ocupa o dia inteiro: ninguém sabe a que horas ela
+ * começa, então ela choca com qualquer outra atividade da mesma data — com ou
+ * sem horário — e com nenhuma de outra data. É a mesma conta que
+ * Atividade::sobrepoe() faz no servidor.
  */
 export function haChoqueDeHorario(a: AtividadePublica, b: AtividadePublica): boolean {
-    const comecaA = Date.parse(a.comeca_em);
-    const terminaA = Date.parse(a.termina_em);
-    const comecaB = Date.parse(b.comeca_em);
-    const terminaB = Date.parse(b.termina_em);
+    if (!temHorario(a) || !temHorario(b)) {
+        return apenasODia(a.data) === apenasODia(b.data);
+    }
+
+    const comecaA = Date.parse(a.comeca_em ?? '');
+    const terminaA = Date.parse(a.termina_em ?? '');
+    const comecaB = Date.parse(b.comeca_em ?? '');
+    const terminaB = Date.parse(b.termina_em ?? '');
 
     if ([comecaA, terminaA, comecaB, terminaB].some((instante) => Number.isNaN(instante))) {
         return false;
@@ -172,7 +188,7 @@ export function useSelecaoAtividades(opcoes: OpcoesDeSelecao) {
             return null;
         }
 
-        const idade = idadeNaData(opcoes.dataNascimento.value, atividade.comeca_em);
+        const idade = idadeNaData(opcoes.dataNascimento.value, atividade.data);
 
         if (idade === null) {
             return null;
@@ -218,7 +234,15 @@ export function useSelecaoAtividades(opcoes: OpcoesDeSelecao) {
         const choque = choqueDeHorarioCom(atividade);
 
         if (choque !== null) {
-            return { selecionada: false, selecionavel: false, motivo: `Indisponível — conflito de horário com ${choque.nome}` };
+            // Quando o bloqueio vem de uma atividade sem horário, é AQUI que a
+            // pessoa descobre por quê: o cartão dela não mostra hora nenhuma,
+            // então "conflito de horário" mandaria procurar na tela um dado que
+            // ninguém escreveu.
+            const motivo = temHorario(choque)
+                ? `Indisponível — conflito de horário com ${choque.nome}`
+                : `Indisponível — ${choque.nome} ocupa o dia inteiro`;
+
+            return { selecionada: false, selecionavel: false, motivo };
         }
 
         const conflito = conflitoDeclaradoCom(atividade);

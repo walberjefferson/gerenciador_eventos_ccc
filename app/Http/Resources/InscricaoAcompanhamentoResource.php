@@ -60,13 +60,17 @@ class InscricaoAcompanhamentoResource extends JsonResource
                 'cidade' => $this->grupoParticipante->cidade?->nome,
                 'uf' => $this->grupoParticipante->cidade?->uf,
             ],
+            // Atividade sem hora marcada existe: os três campos do horário
+            // saem nulos e a tela não escreve linha nenhuma no lugar.
             'atividades' => $this->atividades->map(fn (Atividade $atividade): array => [
                 'nome' => $atividade->nome,
                 'dia' => $atividade->grupoAtividade?->diaEvento?->nome,
                 'grupo' => $atividade->grupoAtividade?->nome,
-                'comeca_em' => $atividade->comeca_em->toIso8601String(),
-                'termina_em' => $atividade->termina_em->toIso8601String(),
-                'horario_rotulo' => $atividade->comeca_em->format('H:i').' às '.$atividade->termina_em->format('H:i'),
+                'comeca_em' => $atividade->comeca_em?->toIso8601String(),
+                'termina_em' => $atividade->termina_em?->toIso8601String(),
+                'horario_rotulo' => $atividade->temHorario()
+                    ? $atividade->comeca_em->format('H:i').' às '.$atividade->termina_em->format('H:i')
+                    : null,
             ])->values()->all(),
         ];
     }

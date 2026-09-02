@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatarValor } from '@/lib/formato';
 import { varianteDaInscricao } from '@/lib/situacoes';
-import type { InscricaoAcompanhada } from '@/types/participante';
+import type { AtividadeEscolhida, InscricaoAcompanhada } from '@/types/participante';
 import { computed } from 'vue';
 
 /**
@@ -27,6 +27,17 @@ const valor = computed(() => formatarValor(props.inscricao.valor_centavos, props
  * que diz que esperar pagamento é ATENÇÃO, porque o prazo está correndo.
  */
 const variante = computed(() => varianteDaInscricao(props.inscricao.situacao));
+
+/**
+ * "Sábado · 09:00 às 11:00" — o que se sabe sobre quando a atividade acontece.
+ *
+ * Nem sempre é tudo. O horário é opcional (atividade que ocupa o dia inteiro
+ * não tem hora marcada) e o dia pode não ter nome. Cada pedaço entra se
+ * existir, e o separador só aparece entre dois pedaços de verdade.
+ */
+function quando(atividade: AtividadeEscolhida): string {
+    return [atividade.dia, atividade.horario_rotulo].filter((parte) => Boolean(parte)).join(' · ');
+}
 
 const grupo = computed(() => {
     const dados = props.inscricao.grupo_participante;
@@ -85,9 +96,12 @@ const grupo = computed(() => {
                 <ul class="mt-2 space-y-2" data-testid="atividades-escolhidas">
                     <li v-for="atividade in inscricao.atividades" :key="atividade.nome" class="border-border rounded-lg border p-3 text-sm">
                         <p class="font-medium">{{ atividade.nome }}</p>
-                        <p class="text-muted-foreground">
-                            <template v-if="atividade.dia">{{ atividade.dia }} · </template>{{ atividade.horario_rotulo }}
-                        </p>
+                        <!-- Dia e horário são duas informações que podem faltar,
+                             cada uma por seu motivo. O separador só aparece
+                             quando existem as duas, e a linha inteira some
+                             quando não há nenhuma: ponto solto no meio do nada
+                             é ruído, não informação. -->
+                        <p v-if="quando(atividade)" class="text-muted-foreground">{{ quando(atividade) }}</p>
                     </li>
                 </ul>
             </div>

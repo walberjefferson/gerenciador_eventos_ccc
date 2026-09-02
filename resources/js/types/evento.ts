@@ -9,9 +9,13 @@ export interface AtividadePublica {
     id: number;
     nome: string;
     descricao: string | null;
-    comeca_em: string;
-    termina_em: string;
-    horario_rotulo: string;
+    /** Nulo quando a atividade não tem hora marcada: ela ocupa o dia inteiro. */
+    comeca_em: string | null;
+    termina_em: string | null;
+    /** "09:00 às 11:00", ou nulo quando não há horário — a tela não escreve nada. */
+    horario_rotulo: string | null;
+    /** O dia em que a atividade acontece, em AAAA-MM-DD. Sempre existe. */
+    data: string;
     capacidade: number | null;
     /** null quando a atividade nao tem limite de vagas. */
     vagas_disponiveis: number | null;

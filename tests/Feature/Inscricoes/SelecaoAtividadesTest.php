@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Exceptions\Inscricoes\SelecaoAtividadesInvalidaException;
 use App\Models\Atividade;
+use App\Models\DiaEvento;
 use App\Models\GrupoAtividade;
 use App\Models\Inscricao;
 use Illuminate\Support\Carbon;
@@ -252,6 +253,110 @@ describe('RN-08 — faixa etaria na data da atividade', function () {
         ]);
 
         expect($inscricao->situacao->value)->toBe('aguardando_pagamento');
+    });
+});
+
+describe('RN-06 revisada — atividade sem horário ocupa o dia inteiro', function () {
+    it('recusa a atividade sem horário junto com outra do mesmo dia', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create([
+            'nome' => 'Mutirão', 'posicao' => 9,
+        ]);
+
+        $mensagens = recusaDaSelecao(fn () => $cenario->inscrever([
+            'atividades' => [$cenario->futebol->id, $mutirao->id],
+        ]));
+
+        // A frase é outra de propósito: dizer "acontecem no mesmo horário"
+        // sobre algo sem horário mandaria a pessoa procurar na tela uma hora
+        // que ninguém escreveu.
+        expect($mensagens)->toContain('Mutirão ocupa o dia inteiro e não pode ser escolhida junto com Futebol.')
+            ->and(Inscricao::count())->toBe(0)
+            ->and($cenario->futebol->fresh()->vagas_reservadas)->toBe(0);
+    });
+
+    it('recusa duas atividades sem horário no mesmo dia', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create(['nome' => 'Mutirão', 'posicao' => 9]);
+        $vigilia = Atividade::factory()->for($cenario->esportes)->semHorario()->create(['nome' => 'Vigília', 'posicao' => 10]);
+
+        $mensagens = recusaDaSelecao(fn () => $cenario->inscrever([
+            'atividades' => [$mutirao->id, $vigilia->id],
+        ]));
+
+        expect($mensagens)->toContain('Mutirão ocupa o dia inteiro e não pode ser escolhida junto com Vigília.');
+    });
+
+    it('aceita atividades sem horário em dias diferentes', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create(['nome' => 'Mutirão', 'posicao' => 9]);
+
+        $segundoDia = DiaEvento::factory()->for($cenario->evento)->create([
+            'nome' => 'Domingo',
+            'data' => $cenario->dataDoDia->copy()->addDay()->toDateString(),
+            'posicao' => 2,
+        ]);
+
+        $oficinas = GrupoAtividade::factory()->for($segundoDia)->opcional(0, 1)->create([
+            'nome' => 'Oficina', 'posicao' => 1,
+        ]);
+
+        $plantio = Atividade::factory()->for($oficinas)->semHorario()->create(['nome' => 'Plantio', 'posicao' => 1]);
+
+        $inscricao = $cenario->inscrever(['atividades' => [$mutirao->id, $plantio->id]]);
+
+        expect($inscricao->atividades->pluck('nome')->all())->toBe(['Mutirão', 'Plantio']);
+    });
+
+    it('aceita a atividade sem horário sozinha', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create(['nome' => 'Mutirão', 'posicao' => 9]);
+
+        $inscricao = $cenario->inscrever(['atividades' => [$mutirao->id]]);
+
+        expect($inscricao->atividades)->toHaveCount(1);
+    });
+});
+
+describe('RN-08 revisada — sem horário, a idade vale na data do dia', function () {
+    it('recusa quem ainda não tem a idade mínima na data do dia da programação', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create([
+            'nome' => 'Mutirão', 'posicao' => 9, 'idade_minima' => 18,
+        ]);
+
+        // Faz 18 anos um dia depois do dia do mutirão: na data dele tem 17.
+        $nascimento = $cenario->dataDoDia->copy()->subYears(18)->addDay();
+
+        $mensagens = recusaDaSelecao(fn () => $cenario->inscrever([
+            'atividades' => [$mutirao->id],
+            'data_nascimento' => $nascimento->toDateString(),
+        ]));
+
+        expect($mensagens)->toContain('Mutirão é permitida a partir de 18 anos.')
+            ->and(Inscricao::count())->toBe(0);
+    });
+
+    it('aceita quem faz a idade mínima no próprio dia da programação', function () {
+        $cenario = Cenario::montar();
+
+        $mutirao = Atividade::factory()->for($cenario->esportes)->semHorario()->create([
+            'nome' => 'Mutirão', 'posicao' => 9, 'idade_minima' => 18,
+        ]);
+
+        $nascimento = $cenario->dataDoDia->copy()->subYears(18);
+
+        $inscricao = $cenario->inscrever([
+            'atividades' => [$mutirao->id],
+            'data_nascimento' => $nascimento->toDateString(),
+        ]);
+
+        expect($inscricao->atividades)->toHaveCount(1);
     });
 });
 

@@ -97,6 +97,8 @@ export interface EventoDaEstrutura {
     data_inicio: string;
     data_fim: string;
     inscricoes_ativas: number;
+    /** Quantos dias a programação tem — com um só, a seção de dias começa recolhida. */
+    dias_total: number;
 }
 
 /** Uma atividade dentro de um grupo. */
@@ -105,8 +107,9 @@ export interface AtividadeDaEstrutura {
     grupo_atividade_id: number;
     nome: string;
     descricao: string | null;
-    comeca_em: string;
-    termina_em: string;
+    /** Nulos quando a atividade não tem hora marcada: ela ocupa o dia inteiro. */
+    comeca_em: string | null;
+    termina_em: string | null;
     capacidade: number | null;
     idade_minima: number | null;
     idade_maxima: number | null;
@@ -223,8 +226,9 @@ export interface PaginaDeInscricoes {
 export interface AtividadeEscolhida {
     id: number;
     nome: string;
-    comeca_em: string;
-    termina_em: string;
+    /** Nulos quando a atividade não tem hora marcada. */
+    comeca_em: string | null;
+    termina_em: string | null;
 }
 
 /** A ficha da inscrição. Sem CPF: ele fica cifrado e não é mostrado. */

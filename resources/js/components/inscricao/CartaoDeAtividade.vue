@@ -74,8 +74,15 @@ const desabilitada = computed<boolean>(() => !props.situacao.selecionavel);
                 </svg>
             </span>
 
-            <!-- .opt__t — coluna fixa e monoespacada -->
-            <span class="text-muted-foreground w-[124px] shrink-0 font-mono text-[13.5px] whitespace-nowrap tabular-nums">
+            <!-- .opt__t — coluna fixa e monoespacada.
+
+                 Sem hora marcada, a coluna não existe: a atividade ocupa o dia
+                 inteiro e não há horário nenhum a escrever. Quem tentar marcá-la
+                 junto com outra do mesmo dia lê o motivo logo abaixo do cartão. -->
+            <span
+                v-if="atividade.horario_rotulo"
+                class="text-muted-foreground w-[124px] shrink-0 font-mono text-[13.5px] whitespace-nowrap tabular-nums"
+            >
                 {{ atividade.horario_rotulo }}
             </span>
 

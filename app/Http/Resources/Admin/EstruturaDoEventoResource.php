@@ -42,6 +42,12 @@ class EstruturaDoEventoResource
                 'data_inicio' => $this->evento->data_inicio->toDateString(),
                 'data_fim' => $this->evento->data_fim->toDateString(),
                 'inscricoes_ativas' => $this->evento->inscricoes()->ativas()->count(),
+                // Quantos dias a programação tem. É por este número que a tela
+                // decide começar com a seção de dias recolhida: evento de um
+                // dia só — o caso do evento recém-criado, que já nasce com o
+                // Dia 1 pronto — não precisa da tabela de dias aberta na cara
+                // de quem só quer cadastrar as atividades.
+                'dias_total' => $this->evento->diasEvento->count(),
             ],
             'dias' => $this->evento->diasEvento
                 ->map(fn (DiaEvento $dia): array => [
@@ -70,8 +76,12 @@ class EstruturaDoEventoResource
                                     'grupo_atividade_id' => $atividade->grupo_atividade_id,
                                     'nome' => $atividade->nome,
                                     'descricao' => $atividade->descricao,
-                                    'comeca_em' => $atividade->comeca_em->format('Y-m-d\TH:i'),
-                                    'termina_em' => $atividade->termina_em->format('Y-m-d\TH:i'),
+                                    // Nulos quando a atividade não tem hora
+                                    // marcada: aqui, ao contrário das telas do
+                                    // participante, a ausência é informação de
+                                    // trabalho e a listagem a mostra como "—".
+                                    'comeca_em' => $atividade->comeca_em?->format('Y-m-d\TH:i'),
+                                    'termina_em' => $atividade->termina_em?->format('Y-m-d\TH:i'),
                                     'capacidade' => $atividade->capacidade,
                                     'idade_minima' => $atividade->idade_minima,
                                     'idade_maxima' => $atividade->idade_maxima,
