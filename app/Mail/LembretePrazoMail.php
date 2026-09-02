@@ -12,7 +12,9 @@ use Illuminate\Mail\Mailables\Content;
  *
  * O unico dos cinco e-mails que nao nasce de um anuncio do dominio: nada
  * acontece quando o tempo passa, entao quem repara na passagem do tempo e uma
- * rotina agendada (inscricoes:lembrar-prazo).
+ * rotina agendada (inscricoes:lembrar-prazo). Ela avisa quando resta metade ou
+ * menos do prazo daquela inscricao — proporcional ao prazo, e nao um numero
+ * fixo de horas.
  *
  * Sai uma unica vez por inscricao — nao porque o comando se lembre disso, mas
  * porque o registro de envio nao aceita a segunda.

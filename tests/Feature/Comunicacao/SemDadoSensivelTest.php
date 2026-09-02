@@ -57,13 +57,19 @@ beforeEach(function (): void {
 
     $evento = Evento::factory()->create(['nome' => 'Retiro de Carnaval']);
 
+    // Criada ha seis horas, com oito de prazo: ja esta na segunda metade, que
+    // e o que faz o lembrete de prazo sair na rotina agendada mais abaixo.
+    $criada = Carbon::now()->subHours(6);
+
     $this->inscricao = Inscricao::factory()
         ->for($evento)
         ->comDocumento(CPF_DA_PESSOA)
         ->create([
             'nome_completo' => 'Maria da Silva',
             'telefone' => TELEFONE_DA_PESSOA,
-            'prazo_pagamento' => Carbon::now()->addHours(6),
+            'created_at' => $criada,
+            'updated_at' => $criada,
+            'prazo_pagamento' => $criada->copy()->addHours(8),
         ]);
 
     $this->pagamento = Pagamento::query()->create([

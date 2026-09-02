@@ -20,7 +20,7 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="APP_TIMEZONE" value="America/Sao_Paulo"/>
+        <env name="APP_TIMEZONE" value="America/Maceio"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <!-- Os testes rodam em PostgreSQL, o mesmo motor de producao: unique

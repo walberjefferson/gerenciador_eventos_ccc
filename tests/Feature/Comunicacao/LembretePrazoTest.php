@@ -18,9 +18,14 @@ use Illuminate\Support\Facades\Mail;
 |--------------------------------------------------------------------------
 |
 | Nada acontece no dominio quando o tempo passa, entao quem repara na
-| aproximacao do prazo e uma rotina agendada. Ela precisa acertar tres coisas:
-| avisar quem esta dentro da janela, nao incomodar quem nao deve receber, e
-| nunca mandar o mesmo lembrete duas vezes.
+| aproximacao do prazo e uma rotina agendada. O momento do aviso e uma FRACAO
+| do prazo que aquela inscricao recebeu, e nao um numero fixo de horas: quem
+| teve 24 horas e avisado faltando 12, quem teve uma hora e avisado faltando
+| 30 minutos.
+|
+| A rotina precisa acertar quatro coisas: avisar quem ja gastou metade do
+| proprio prazo, calar-se para quem ainda tem folga, nao incomodar quem nao
+| deve receber, e nunca mandar o mesmo lembrete duas vezes.
 |
 */
 
@@ -29,16 +34,27 @@ beforeEach(function (): void {
     $this->evento = Evento::factory()->create(['nome' => 'Retiro de Carnaval']);
 });
 
-/** Inscricao aguardando pagamento com o prazo vencendo daqui a X horas. */
-function aguardando(Evento $evento, float $horas, array $atributos = []): Inscricao
+/**
+ * Inscricao aguardando pagamento que recebeu $prazo horas de prazo e das quais
+ * ja gastou $gastas.
+ *
+ * As duas pontas sao explicitas de proposito: o que decide o lembrete nao e o
+ * quanto falta, e sim o quanto falta EM RELACAO ao que foi dado.
+ */
+function aguardando(Evento $evento, float $prazo, float $gastas, array $atributos = []): Inscricao
 {
+    $criada = Carbon::now()->subMinutes((int) round($gastas * 60));
+
     return Inscricao::factory()->for($evento)->create(array_merge([
-        'prazo_pagamento' => Carbon::now()->addMinutes((int) round($horas * 60)),
+        'created_at' => $criada,
+        'updated_at' => $criada,
+        'prazo_pagamento' => $criada->copy()->addMinutes((int) round($prazo * 60)),
     ], $atributos));
 }
 
-it('avisa quem tem prazo dentro da janela', function (): void {
-    $inscricao = aguardando($this->evento, 6, ['nome_completo' => 'Maria da Silva']);
+it('avisa quem ja gastou metade do prazo', function (): void {
+    // 24 horas de prazo, 13 ja gastas: restam 11, menos que a metade.
+    $inscricao = aguardando($this->evento, 24, 13, ['nome_completo' => 'Maria da Silva']);
 
     $this->artisan('inscricoes:lembrar-prazo')
         ->expectsOutputToContain('Lembretes enviados nesta execucao: 1.')
@@ -48,7 +64,7 @@ it('avisa quem tem prazo dentro da janela', function (): void {
     Mail::assertQueued(LembretePrazoMail::class, function (LembretePrazoMail $email) use ($inscricao): bool {
         expect($email->hasTo($inscricao->email))->toBeTrue()
             ->and($email->nome)->toBe('Maria')
-            ->and($email->tempoRestante)->toBe('Faltam cerca de 6 horas')
+            ->and($email->tempoRestante)->toBe('Faltam cerca de 11 horas')
             ->and($email->link)->toContain('signature=')
             ->and($email->render())->toContain('Retiro de Carnaval');
 
@@ -56,35 +72,69 @@ it('avisa quem tem prazo dentro da janela', function (): void {
     });
 });
 
-it('nao avisa quem ainda esta longe do prazo', function (): void {
-    aguardando($this->evento, 72);
+it('nao avisa quem ainda nao gastou metade do prazo', function (): void {
+    // 24 horas de prazo, 11 gastas: restam 13, mais que a metade.
+    aguardando($this->evento, 24, 11);
+
+    $this->artisan('inscricoes:lembrar-prazo')
+        ->expectsOutputToContain('Nenhum lembrete a enviar')
+        ->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('mede a metade pelo prazo de cada inscricao, e nao por um numero fixo de horas', function (): void {
+    // Prazo curto ja na segunda metade: 1 hora de prazo, 40 minutos gastos.
+    $curto = aguardando($this->evento, 1, 40 / 60);
+
+    // Prazo longo ainda na primeira metade, embora falte MENOS tempo em horas
+    // do que a janela fixa de 24 horas que existia antes: 30 dias de prazo,
+    // 10 gastos.
+    $longo = aguardando($this->evento, 30 * 24, 10 * 24);
+
+    $this->artisan('inscricoes:lembrar-prazo')
+        ->expectsOutputToContain('Lembretes enviados nesta execucao: 1.')
+        ->assertSuccessful();
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(LembretePrazoMail::class, fn (LembretePrazoMail $email): bool => $email->hasTo($curto->email));
+    Mail::assertNotQueued(LembretePrazoMail::class, fn (LembretePrazoMail $email): bool => $email->hasTo($longo->email));
+});
+
+it('nao avisa quem acabou de se inscrever com prazo curto', function (): void {
+    // O defeito que a regra proporcional conserta: com janela fixa de 24 horas,
+    // esta inscricao receberia o "o prazo esta acabando" na primeira execucao
+    // do agendador, junto com o e-mail de inscricao recebida.
+    aguardando($this->evento, 24, 0.1);
 
     $this->artisan('inscricoes:lembrar-prazo')->assertSuccessful();
 
     Mail::assertNothingQueued();
 });
 
-it('respeita a janela informada na linha de comando', function (): void {
-    aguardando($this->evento, 40);
+it('respeita a fracao informada na linha de comando', function (): void {
+    // 24 horas de prazo, 8 gastas: restam 16 (dois tercos).
+    aguardando($this->evento, 24, 8);
 
     $this->artisan('inscricoes:lembrar-prazo')->assertSuccessful();
     Mail::assertNothingQueued();
 
-    $this->artisan('inscricoes:lembrar-prazo', ['--janela' => 48])->assertSuccessful();
+    $this->artisan('inscricoes:lembrar-prazo', ['--fracao' => 0.75])->assertSuccessful();
     Mail::assertQueuedCount(1);
 });
 
-it('recusa uma janela sem sentido', function (): void {
-    $this->artisan('inscricoes:lembrar-prazo', ['--janela' => 0])->assertFailed();
-    $this->artisan('inscricoes:lembrar-prazo', ['--janela' => 'amanha'])->assertFailed();
+it('recusa uma fracao sem sentido', function (): void {
+    $this->artisan('inscricoes:lembrar-prazo', ['--fracao' => 0])->assertFailed();
+    $this->artisan('inscricoes:lembrar-prazo', ['--fracao' => 1.5])->assertFailed();
+    $this->artisan('inscricoes:lembrar-prazo', ['--fracao' => 'metade'])->assertFailed();
 
     Mail::assertNothingQueued();
 });
 
 it('nao avisa quem ja confirmou, expirou ou foi cancelado', function (): void {
-    aguardando($this->evento, 3, ['situacao' => 'confirmada', 'confirmada_em' => Carbon::now()]);
-    aguardando($this->evento, 3, ['situacao' => 'expirada', 'expirada_em' => Carbon::now()]);
-    aguardando($this->evento, 3, ['situacao' => 'cancelada', 'cancelada_em' => Carbon::now()]);
+    aguardando($this->evento, 24, 20, ['situacao' => 'confirmada', 'confirmada_em' => Carbon::now()]);
+    aguardando($this->evento, 24, 20, ['situacao' => 'expirada', 'expirada_em' => Carbon::now()]);
+    aguardando($this->evento, 24, 20, ['situacao' => 'cancelada', 'cancelada_em' => Carbon::now()]);
 
     $this->artisan('inscricoes:lembrar-prazo')
         ->expectsOutputToContain('Nenhum lembrete a enviar')
@@ -94,7 +144,7 @@ it('nao avisa quem ja confirmou, expirou ou foi cancelado', function (): void {
 });
 
 it('nao avisa quem ja perdeu o prazo: para esse, o aviso e outro', function (): void {
-    aguardando($this->evento, -2);
+    aguardando($this->evento, 24, 26);
 
     $this->artisan('inscricoes:lembrar-prazo')->assertSuccessful();
 
@@ -102,7 +152,7 @@ it('nao avisa quem ja perdeu o prazo: para esse, o aviso e outro', function (): 
 });
 
 it('rodado duas vezes seguidas nao manda nada na segunda', function (): void {
-    aguardando($this->evento, 5);
+    aguardando($this->evento, 24, 19);
 
     $this->artisan('inscricoes:lembrar-prazo')->assertSuccessful();
     $this->artisan('inscricoes:lembrar-prazo')
@@ -116,8 +166,12 @@ it('rodado duas vezes seguidas nao manda nada na segunda', function (): void {
 });
 
 it('percorre em lotes e avisa todo mundo uma vez so', function (): void {
+    $criada = Carbon::now()->subHours(20);
+
     Inscricao::factory()->count(7)->for($this->evento)->create([
-        'prazo_pagamento' => Carbon::now()->addHours(4),
+        'created_at' => $criada,
+        'updated_at' => $criada,
+        'prazo_pagamento' => $criada->copy()->addHours(24),
     ]);
 
     $this->artisan('inscricoes:lembrar-prazo', ['--lote' => 2])

@@ -300,6 +300,7 @@ Tudo o que conhece a Efí mora em **`app/Services/Payments/Efi/`**, mais o braç
 | **Endereço do aviso** | A Efí acrescenta `/pix` ao fim do endereço registrado | A rota responde **nos dois caminhos**. Cinto e suspensório: custa uma linha, e descobrir o erro custaria pagamentos perdidos |
 | **Cobrança vencida** | **Não existe** situação de vencida: passado o prazo, a consulta continua respondendo `ATIVA` | Quem decide que venceu continua sendo o `prazo_pagamento` do domínio (D-25). Traduzir `ATIVA` para "vencida" fecharia cobrança que a Efí ainda aceita pagar |
 | **Cobrança repetida** | Recusa com 409 se o `txid` já existe | Uma nova tentativa com identificador novo. **Uma só** — insistir para sempre transformaria um erro de programação em enxurrada contra a instituição financeira |
+| **Horário do pagamento** | RFC 3339, frequentemente **em UTC** (terminado em `Z`) | Convertido para o fuso da aplicação **na fronteira**, por `MomentoDoProvedor`. O Laravel grava data e hora sem o fuso escrito (`Y-m-d H:i:s`) e quem interpreta é o PostgreSQL, pelo fuso da sessão: sem essa conversão, o pagamento do meio-dia entrava no banco como pagamento das 15h — três horas de erro no único campo que prova quando o dinheiro entrou |
 
 ### 9.3 Os três identificadores
 

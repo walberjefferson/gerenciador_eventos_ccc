@@ -11,6 +11,7 @@ use App\DTOs\Payments\PaymentStatusResult;
 use App\DTOs\Payments\RefundResult;
 use App\DTOs\Payments\WebhookRequestData;
 use App\DTOs\Payments\WebhookResult;
+use App\Services\Payments\MomentoDoProvedor;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -88,7 +89,7 @@ class FakePaymentGateway implements PaymentGateway
             externalId: $externalId,
             status: (string) $charge['status'],
             amountCents: (int) $charge['amount_cents'],
-            paidAt: $charge['paid_at'] !== null ? Carbon::parse($charge['paid_at']) : null,
+            paidAt: MomentoDoProvedor::deTexto($charge['paid_at'] ?? null),
             refundedAmountCents: $charge['refunded_amount_cents'] !== null
                 ? (int) $charge['refunded_amount_cents']
                 : null,
@@ -130,7 +131,7 @@ class FakePaymentGateway implements PaymentGateway
             externalId: $externalId,
             status: 'refunded',
             refundedAmountCents: $valor,
-            refundedAt: Carbon::parse($charge['refunded_at']),
+            refundedAt: MomentoDoProvedor::deTexto($charge['refunded_at'] ?? null),
             raw: $charge,
         );
     }
@@ -174,7 +175,7 @@ class FakePaymentGateway implements PaymentGateway
             externalId: isset($payload['data']['payment_id']) ? (string) $payload['data']['payment_id'] : null,
             status: isset($payload['data']['status']) ? (string) $payload['data']['status'] : null,
             amountCents: isset($payload['data']['amount_cents']) ? (int) $payload['data']['amount_cents'] : null,
-            occurredAt: isset($payload['occurred_at']) ? Carbon::parse((string) $payload['occurred_at']) : null,
+            occurredAt: MomentoDoProvedor::deTexto($payload['occurred_at'] ?? null),
             raw: $payload,
         )];
     }

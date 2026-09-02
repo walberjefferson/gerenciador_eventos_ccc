@@ -13,6 +13,7 @@ use App\DTOs\Payments\WebhookRequestData;
 use App\DTOs\Payments\WebhookResult;
 use App\Exceptions\Payments\EfiException;
 use App\Exceptions\Payments\EstornoNaoSuportadoException;
+use App\Services\Payments\MomentoDoProvedor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -124,7 +125,7 @@ class EfiPaymentGateway implements PaymentGateway
             // nao tem situacao de vencida e quem decide isso e o dominio.
             status: TraducaoDeStatus::daCobranca((string) ($resposta['status'] ?? '')) ?? 'pending',
             amountCents: $this->emCentavos((string) ($resposta['valor']['original'] ?? '0')),
-            paidAt: isset($primeiroPix['horario']) ? Carbon::parse((string) $primeiroPix['horario']) : null,
+            paidAt: MomentoDoProvedor::deTexto($primeiroPix['horario'] ?? null),
             refundedAmountCents: null,
             raw: $resposta,
         );
@@ -208,7 +209,7 @@ class EfiPaymentGateway implements PaymentGateway
                 externalId: isset($item['txid']) ? (string) $item['txid'] : null,
                 status: TraducaoDeStatus::doAvisoDePixRecebido(),
                 amountCents: isset($item['valor']) ? $this->emCentavos((string) $item['valor']) : null,
-                occurredAt: isset($item['horario']) ? Carbon::parse((string) $item['horario']) : null,
+                occurredAt: MomentoDoProvedor::deTexto($item['horario'] ?? null),
                 // O recorte deste evento, no mesmo formato do aviso original,
                 // para que ele possa ser relido mais tarde pelo mesmo
                 // tradutor. A chave em separado existe porque o identificador
