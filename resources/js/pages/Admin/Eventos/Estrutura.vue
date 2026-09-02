@@ -555,7 +555,36 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     </DialogHeader>
 
                     <form class="grid gap-4" @submit.prevent="gravarGrupo">
+                        <!--
+                            O NOME VEM PRIMEIRO, E OCUPA A LINHA INTEIRA. Ele e o
+                            campo principal do que se esta criando; "Dia" e
+                            acessorio, e vinha antes so por acidente de escrita.
+                            Assim a ordem de tabulacao tambem melhora: quem abre o
+                            dialogo digita o nome antes de escolher onde encaixar.
+
+                            O `col-span` esta na MESMA faixa da grade
+                            (`sm:grid-cols-2` pede `sm:col-span-2`). Antes era
+                            `md:col-span-2` dentro de grade `sm:`, e essa
+                            discordancia de faixa e que abria dois buracos no
+                            desktop: o Nome so esticava a partir de 768px, e de
+                            640 a 767 sobrava celula vazia ao lado.
+                        -->
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="grupo-nome" class="text-sm font-medium">Nome do grupo</label>
+                                <input
+                                    id="grupo-nome"
+                                    v-model="formularioGrupo.nome"
+                                    type="text"
+                                    required
+                                    maxlength="120"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioGrupo.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioGrupo.errors.nome }}
+                                </p>
+                            </div>
+
                             <div class="flex flex-col gap-1">
                                 <label for="grupo-dia" class="text-sm font-medium">Dia</label>
                                 <select
@@ -568,21 +597,6 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 </select>
                                 <p v-if="formularioGrupo.errors.dia_evento_id" role="alert" class="text-destructive text-sm">
                                     {{ formularioGrupo.errors.dia_evento_id }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label for="grupo-nome" class="text-sm font-medium">Nome do grupo</label>
-                                <input
-                                    id="grupo-nome"
-                                    v-model="formularioGrupo.nome"
-                                    type="text"
-                                    required
-                                    maxlength="120"
-                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                                />
-                                <p v-if="formularioGrupo.errors.nome" role="alert" class="text-destructive text-sm">
-                                    {{ formularioGrupo.errors.nome }}
                                 </p>
                             </div>
 
@@ -736,7 +750,29 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     </DialogHeader>
 
                     <form class="grid gap-4" @submit.prevent="gravarAtividade">
+                        <!--
+                            Mesma correcao do dialogo do grupo, e pela mesma
+                            razao: o Nome e o campo principal e abre a grade
+                            ocupando a linha inteira, com `sm:col-span-2` casando
+                            com a faixa da grade (`sm:grid-cols-2`). Grupo e
+                            Posicao dividem a linha seguinte, sem celula vazia.
+                        -->
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="atividade-nome" class="text-sm font-medium">Nome da atividade</label>
+                                <input
+                                    id="atividade-nome"
+                                    v-model="formularioAtividade.nome"
+                                    type="text"
+                                    required
+                                    maxlength="120"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioAtividade.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioAtividade.errors.nome }}
+                                </p>
+                            </div>
+
                             <div class="flex flex-col gap-1">
                                 <label for="atividade-grupo" class="text-sm font-medium">Grupo</label>
                                 <select
@@ -749,21 +785,6 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 </select>
                                 <p v-if="formularioAtividade.errors.grupo_atividade_id" role="alert" class="text-destructive text-sm">
                                     {{ formularioAtividade.errors.grupo_atividade_id }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label for="atividade-nome" class="text-sm font-medium">Nome da atividade</label>
-                                <input
-                                    id="atividade-nome"
-                                    v-model="formularioAtividade.nome"
-                                    type="text"
-                                    required
-                                    maxlength="120"
-                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                                />
-                                <p v-if="formularioAtividade.errors.nome" role="alert" class="text-destructive text-sm">
-                                    {{ formularioAtividade.errors.nome }}
                                 </p>
                             </div>
 

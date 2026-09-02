@@ -185,7 +185,11 @@ function gravar(): void {
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-1 md:max-w-xs">
+                <!-- Sem teto de largura proprio: quem manda na largura de um
+                     campo e a grade da secao, e nao o campo. Com `md:max-w-xs`
+                     este select ficava sozinho e estreito, com a linha inteira
+                     vazia ao lado, desalinhado das duas grades de cima. -->
+                <div class="flex flex-col gap-1">
                     <label for="evento-situacao" class="text-sm font-medium">Situação</label>
                     <select
                         id="evento-situacao"

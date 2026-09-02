@@ -156,7 +156,14 @@ function payloadLegivel(aviso: AvisoDoProvedor): string {
                         </p>
                     </div>
 
-                    <div class="flex flex-col gap-1">
+                    <!-- Em `md` a grade tem tres colunas e os cinco campos
+                         deixavam a segunda linha pela metade: Provedor e
+                         Assinatura ocupavam duas das tres celulas e a terceira
+                         ficava vazia. O Provedor toma as duas — e nao a
+                         Assinatura — porque nome de provedor e o texto mais
+                         longo dos dois. Em `lg` sao cinco colunas para cinco
+                         campos, e cada um volta a valer por um. -->
+                    <div class="flex flex-col gap-1 md:col-span-2 lg:col-span-1">
                         <label for="avisos-gateway" class="text-sm font-medium">Provedor</label>
                         <select
                             id="avisos-gateway"
