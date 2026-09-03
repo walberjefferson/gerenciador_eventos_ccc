@@ -33,6 +33,10 @@ class StoreInscricaoRequest extends FormRequest
     {
         return [
             'evento_id' => ['required', 'integer', 'exists:eventos,id'],
+            // O lote que a pessoa viu na tela. Nulo em evento sem lotes. Aqui
+            // so se confere o formato: se ele ainda e o vigente e pergunta de
+            // negocio, e quem responde e a Action (RN-L5).
+            'lote_id' => ['nullable', 'integer', 'exists:lotes,id'],
             'cidade_id' => ['required', 'integer', 'exists:cidades,id'],
             'grupo_participante_id' => ['required', 'integer', 'exists:grupos_participantes,id'],
             'nome_completo' => ['required', 'string', 'min:3', 'max:160'],
@@ -55,6 +59,8 @@ class StoreInscricaoRequest extends FormRequest
         return [
             'evento_id.required' => 'Não foi possível identificar o evento desta inscrição.',
             'evento_id.exists' => 'Este evento não existe mais.',
+            'lote_id.integer' => 'Recarregue a página: não foi possível identificar o lote da sua inscrição.',
+            'lote_id.exists' => 'O lote escolhido não existe mais. Recarregue a página para ver o lote atual.',
             'cidade_id.required' => 'Escolha o seu setor.',
             'cidade_id.exists' => 'O setor escolhido não está disponível.',
             'grupo_participante_id.required' => 'Escolha o seu grupo.',

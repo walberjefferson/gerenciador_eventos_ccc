@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\ExportarInscricoesController;
 use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
+use App\Http\Controllers\Admin\LoteController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\Admin\PapelController;
 use App\Http\Controllers\Admin\PortariaController;
@@ -207,6 +208,11 @@ Route::middleware(['auth', 'verified'])
                 Route::post('{evento}/dias', [DiaEventoController::class, 'store'])->name('dias.store');
                 Route::put('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'update'])->name('dias.update');
                 Route::delete('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'destroy'])->name('dias.destroy');
+
+                // Os lotes de inscricao: os degraus de preco do evento.
+                Route::post('{evento}/lotes', [LoteController::class, 'store'])->name('lotes.store');
+                Route::put('{evento}/lotes/{lote}', [LoteController::class, 'update'])->name('lotes.update');
+                Route::delete('{evento}/lotes/{lote}', [LoteController::class, 'destroy'])->name('lotes.destroy');
 
                 Route::post('{evento}/grupos', [GrupoAtividadeController::class, 'store'])->name('grupos.store');
                 Route::put('{evento}/grupos/{grupo_atividade}', [GrupoAtividadeController::class, 'update'])->name('grupos.update');

@@ -35,6 +35,9 @@ class InscricaoPublicaController extends Controller
                 SituacaoEvento::Cancelado->value,
             ])
             ->with([
+                // Todos os lotes, e nao so o vigente: a tela mostra a sucessao
+                // inteira, e e o Resource que marca qual deles vale agora.
+                'lotes',
                 'diasEvento' => fn ($dias) => $dias->ativos(),
                 'diasEvento.gruposAtividades' => fn ($grupos) => $grupos->ativos(),
                 'diasEvento.gruposAtividades.atividades' => fn ($atividades) => $atividades->ativos(),
@@ -42,8 +45,13 @@ class InscricaoPublicaController extends Controller
             ->firstOrFail();
 
         // Inscricao fechada nao tem formulario: a pagina do evento e quem
-        // explica o motivo, e e para la que o visitante volta.
-        if (! $evento->inscricoesEstaoAbertas() || ! $evento->temVagaDisponivel()) {
+        // explica o motivo, e e para la que o visitante volta. Evento com lotes
+        // e sem nenhum vigente esta fechado tambem (RN-L9) — nao ha preco pelo
+        // qual cobrar, ainda que a janela e a capacidade permitissem.
+        if (! $evento->inscricoesEstaoAbertas()
+            || ! $evento->temVagaDisponivel()
+            || ! $evento->aceitaInscricaoPorLote()
+        ) {
             return redirect()->route('eventos.show', ['slug' => $evento->slug]);
         }
 

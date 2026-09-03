@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\Inscricoes\ResolverLoteVigente;
 use App\Enums\SituacaoEvento;
 use Database\Factories\EventoFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -67,6 +68,19 @@ class Evento extends Model
     public function diasEvento(): HasMany
     {
         return $this->hasMany(DiaEvento::class)->orderBy('posicao');
+    }
+
+    /**
+     * Os lotes de inscricao, na ordem em que se sucedem.
+     *
+     * Lista vazia e o caso comum e continua sendo: evento sem lote nenhum cobra
+     * o proprio valor_centavos e se comporta exatamente como antes (RN-L8).
+     *
+     * @return HasMany<Lote, $this>
+     */
+    public function lotes(): HasMany
+    {
+        return $this->hasMany(Lote::class)->emOrdem();
     }
 
     /**
@@ -145,6 +159,54 @@ class Evento extends Model
     public function temVagaDisponivel(): bool
     {
         return $this->capacidade === null || $this->vagasOcupadas() < $this->capacidade;
+    }
+
+    /**
+     * Este evento trabalha com lotes?
+     */
+    public function temLotes(): bool
+    {
+        return $this->relationLoaded('lotes')
+            ? $this->lotes->isNotEmpty()
+            : $this->lotes()->exists();
+    }
+
+    /**
+     * O lote que vale neste instante, ou null quando nao ha nenhum.
+     *
+     * A regra mora em App\Actions\Inscricoes\ResolverLoteVigente (RN-L3); aqui
+     * so ha o atalho. Quando os lotes ja foram carregados — o caso das telas
+     * publicas, que os mostram todos —, a resposta sai da colecao em maos, sem
+     * uma segunda ida ao banco.
+     */
+    public function loteVigente(?Carbon $momento = null): ?Lote
+    {
+        $resolver = app(ResolverLoteVigente::class);
+
+        return $this->relationLoaded('lotes')
+            ? $resolver->daColecao($this->lotes, $momento)
+            : $resolver($this, $momento);
+    }
+
+    /**
+     * RN-L9 — ha por qual lote se inscrever?
+     *
+     * Evento SEM lotes nunca cai nesta regra: para ele a resposta e sempre sim.
+     * Evento COM lotes e sem nenhum vigente tem as inscricoes fechadas, ainda
+     * que a janela esteja aberta e sobrem vagas na capacidade: nao existe preco
+     * pelo qual cobrar.
+     *
+     * POR QUE ISTO NAO ESTA DENTRO DE inscricoesEstaoAbertas(): pelo mesmo
+     * motivo que temVagaDisponivel() tambem nao esta. Aquele metodo responde
+     * sobre a JANELA, com colunas que ja estao em memoria, e e chamado uma vez
+     * por evento na porta da rua — a pagina mais acessada do sistema. Uma
+     * consulta ali viraria uma ida ao banco por evento da lista. Quem decide se
+     * da para se inscrever combina as tres perguntas, e sao tres porque as
+     * respostas erradas precisam de explicacoes diferentes.
+     */
+    public function aceitaInscricaoPorLote(?Carbon $momento = null): bool
+    {
+        return ! $this->temLotes() || $this->loteVigente($momento) !== null;
     }
 
     /**

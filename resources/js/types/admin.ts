@@ -145,6 +145,40 @@ export interface DiaDaEstrutura {
     grupos: GrupoDaEstrutura[];
 }
 
+/**
+ * Um lote de inscrição na tela de programação.
+ *
+ * `vagas_ocupadas` é o contador do lote — que só cresce (RN-L6) — e
+ * `inscricoes` é quanta gente veio dele. Os dois viajam porque é por eles que a
+ * tela decide se pode oferecer o botão de excluir.
+ */
+export interface LoteDaEstrutura {
+    id: number;
+    nome: string;
+    posicao: number;
+    valor_centavos: number;
+    /** "AAAA-MM-DDTHH:MM", o formato do campo de data e hora. Nulo = sem prazo. */
+    disponivel_ate: string | null;
+    quantidade: number | null;
+    vagas_ocupadas: number;
+    situacao: 'encerrado' | 'vigente' | 'futuro';
+    /** Quantas inscrições vieram deste lote, em qualquer situação. */
+    inscricoes: number;
+}
+
+/**
+ * A soma das quantidades ao lado da capacidade do evento.
+ *
+ * É informação, e nunca bloqueio: lote e capacidade são tetos independentes
+ * (RN-L10). A soma é nula quando nenhum lote tem quantidade — aí não há o que
+ * comparar, e um zero mentiria.
+ */
+export interface ResumoDosLotes {
+    capacidade: number | null;
+    soma_quantidades: number | null;
+    valor_do_evento: number;
+}
+
 /** Um par de atividades que ninguém pode escolher junto. */
 export interface ConflitoDaEstrutura {
     id: number;

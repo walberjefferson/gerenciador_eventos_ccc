@@ -1,20 +1,35 @@
 <script setup lang="ts">
+import ListaDeLotes from '@/components/eventos/ListaDeLotes.vue';
 import GrupoDeAtividades from '@/components/inscricao/GrupoDeAtividades.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { useSelecaoAtividades } from '@/composables/useSelecaoAtividades';
-import type { DiaEventoPublico } from '@/types/evento';
+import type { DiaEventoPublico, LotePublico } from '@/types/evento';
 import { computed } from 'vue';
 
 /**
  * Segunda etapa: o que a pessoa vai fazer em cada dia. As regras aparecem na
  * tela antes de o servidor precisar recusar — mas quem decide continua sendo
  * ele.
+ *
+ * OS LOTES ABREM ESTA ETAPA quando o evento trabalha com eles. É aqui, e não na
+ * revisão, porque é aqui que a pessoa está decidindo — e o preço que sobe faz
+ * parte da decisão. Na revisão ela só confere o que já escolheu.
  */
-const props = defineProps<{
-    dias: DiaEventoPublico[];
-    selecao: ReturnType<typeof useSelecaoAtividades>;
-    mostrarProblemas: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        dias: DiaEventoPublico[];
+        selecao: ReturnType<typeof useSelecaoAtividades>;
+        mostrarProblemas: boolean;
+        lotes?: LotePublico[];
+        moeda?: string;
+        /** O aviso do servidor quando o lote virou entre a tela e o envio. */
+        erroDoLote?: string | null;
+    }>(),
+    { lotes: () => [], moeda: 'BRL', erroDoLote: null },
+);
+
+/** O lote que viaja com o formulário. */
+const loteEscolhido = defineModel<number | null>('loteId', { default: null });
 
 const problemaDoGrupo = computed<Record<number, string>>(() => {
     if (!props.mostrarProblemas) {
@@ -27,6 +42,15 @@ const problemaDoGrupo = computed<Record<number, string>>(() => {
 
 <template>
     <div class="space-y-8">
+        <ListaDeLotes
+            v-if="props.lotes.length > 0"
+            v-model="loteEscolhido"
+            :lotes="props.lotes"
+            :moeda="props.moeda"
+            :erro="props.erroDoLote"
+            com-escolha
+        />
+
         <Alert variant="informacao">
             <AlertTitle>Escolha a sua participação</AlertTitle>
             <AlertDescription>

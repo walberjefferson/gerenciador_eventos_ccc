@@ -10,10 +10,12 @@ use App\Enums\SituacaoInscricao;
 use App\Events\InscricaoCriada;
 use App\Exceptions\Inscricoes\InscricaoDuplicadaException;
 use App\Exceptions\Inscricoes\InscricaoIndisponivelException;
+use App\Exceptions\Inscricoes\LoteIndisponivelException;
 use App\Exceptions\Inscricoes\VagasEsgotadasException;
 use App\Models\Evento;
 use App\Models\GrupoParticipante;
 use App\Models\Inscricao;
+use App\Models\Lote;
 use App\Services\Inscricoes\ValidadorSelecaoAtividades;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -28,6 +30,11 @@ use Illuminate\Support\Facades\DB;
  * varre as reservas vencidas daquele evento (a vaga pode estar presa por quem
  * ja perdeu o prazo) e tenta a transacao inteira mais uma vez. So depois disso
  * a recusa e definitiva.
+ *
+ * Essa segunda chance vale para a vaga do EVENTO e da ATIVIDADE, e nao para a
+ * do lote: vaga de lote nao volta (RN-L6), entao varrer os vencidos nao
+ * devolveria nada e a segunda tentativa recusaria pela mesma razao. Por isso a
+ * recusa por lote sai daqui direto para o participante.
  */
 class CriarInscricao
 {
@@ -36,6 +43,7 @@ class CriarInscricao
         private readonly ReservarVagas $reservarVagas,
         private readonly ExpirarInscricoesVencidas $expirarVencidas,
         private readonly CriarPagamentoDaInscricao $criarPagamento,
+        private readonly ResolverLoteVigente $resolverLoteVigente,
     ) {}
 
     public function __invoke(DadosNovaInscricao $dados): Inscricao
@@ -96,11 +104,15 @@ class CriarInscricao
         // RN-03 a RN-08 — a combinacao escolhida precisa ser possivel.
         $atividades = ($this->validadorSelecao)($evento, $dados->atividadeIds, $dados->dataNascimento);
 
-        // RN-09 e RN-10 — evento primeiro, depois cada atividade em ordem
-        // crescente de id.
-        ($this->reservarVagas)($evento, $atividades);
-
         $agora = Carbon::now();
+
+        // RN-L3 e RN-L5 — de qual lote esta inscricao vai sair, decidido aqui e
+        // agora, dentro da transacao.
+        $lote = $this->conferirLote($evento, $dados, $agora);
+
+        // RN-09, RN-10 e RN-L11 — evento primeiro, depois o lote, depois cada
+        // atividade em ordem crescente de id.
+        ($this->reservarVagas)($evento, $atividades, $lote, $agora);
 
         $inscricao = Inscricao::create([
             'evento_id' => $evento->id,
@@ -112,8 +124,14 @@ class CriarInscricao
             'documento_hash' => Inscricao::hashDocumento($dados->documento),
             'data_nascimento' => $dados->dataNascimento->toDateString(),
             'situacao' => SituacaoInscricao::AguardandoPagamento,
-            // Fotografia do preco e do regulamento no instante da inscricao.
-            'valor_centavos' => $evento->valor_centavos,
+            // De qual degrau de preco esta pessoa veio. Serve a conferencia; o
+            // que ela deve pagar e a linha de baixo, e so ela.
+            'lote_id' => $lote?->getKey(),
+            // Fotografia do preco e do regulamento no instante da inscricao. O
+            // valor e o do lote vigente quando ha lotes (RN-L7) e o do proprio
+            // evento quando nao ha (RN-L8). Mudar o preco do lote depois nao
+            // alcanca esta linha — nem a cobranca que sai dela.
+            'valor_centavos' => $lote?->valor_centavos ?? $evento->valor_centavos,
             'versao_termos' => $evento->versao_termos,
             'termos_aceitos_em' => $agora,
             'chave_idempotencia' => $dados->chaveIdempotencia,
@@ -127,6 +145,43 @@ class CriarInscricao
         InscricaoCriada::dispatch($inscricao);
 
         return $inscricao->load('atividades');
+    }
+
+    /**
+     * RN-L5 — por qual lote esta inscricao entra, se e que ha lotes.
+     *
+     * O servidor RESOLVE O LOTE DE NOVO aqui, dentro da transacao, e nao confia
+     * no que veio do formulario. O lote_id enviado serve a uma unica pergunta:
+     * "e o mesmo que a pessoa viu?". Quando nao e, a inscricao e recusada com a
+     * explicacao do que mudou — corrigir em silencio para o lote novo cobraria
+     * um preco que ela nao viu, e aceitar pelo lote velho venderia abaixo do
+     * combinado.
+     *
+     * Cliente que nao mandou lote_id nenhum (o caso de quem fala com a API sem
+     * passar pela tela) entra pelo vigente: nao ha preco visto a proteger.
+     *
+     * @throws LoteIndisponivelException
+     */
+    private function conferirLote(Evento $evento, DadosNovaInscricao $dados, Carbon $momento): ?Lote
+    {
+        // RN-L8 — evento sem lotes continua exatamente como era.
+        if (! $evento->temLotes()) {
+            return null;
+        }
+
+        $vigente = ($this->resolverLoteVigente)($evento, $momento);
+
+        // RN-L9 — ha lotes, e nenhum deles vale mais. A inscricao esta fechada,
+        // ainda que a janela esteja aberta e sobrem vagas na capacidade.
+        if ($vigente === null) {
+            throw LoteIndisponivelException::naoHaMaisLote();
+        }
+
+        if ($dados->loteId !== null && $dados->loteId !== (int) $vigente->getKey()) {
+            throw LoteIndisponivelException::oLoteVirou($vigente);
+        }
+
+        return $vigente;
     }
 
     /**

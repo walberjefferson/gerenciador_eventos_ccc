@@ -21,6 +21,14 @@ use Illuminate\Support\Facades\DB;
  *
  * A ordem e a mesma da reserva: evento primeiro, atividades em ordem crescente
  * de id.
+ *
+ * O LOTE NAO ENTRA AQUI, E A AUSENCIA E A REGRA (RN-L6). Quando uma inscricao
+ * expira ou e cancelada, a vaga volta para o evento e para as atividades, mas
+ * NAO volta para o lote: lotes.vagas_ocupadas so cresce, e lote esgotado nao
+ * reabre. E decisao do dono do produto, tomada com o efeito colateral a vista:
+ * quem reserva e nao paga queima a vaga do lote barato, e ela sera vendida pelo
+ * preco do lote seguinte. Devolver a vaga ao lote de origem e um caminho
+ * possivel — e outro plano, com outra conversa.
  */
 class LiberarVagas
 {

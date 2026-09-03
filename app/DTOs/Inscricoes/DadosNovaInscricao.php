@@ -30,6 +30,15 @@ final readonly class DadosNovaInscricao
         public array $atividadeIds,
         public bool $aceitouTermos,
         public string $chaveIdempotencia,
+        /**
+         * O lote que a pessoa VIU na tela, quando o evento tem lotes.
+         *
+         * Vem do formulario e nao vale como decisao: o servidor resolve o lote
+         * vigente de novo no instante do envio e recusa quando os dois nao
+         * coincidem (RN-L5). Nulo em evento sem lotes — e tambem quando o
+         * cliente nao mandou nada, caso em que nao ha preco visto a proteger.
+         */
+        public ?int $loteId = null,
     ) {}
 
     /**
@@ -55,6 +64,7 @@ final readonly class DadosNovaInscricao
             ))),
             aceitouTermos: (bool) ($dados['aceite_termos'] ?? false),
             chaveIdempotencia: (string) $dados['chave_idempotencia'],
+            loteId: isset($dados['lote_id']) ? (int) $dados['lote_id'] : null,
         );
     }
 

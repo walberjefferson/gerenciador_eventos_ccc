@@ -273,6 +273,74 @@ Inscrições e pagamentos nunca são removidos do banco. Toda mudança é de sit
 
 ---
 
+## Regras de lote de inscrição
+
+O **lote** é um degrau de preço entre o evento e a inscrição: ele vale até uma data, até acabarem as vagas dele, ou até o que vier primeiro. Um evento pode ter uma sequência deles — e pode não ter nenhum, que é o caso mais comum e continua funcionando exatamente como antes.
+
+### RN-L1 — Todo lote encerra
+
+Pelo menos um dos dois limites (`disponivel_ate` ou `quantidade`) precisa estar preenchido. Um lote sem limite nenhum nunca encerraria, e um lote que não encerra não é um lote: é o preço do evento com outro nome.
+**Onde é aplicada:** `app/Http/Requests/Admin/LoteRequest.php` (avisa antes) e o CHECK `lotes_tem_limite_check` (recusa depois).
+**Mensagem:** "Todo lote precisa de um limite: uma data, uma quantidade de vagas, ou os dois. Sem limite, ele nunca encerraria — e aí é o valor do próprio evento."
+**Teste:** `tests/Feature/Admin/LotesAdminTest.php`
+
+### RN-L2 — A ordem é a `posicao`
+
+A posição decide qual lote sucede qual e não se repete dentro do evento, no mesmo molde de `dias_evento`. Cobrada pelo índice único `lotes_evento_id_posicao_unique`.
+**Mensagem:** "Já existe um lote nesta posição. Cada lote ocupa uma posição diferente na sequência."
+
+### RN-L3 — O lote vigente é calculado, nunca gravado
+
+O lote vigente é o primeiro da ordem que ainda está disponível: dentro do prazo e com vaga. **Não existe coluna "ativo".** Situação derivada de data e contador é sempre verdadeira; situação gravada envelhece no primeiro minuto em que ninguém roda a rotina que a atualizaria.
+**Onde é aplicada:** `app/Actions/Inscricoes/ResolverLoteVigente.php` — o único lugar onde a regra mora. A Action de inscrição, o Resource público e os testes perguntam todos ali.
+
+### RN-L4 — Todos aparecem, só o vigente é selecionável
+
+A página do evento e o formulário listam os lotes na ordem, cada um com nome, valor e situação (`encerrado`, `vigente`, `futuro`). Os não vigentes chegam à tela já marcados como não selecionáveis — e o servidor decide de novo no envio.
+**Onde é aplicada:** `app/Http/Resources/LotePublicoResource.php`, `resources/js/components/eventos/ListaDeLotes.vue`.
+
+### RN-L5 — O lote virou enquanto a pessoa preenchia
+
+O formulário envia o `lote_id` que a pessoa viu. Se, no instante do envio, esse não for mais o vigente, a inscrição é **recusada** com 422 e uma mensagem que diz o que mudou e qual é o novo valor; a tela recarrega os lotes. Aceitar em silêncio pelo lote novo cobraria um preço que a pessoa não viu; aceitar pelo lote velho venderia abaixo do combinado.
+**Onde é aplicada:** `app/Actions/Inscricoes/CriarInscricao.php`, `app/Exceptions/Inscricoes/LoteIndisponivelException.php`.
+**Mensagem:** "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}. Confira o novo valor e envie a inscrição novamente."
+**Teste:** `tests/Feature/Inscricoes/LotesTest.php`, `tests/e2e/inscricao-por-lote.spec.ts`
+
+### RN-L6 — O contador do lote nunca volta
+
+A vaga é presa no lote no mesmo instante em que é presa no evento, com o mesmo UPDATE condicional. Quando a inscrição expira ou é cancelada, a vaga volta para o evento e para as atividades, **mas não para o lote**: `lotes.vagas_ocupadas` só cresce, e lote esgotado não reabre.
+
+**Decisão do dono do produto, com o efeito colateral à vista:** quem reserva e não paga queima a vaga do lote barato, e ela será vendida pelo preço do lote seguinte. Num evento popular, o 1º lote pode esgotar em minutos e, no dia seguinte, ver metade daquelas inscrições expiradas. Duas mitigações existem e estão fora deste escopo: prazo de pagamento mais curto nos eventos com lote, ou devolver a vaga ao lote de origem enquanto ele ainda estiver na data.
+**Onde é aplicada:** `app/Actions/Inscricoes/LiberarVagas.php` (que documenta a ausência).
+
+### RN-L7 — O valor é fotografado, e a fotografia não se refaz
+
+Na criação da inscrição, `valor_centavos` recebe o valor do lote vigente e `lote_id` guarda de qual lote ela veio. Alterar o valor de um lote depois **não muda inscrição nenhuma**, nem cobrança já emitida, nem segunda via de Pix — que continua lendo `inscricoes.valor_centavos`. O `lote_id` serve a relatório e conferência, nunca a cálculo de cobrança.
+
+### RN-L8 — Evento sem lote continua como hoje
+
+Nenhum lote cadastrado → `lote_id` nulo e `valor_centavos` copiado de `eventos.valor_centavos`. Nenhuma tela muda de comportamento.
+
+### RN-L9 — Lotes esgotados fecham a inscrição
+
+Evento **com** lotes e **sem** lote vigente tem as inscrições fechadas, com motivo em palavras, pelo mesmo caminho que já explica capacidade cheia e janela fechada. Evento **sem** lotes nunca cai nesta regra.
+**Mensagem:** "Os lotes de inscrição se esgotaram."
+**Onde é aplicada:** `Evento::aceitaInscricaoPorLote()`, combinada com `inscricoesEstaoAbertas()` e `temVagaDisponivel()` nos três pontos de decisão (Resource público, formulário público e `CriarInscricao`).
+
+### RN-L10 — Lote e capacidade são tetos independentes
+
+`eventos.capacidade` continua sendo o teto físico e manda em último caso; os lotes são degraus de preço dentro dela. A soma das quantidades pode ser menor que a capacidade (sobra vaga sem lote — e aí a inscrição fecha por RN-L9) ou maior (o evento lota antes do último lote). **Não há validação cruzada entre os dois**; a tela administrativa apenas informa a soma ao lado da capacidade.
+
+### RN-L11 — Ordem canônica das travas
+
+`evento → lote → atividades (id crescente)`. O lote entra logo depois do evento, antes das atividades. Cada inscrição toca um único lote, então não há ordem a arbitrar entre lotes.
+
+### RN-L12 — Lote com inscrição não some nem encolhe
+
+Excluir lote que já tem inscrição é recusado (`restrictOnDelete`, com a explicação do caminho certo). Reduzir `quantidade` abaixo de `vagas_ocupadas` é recusado no `FormRequest` e no CHECK `lotes_quantidade_check`.
+
+---
+
 ## Mapeamento com os testes obrigatórios do briefing
 
 O briefing exige oito testes com nomes em inglês. Como o domínio deste projeto é escrito em português, eles receberam nomes equivalentes. A correspondência é esta:
@@ -296,6 +364,8 @@ Testes adicionais criados além dos exigidos:
 | `tests/Feature/Inscricoes/InscricaoDuplicadaTest.php` | RN-11, incluindo a liberação depois da expiração |
 | `tests/Feature/Inscricoes/ConcorrenciaTest.php` | RN-09 e RN-10 sob concorrência real, com processos paralelos |
 | `tests/Feature/Pagamentos/ReconciliacaoTest.php` | RN-P05 |
+| `tests/Feature/Inscricoes/LotesTest.php` | RN-L1 a RN-L11: vigência, fotografia do preço, corrida pela última vaga do lote e a vaga que não volta |
+| `tests/Feature/Admin/LotesAdminTest.php` | RN-L1, RN-L2 e RN-L12 no cadastro, com auditoria |
 
 ---
 
@@ -316,3 +386,8 @@ Testes adicionais criados além dos exigidos:
 | RN-11 | "Já existe uma inscrição ativa com este e-mail neste evento." / "Já existe uma inscrição ativa com este CPF neste evento." |
 | RN-12 | (sem mensagem — devolve a inscrição já criada) |
 | RN-13 | "Você precisa aceitar o regulamento do evento para continuar." |
+| RN-L1 | "Todo lote precisa de um limite: uma data, uma quantidade de vagas, ou os dois." |
+| RN-L2 | "Já existe um lote nesta posição. Cada lote ocupa uma posição diferente na sequência." |
+| RN-L5 | "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}." / "As vagas do {lote} acabaram neste instante." |
+| RN-L9 | "Os lotes de inscrição se esgotaram." |
+| RN-L12 | "Não é possível excluir este lote: {n} inscrição(ões) vieram dele." / "Este lote já ocupou {n} vaga(s). A quantidade não pode ser menor do que isso." |

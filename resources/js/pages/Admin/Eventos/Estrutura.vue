@@ -6,7 +6,17 @@ import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import { DateField } from '@/components/ui/date-field';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { AtividadeDaEstrutura, ConflitoDaEstrutura, DiaDaEstrutura, EventoDaEstrutura, GrupoDaEstrutura, OpcaoDeAtividade } from '@/types/admin';
+import { formatarValor } from '@/lib/formato';
+import type {
+    AtividadeDaEstrutura,
+    ConflitoDaEstrutura,
+    DiaDaEstrutura,
+    EventoDaEstrutura,
+    GrupoDaEstrutura,
+    LoteDaEstrutura,
+    OpcaoDeAtividade,
+    ResumoDosLotes,
+} from '@/types/admin';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -27,6 +37,8 @@ const props = defineProps<{
     dias: DiaDaEstrutura[];
     conflitos: ConflitoDaEstrutura[];
     atividades: OpcaoDeAtividade[];
+    lotes: LoteDaEstrutura[];
+    lotes_resumo: ResumoDosLotes;
     sucesso: string | null;
 }>();
 
@@ -336,6 +348,155 @@ function gravarConflito(): void {
         },
     });
 }
+
+/* ------------------------------------------------------------- lotes --- */
+
+/**
+ * OS LOTES SÃO OS DEGRAUS DE PREÇO DO EVENTO.
+ *
+ * Cada um vale até uma data, até acabarem as vagas dele, ou até o que vier
+ * primeiro — e pelo menos um dos dois limites é obrigatório: lote que não
+ * encerra é o valor do próprio evento com outro nome.
+ *
+ * A situação de cada lote (encerrado, atual, em breve) vem DECIDIDA do servidor:
+ * ela é derivada da data e do contador a cada leitura, e não existe coluna
+ * guardando-a. Refazer essa conta aqui criaria um segundo lugar onde a regra
+ * mora — e o relógio deste computador não é o que vende a vaga.
+ */
+const modalLoteAberto = ref(false);
+
+const loteEmEdicao = ref<LoteDaEstrutura | null>(null);
+
+const formularioLote = useForm({
+    nome: '',
+    posicao: props.lotes.length + 1,
+    valor_centavos: props.lotes_resumo.valor_do_evento,
+    disponivel_ate: '',
+    quantidade: null as number | null,
+}).transform((dados) => ({
+    ...dados,
+    // Campo vazio é "sem prazo", e não string vazia: é assim que o servidor
+    // reconhece um lote que só encerra por vagas.
+    disponivel_ate: dados.disponivel_ate === '' ? null : dados.disponivel_ate,
+}));
+
+function editarLote(lote: LoteDaEstrutura): void {
+    modalLoteAberto.value = true;
+    loteEmEdicao.value = lote;
+    formularioLote.clearErrors();
+    formularioLote.nome = lote.nome;
+    formularioLote.posicao = lote.posicao;
+    formularioLote.valor_centavos = lote.valor_centavos;
+    formularioLote.disponivel_ate = lote.disponivel_ate ?? '';
+    formularioLote.quantidade = lote.quantidade;
+}
+
+function abrirCadastroLote(): void {
+    loteEmEdicao.value = null;
+    formularioLote.clearErrors();
+    formularioLote.reset();
+    // A próxima posição livre, para que o caso comum não peça digitação.
+    formularioLote.posicao = props.lotes.length + 1;
+    modalLoteAberto.value = true;
+}
+
+/**
+ * Fechar DESFAZ a edicao em curso: quem fechou desistiu. Sem isto, o proximo
+ * "Novo" abriria com os dados de um registro que a pessoa achou que tinha
+ * abandonado.
+ */
+function aoTrocarAberturaLote(aberto: boolean): void {
+    modalLoteAberto.value = aberto;
+
+    if (!aberto) {
+        loteEmEdicao.value = null;
+        formularioLote.clearErrors();
+        formularioLote.reset();
+    }
+}
+
+function cancelarLote(): void {
+    loteEmEdicao.value = null;
+    modalLoteAberto.value = false;
+    formularioLote.clearErrors();
+    formularioLote.reset();
+}
+
+function gravarLote(): void {
+    if (loteEmEdicao.value === null) {
+        formularioLote.post(route('admin.eventos.lotes.store', { evento: props.evento.id }), {
+            preserveScroll: true,
+            onSuccess: () => {
+                formularioLote.reset();
+                modalLoteAberto.value = false;
+            },
+        });
+
+        return;
+    }
+
+    formularioLote.put(route('admin.eventos.lotes.update', { evento: props.evento.id, lote: loteEmEdicao.value.id }), {
+        preserveScroll: true,
+        onSuccess: () => cancelarLote(),
+    });
+}
+
+function excluirLote(lote: LoteDaEstrutura): void {
+    excluir(route('admin.eventos.lotes.destroy', { evento: props.evento.id, lote: lote.id }));
+}
+
+/** "Lote atual", "Em breve", "Encerrado" — a situação sempre escrita. */
+function situacaoDoLote(lote: LoteDaEstrutura): string {
+    if (lote.situacao === 'vigente') {
+        return 'Lote atual';
+    }
+
+    return lote.situacao === 'futuro' ? 'Em breve' : 'Encerrado';
+}
+
+/** "Até 10/10/2026 às 23:59 · 40 vagas", ou o que houver dos dois. */
+function limiteDoLote(lote: LoteDaEstrutura): string {
+    const partes: string[] = [];
+
+    if (lote.disponivel_ate !== null) {
+        partes.push(`Até ${horario(lote.disponivel_ate)}`);
+    }
+
+    if (lote.quantidade !== null) {
+        partes.push(`${lote.quantidade} vaga(s)`);
+    }
+
+    return partes.join(' · ');
+}
+
+/**
+ * A soma das quantidades ao lado da capacidade — INFORMAÇÃO, nunca bloqueio.
+ *
+ * Os dois tetos são independentes: a soma pode ficar abaixo da capacidade (e aí
+ * sobra vaga sem lote, e a inscrição fecha quando o último lote acabar) ou acima
+ * dela (e aí o evento lota antes do último lote). Nenhum dos dois é erro; os
+ * dois são decisões — e quem cadastra precisa enxergar qual delas tomou.
+ */
+const comparacaoComACapacidade = computed<string | null>(() => {
+    const { capacidade, soma_quantidades: soma } = props.lotes_resumo;
+
+    if (soma === null) {
+        return null;
+    }
+
+    if (capacidade === null) {
+        return `Os lotes somam ${soma} vaga(s). O evento não tem capacidade máxima definida.`;
+    }
+
+    if (soma === capacidade) {
+        return `Os lotes somam ${soma} vaga(s), exatamente a capacidade do evento.`;
+    }
+
+    return soma < capacidade
+        ? `Os lotes somam ${soma} vaga(s) e a capacidade do evento é ${capacidade}. ` +
+              `Sobram ${capacidade - soma} vaga(s) sem lote: quando o último lote acabar, as inscrições fecham mesmo com vaga livre.`
+        : `Os lotes somam ${soma} vaga(s) e a capacidade do evento é ${capacidade}. ` + 'O evento lota antes do último lote acabar.';
+});
 
 /* ---------------------------------------------------------- exclusões --- */
 
@@ -1142,6 +1303,204 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                 </tbody>
             </table>
             <p v-else class="text-muted-foreground text-sm">Nenhum conflito cadastrado.</p>
+        </section>
+
+        <!-- Lotes de inscrição -->
+        <section aria-labelledby="titulo-lotes" class="border-border grid gap-4 rounded-lg border p-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 id="titulo-lotes" class="mr-auto text-lg font-semibold">Lotes de inscrição</h2>
+
+                <button
+                    type="button"
+                    class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
+                    @click="abrirCadastroLote"
+                >
+                    Novo lote
+                </button>
+            </div>
+
+            <p class="text-muted-foreground max-w-3xl text-sm">
+                Cada lote é um degrau de preço: ele vale até uma data, até acabarem as vagas dele, ou até o que vier primeiro — e precisa de pelo
+                menos um desses dois limites. Quem se inscreve entra sempre pelo lote em vigor, e o valor daquele lote fica gravado na inscrição:
+                mudar o preço depois não altera o que ninguém já deve. Sem nenhum lote cadastrado, vale o valor do próprio evento.
+            </p>
+
+            <p v-if="comparacaoComACapacidade" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
+                {{ comparacaoComACapacidade }}
+            </p>
+
+            <Dialog :open="modalLoteAberto" @update:open="aoTrocarAberturaLote">
+                <DialogContent class="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{{ loteEmEdicao === null ? 'Novo lote' : `Editando ${loteEmEdicao.nome}` }}</DialogTitle>
+                        <DialogDescription>
+                            A posição decide a ordem da sucessão: vale sempre o primeiro lote da fila que ainda não encerrou.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form class="grid gap-4" @submit.prevent="gravarLote">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="lote-nome" class="text-sm font-medium">Nome do lote</label>
+                                <input
+                                    id="lote-nome"
+                                    v-model="formularioLote.nome"
+                                    type="text"
+                                    required
+                                    maxlength="80"
+                                    :aria-invalid="formularioLote.errors.nome ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.nome }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-posicao" class="text-sm font-medium">Posição</label>
+                                <input
+                                    id="lote-posicao"
+                                    v-model.number="formularioLote.posicao"
+                                    type="number"
+                                    min="1"
+                                    required
+                                    :aria-invalid="formularioLote.errors.posicao ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.posicao" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.posicao }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-valor" class="text-sm font-medium">Valor em centavos</label>
+                                <input
+                                    id="lote-valor"
+                                    v-model.number="formularioLote.valor_centavos"
+                                    type="number"
+                                    min="0"
+                                    required
+                                    aria-describedby="ajuda-lote-valor"
+                                    :aria-invalid="formularioLote.errors.valor_centavos ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p id="ajuda-lote-valor" class="text-muted-foreground text-sm">R$ 120,00 se escreve 12000.</p>
+                                <p v-if="formularioLote.errors.valor_centavos" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.valor_centavos }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <p id="ajuda-lote-limite" class="text-muted-foreground text-sm sm:col-span-2">
+                                Preencha pelo menos um dos dois. Com os dois, o lote encerra no que vier primeiro.
+                            </p>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-disponivel-ate" class="text-sm font-medium">Disponível até (opcional)</label>
+                                <CampoDeDataHora
+                                    id="lote-disponivel-ate"
+                                    v-model="formularioLote.disponivel_ate"
+                                    aria-describedby="ajuda-lote-limite"
+                                    :aria-invalid="formularioLote.errors.disponivel_ate ? true : undefined"
+                                />
+                                <p v-if="formularioLote.errors.disponivel_ate" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.disponivel_ate }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-quantidade" class="text-sm font-medium">Quantidade de vagas (opcional)</label>
+                                <input
+                                    id="lote-quantidade"
+                                    v-model.number="formularioLote.quantidade"
+                                    type="number"
+                                    min="1"
+                                    aria-describedby="ajuda-lote-limite"
+                                    :aria-invalid="formularioLote.errors.quantidade ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.quantidade" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.quantidade }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <button
+                                type="button"
+                                class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                @click="cancelarLote"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                :disabled="formularioLote.processing"
+                                class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
+                            >
+                                {{ loteEmEdicao === null ? 'Acrescentar' : 'Salvar' }}
+                            </button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <table v-if="props.lotes.length > 0" class="w-full text-sm" data-testid="tabela-de-lotes">
+                <caption class="sr-only">
+                    Lotes de inscrição, com o valor, o limite de cada um, quantas vagas já saíram e a situação.
+                </caption>
+                <thead>
+                    <tr class="border-border border-b text-left">
+                        <th scope="col" class="px-2 py-2 font-medium">Lote</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Valor</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Limite</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Vagas do lote</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Inscrições</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Situação</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="lote in props.lotes" :key="lote.id" class="border-border border-b last:border-0">
+                        <th scope="row" class="px-2 py-2 text-left font-normal">{{ lote.posicao }}. {{ lote.nome }}</th>
+                        <td class="px-2 py-2 tabular-nums">{{ formatarValor(lote.valor_centavos) }}</td>
+                        <td class="px-2 py-2">{{ limiteDoLote(lote) }}</td>
+                        <td class="px-2 py-2">
+                            {{ lote.quantidade === null ? `${lote.vagas_ocupadas} (sem limite)` : `${lote.vagas_ocupadas} de ${lote.quantidade}` }}
+                        </td>
+                        <td class="px-2 py-2">{{ lote.inscricoes }}</td>
+                        <!-- A palavra fica sempre escrita: a situação não pode
+                             depender só da cor (WCAG 1.4.1). -->
+                        <td class="px-2 py-2" :class="lote.situacao === 'vigente' ? 'font-medium' : 'text-muted-foreground'">
+                            {{ situacaoDoLote(lote) }}
+                        </td>
+                        <td class="px-2 py-2">
+                            <div class="flex flex-wrap gap-2">
+                                <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarLote(lote)">Editar</BotaoDeAcao>
+                                <!--
+                                    Sem botão de excluir quando alguém já entrou
+                                    por este lote: apagá-lo apagaria de onde
+                                    aquelas pessoas vieram e por qual valor. O
+                                    caminho certo é encerrar o lote pela data ou
+                                    pela quantidade, e a frase diz isso no lugar
+                                    do botão que não existe.
+                                -->
+                                <span v-if="lote.inscricoes > 0" class="text-muted-foreground">
+                                    Já tem inscrição: encerre pela data ou pela quantidade em vez de excluir.
+                                </span>
+                                <BotaoDeAcao v-else tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirLote(lote)">
+                                    Excluir
+                                </BotaoDeAcao>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p v-else class="text-muted-foreground text-sm">
+                Nenhum lote cadastrado. Sem lotes, a inscrição custa o valor do evento — {{ formatarValor(props.lotes_resumo.valor_do_evento) }} — do
+                começo ao fim.
+            </p>
         </section>
     </AdminLayout>
 </template>

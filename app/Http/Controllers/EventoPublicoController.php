@@ -31,6 +31,9 @@ class EventoPublicoController extends Controller
                 SituacaoEvento::Cancelado->value,
             ])
             ->with([
+                // Todos os lotes, e nao so o vigente: a tela mostra a sucessao
+                // inteira, e e o Resource que marca qual deles vale agora.
+                'lotes',
                 'diasEvento' => fn ($dias) => $dias->ativos(),
                 'diasEvento.gruposAtividades' => fn ($grupos) => $grupos->ativos(),
                 'diasEvento.gruposAtividades.atividades' => fn ($atividades) => $atividades->ativos(),

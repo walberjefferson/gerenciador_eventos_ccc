@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Inscricoes\ResolverLoteVigente;
 use App\Enums\SituacaoEvento;
 use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
@@ -12,6 +13,7 @@ use App\Http\Resources\Admin\EstruturaDoEventoResource;
 use App\Models\DiaEvento;
 use App\Models\Evento;
 use App\Models\GrupoAtividade;
+use App\Models\Lote;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Response;
@@ -180,7 +182,53 @@ class EventoController extends Controller
         $this->authorize('view', $evento);
 
         return inertia('Admin/Eventos/Estrutura', (new EstruturaDoEventoResource($evento))->paraTela()
-            + ['sucesso' => session('sucesso')]);
+            + ['sucesso' => session('sucesso')]
+            + $this->lotesDoEvento($evento));
+    }
+
+    /**
+     * Os lotes de inscricao, no formato que a tela de programacao le.
+     *
+     * Cada linha leva quantas vagas ja sairam e quantas inscricoes vieram
+     * daquele lote: e por esses dois numeros que a tela decide se pode oferecer
+     * o botao de excluir (RN-L12). Sem eles, ela ofereceria um botao que o
+     * servidor recusaria.
+     *
+     * A soma das quantidades viaja ao lado da capacidade do evento como
+     * INFORMACAO, nunca como bloqueio (RN-L10): os dois tetos sao independentes,
+     * e quem cadastra e que precisa enxergar a diferenca entre eles.
+     *
+     * @return array<string, mixed>
+     */
+    private function lotesDoEvento(Evento $evento): array
+    {
+        $lotes = $evento->lotes()->withCount('inscricoes')->get();
+        $vigente = app(ResolverLoteVigente::class)->daColecao($lotes);
+        $comQuantidade = $lotes->whereNotNull('quantidade');
+
+        return [
+            'lotes' => $lotes
+                ->map(fn (Lote $lote): array => [
+                    'id' => $lote->id,
+                    'nome' => $lote->nome,
+                    'posicao' => $lote->posicao,
+                    'valor_centavos' => $lote->valor_centavos,
+                    // O formato que o campo de data e hora do painel troca.
+                    'disponivel_ate' => $lote->disponivel_ate?->format('Y-m-d\TH:i'),
+                    'quantidade' => $lote->quantidade,
+                    'vagas_ocupadas' => $lote->vagas_ocupadas,
+                    'situacao' => $lote->situacaoEm(null, $vigente?->id),
+                    'inscricoes' => (int) $lote->inscricoes_count,
+                ])
+                ->all(),
+            'lotes_resumo' => [
+                'capacidade' => $evento->capacidade,
+                // Null quando NENHUM lote tem quantidade: aí não há soma a
+                // comparar com a capacidade, e um zero mentiria.
+                'soma_quantidades' => $comQuantidade->isEmpty() ? null : (int) $comQuantidade->sum('quantidade'),
+                'valor_do_evento' => $evento->valor_centavos,
+            ],
+        ];
     }
 
     public function destroy(Evento $evento): RedirectResponse

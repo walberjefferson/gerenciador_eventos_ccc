@@ -10,7 +10,7 @@ import { useGruposDaCidade } from '@/composables/useGruposDaCidade';
 import { useSelecaoAtividades } from '@/composables/useSelecaoAtividades';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarValor } from '@/lib/formato';
-import type { DiaEventoPublico, EventoPublico } from '@/types/evento';
+import type { DiaEventoPublico, EventoPublico, LotePublico } from '@/types/evento';
 import type { CidadePublica, ConflitoDeAtividades, FormularioInscricao, GrupoParticipantePublico, PassoDaInscricao } from '@/types/inscricao';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
@@ -33,6 +33,25 @@ const cidades = computed<CidadePublica[]>(() => props.cidades ?? []);
 const gruposParticipantes = computed<GrupoParticipantePublico[]>(() => props.grupos_participantes ?? []);
 const conflitos = computed<ConflitoDeAtividades[]>(() => props.conflitos ?? []);
 const dias = computed<DiaEventoPublico[]>(() => evento.value?.dias ?? []);
+const lotes = computed<LotePublico[]>(() => evento.value?.lotes ?? []);
+
+/**
+ * O valor que vale agora, ja escolhido pelo servidor: o do lote vigente quando
+ * ha lotes, o do proprio evento quando nao ha. A tela nunca decide entre os
+ * dois — ela so mostra o numero que recebeu.
+ */
+const valorVigente = computed<number>(() => evento.value?.valor_centavos ?? 0);
+
+/** O lote que vale agora, so para poder escrever o nome dele ao lado do valor. */
+const loteVigente = computed<LotePublico | null>(() => {
+    const dados = evento.value;
+
+    if (dados === undefined || dados === null || dados.lote_vigente_id === null) {
+        return null;
+    }
+
+    return dados.lotes.find((lote) => lote.id === dados.lote_vigente_id) ?? null;
+});
 
 /**
  * A chave de idempotencia nasce quando o formulario abre e acompanha todas as
@@ -48,6 +67,9 @@ function novaChave(): string {
 
 const formulario = ref<FormularioInscricao>({
     evento_id: props.evento_id ?? 0,
+    // O lote que a pessoa esta vendo agora. Quem escolheu foi o servidor; este
+    // campo existe para que ele possa avisar, no envio, se mudou (RN-L5).
+    lote_id: props.evento?.lote_vigente_id ?? null,
     cidade_id: null,
     grupo_participante_id: null,
     nome_completo: '',
@@ -269,6 +291,7 @@ const passoDoCampo: Record<string, PassoDaInscricao> = {
     cidade_id: 'dados',
     grupo_participante_id: 'dados',
     atividades: 'participacao',
+    lote_id: 'participacao',
     aceite_termos: 'revisao',
     chave_idempotencia: 'revisao',
     evento_id: 'revisao',
@@ -325,6 +348,14 @@ async function tratarRecusa(recebidos: Record<string, string>): Promise<void> {
 
     errosDoServidor.value = traduzidos;
 
+    // RN-L5 — o lote virou entre a tela e o envio. A mensagem do servidor diz o
+    // que mudou; recarregar o evento traz a sucessao de lotes atualizada, com o
+    // novo preco ja marcado como o vigente. Sem isto, a pessoa continuaria
+    // olhando para o preco que nao existe mais e reenviaria o mesmo lote.
+    if (recebidos.lote_id !== undefined) {
+        recarregarLotes();
+    }
+
     const primeiro = Object.keys(recebidos)[0];
 
     if (primeiro === undefined) {
@@ -344,6 +375,22 @@ async function tratarRecusa(recebidos: Record<string, string>): Promise<void> {
 
     await nextTick();
     document.getElementById(raiz)?.focus();
+}
+
+/**
+ * Busca de novo os lotes do evento, sem perder nada do que ja foi preenchido.
+ *
+ * `only: ['evento']` troca so esse prop: o formulario, as etapas e o que a
+ * pessoa escreveu continuam onde estavam. O aviso do servidor permanece na tela
+ * — quem acabou de ser recusado precisa ler o motivo depois da recarga.
+ */
+function recarregarLotes(): void {
+    router.reload({
+        only: ['evento'],
+        onSuccess: () => {
+            formulario.value.lote_id = evento.value?.lote_vigente_id ?? null;
+        },
+    });
 }
 
 function enviar(): void {
@@ -459,10 +506,14 @@ async function voltar(): Promise<void> {
 
                     <PassoParticipacao
                         v-if="passo === 'participacao'"
+                        v-model:lote-id="formulario.lote_id"
                         class="mt-[26px]"
                         :dias="dias"
                         :selecao="selecao"
                         :mostrar-problemas="mostrarProblemasDaParticipacao"
+                        :lotes="lotes"
+                        :moeda="evento.moeda"
+                        :erro-do-lote="erros.lote_id ?? null"
                     />
 
                     <PassoRevisao
@@ -471,6 +522,7 @@ async function voltar(): Promise<void> {
                         v-model="formulario"
                         :evento="evento"
                         :resumo-pessoal="resumoPessoal"
+                        :lote-vigente="loteVigente"
                         :atividades-por-dia="atividadesPorDia"
                         :erros="erros"
                         :enviando="enviando"
@@ -524,8 +576,10 @@ async function voltar(): Promise<void> {
                             <p class="text-muted-foreground order-first text-sm sm:order-none sm:mr-auto lg:hidden">
                                 Total
                                 <strong class="text-foreground font-semibold tabular-nums">
-                                    {{ formatarValor(evento.valor_centavos, evento.moeda) }}
+                                    {{ formatarValor(valorVigente, evento.moeda) }}
                                 </strong>
+                                <!-- De qual lote esse total veio. -->
+                                <span v-if="loteVigente" class="block text-[12px]">{{ loteVigente.nome }}</span>
                             </p>
 
                             <Button v-if="passo !== 'dados'" type="button" variant="outline" class="h-12 w-full text-base sm:w-auto" @click="voltar">
@@ -551,6 +605,7 @@ async function voltar(): Promise<void> {
                 <ResumoDaInscricao
                     class="hidden lg:sticky lg:top-6 lg:block"
                     :evento="evento"
+                    :lote-vigente="loteVigente"
                     :atividades-por-dia="atividadesPorDia"
                     @editar="irPara('participacao')"
                 />

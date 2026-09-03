@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import CabecalhoEvento from '@/components/eventos/CabecalhoEvento.vue';
+import ListaDeLotes from '@/components/eventos/ListaDeLotes.vue';
 import ProgramacaoDoDia from '@/components/eventos/ProgramacaoDoDia.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarValor } from '@/lib/formato';
-import type { EventoPublico } from '@/types/evento';
+import type { EventoPublico, LotePublico } from '@/types/evento';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -46,6 +47,23 @@ onBeforeUnmount(() => {
 const enderecoDaInscricao = computed<string>(() => `/eventos/${evento.value?.slug ?? ''}/inscricao`);
 
 const valor = computed<string>(() => (evento.value ? formatarValor(evento.value.valor_centavos, evento.value.moeda) : ''));
+
+/**
+ * O nome do lote que vale agora — "1º lote", "Lote promocional".
+ *
+ * E so uma busca pelo identificador que o servidor ja escolheu: a tela nao
+ * decide qual lote vale, ela apenas o nomeia ao lado do preco, para que o
+ * numero grande no painel tenha de onde ter vindo.
+ */
+const loteVigente = computed<LotePublico | null>(() => {
+    const dados = evento.value;
+
+    if (dados === null || dados.lote_vigente_id === null) {
+        return null;
+    }
+
+    return dados.lotes.find((lote) => lote.id === dados.lote_vigente_id) ?? null;
+});
 
 const fechamentoEmPalavras = computed<string | null>(() => {
     const dados = evento.value;
@@ -115,6 +133,17 @@ const vagasEmPalavras = computed<string | null>(() => {
                             <ProgramacaoDoDia v-for="dia in evento.dias" :key="dia.id" :dia="dia" />
                         </div>
                     </section>
+
+                    <!--
+                        Os lotes, quando o evento trabalha com eles.
+
+                        Ficam DEPOIS da programacao e ANTES do que esta
+                        incluido: quem chega quer saber primeiro o que vai
+                        acontecer; o preco que sobe e o argumento para nao
+                        deixar para depois, e ele so convence depois de a
+                        pessoa querer ir.
+                    -->
+                    <ListaDeLotes v-if="evento.lotes.length > 0" class="mt-11" :lotes="evento.lotes" :moeda="evento.moeda" />
 
                     <!-- O que a inscricao inclui. A secao inteira some quando a
                          lista esta vazia: titulo sem itens embaixo nao informa. -->
@@ -194,6 +223,17 @@ const vagasEmPalavras = computed<string | null>(() => {
                             <span class="text-muted-foreground align-middle text-sm font-normal tracking-normal">/ pessoa</span>
                         </p>
 
+                        <!-- De qual lote esse preco veio, e ate quando ele
+                             vale. Sem isto o valor no painel e um numero sem
+                             prazo, e o lote perde justamente o que ele tem de
+                             diferente do preco fixo. -->
+                        <p v-if="loteVigente" data-testid="lote-vigente-no-painel" class="text-acao-texto mt-2 text-[13.5px] font-medium">
+                            {{ loteVigente.nome
+                            }}<span v-if="loteVigente.limite_rotulo" class="text-muted-foreground font-normal">
+                                · {{ loteVigente.limite_rotulo }}</span
+                            >
+                        </p>
+
                         <!-- .buy__n — 13.5px, 12px acima -->
                         <p class="text-muted-foreground mt-3 text-[13.5px] leading-[1.5]">
                             Pagamento por Pix ao final. A vaga fica reservada enquanto o prazo corre.
@@ -255,7 +295,7 @@ const vagasEmPalavras = computed<string | null>(() => {
                         </div>
                     </div>
 
-                    <p class="mt-4 text-sm text-center">
+                    <p class="mt-4 text-center text-sm">
                         <Link
                             :href="`/acesso?evento=${evento.slug}`"
                             class="text-acao-texto inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline"

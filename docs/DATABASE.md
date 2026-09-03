@@ -36,6 +36,9 @@ erDiagram
     atividades ||--o{ conflitos_atividades : "atividade_a"
     atividades ||--o{ conflitos_atividades : "atividade_b"
 
+    eventos ||--o{ lotes : "vende em"
+    lotes ||--o{ inscricoes : "origina"
+
     eventos ||--o{ inscricoes : "recebe"
     inscricoes ||--o{ inscricoes_atividades : "escolhe"
     atividades ||--o{ inscricoes_atividades : "escolhida em"
@@ -82,6 +85,19 @@ erDiagram
         jsonb configuracoes
         integer vagas_reservadas
         integer vagas_confirmadas
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    lotes {
+        bigserial id PK
+        bigint evento_id FK
+        varchar nome
+        integer posicao
+        bigint valor_centavos
+        timestamptz disponivel_ate
+        integer quantidade
+        integer vagas_ocupadas
         timestamptz created_at
         timestamptz updated_at
     }
@@ -393,6 +409,7 @@ Pares de atividades que não podem ser escolhidas juntas **mesmo sem choque de h
 | `codigo_publico` | char(26) ULID | não | — | Identificador público não sequencial |
 | `evento_id` | bigint FK → `eventos` (restrict) | não | — | Evento da inscrição |
 | `grupo_participante_id` | bigint FK → `grupos_participantes` (restrict) | não | — | Grupo do participante |
+| `lote_id` | bigint FK → `lotes` (restrict) | sim | `null` | De qual lote a inscrição veio. Nulo em evento sem lotes. Serve a relatório e conferência, **nunca a cálculo de cobrança** |
 | `nome_completo` | varchar(160) | não | — | Nome do participante |
 | `email` | varchar(160) | não | — | E-mail |
 | `telefone` | varchar(40) | não | — | Telefone |
@@ -400,7 +417,7 @@ Pares de atividades que não podem ser escolhidas juntas **mesmo sem choque de h
 | `documento_hash` | char(64) | não | — | Impressão digital do CPF (SHA-256 com segredo), usada só para duplicidade |
 | `data_nascimento` | date | não | — | Usada para verificar faixa etária por atividade |
 | `situacao` | varchar(40) | não | `'aguardando_pagamento'` | Situação (Enum `SituacaoInscricao`) |
-| `valor_centavos` | bigint | não | — | Valor congelado na criação |
+| `valor_centavos` | bigint | não | — | Valor congelado na criação: o do lote vigente quando há lotes (RN-L7), o do evento quando não há (RN-L8). **É a única fonte de verdade do que a pessoa deve pagar** |
 | `versao_termos` | varchar(40) | não | — | Versão do regulamento aceita |
 | `termos_aceitos_em` | timestamptz | não | — | Momento do aceite |
 | `chave_idempotencia` | uuid | não | — | Código do envio do formulário |
@@ -538,6 +555,40 @@ Registro de cada mensagem enviada ao participante. Criada na Fase 7.
 - **A chave é `restrict`** pelo mesmo motivo da de `pagamentos`: prova de comunicação com uma pessoa não pode sumir junto com um apagamento acidental.
 
 ---
+
+---
+
+### 3.13 `lotes` → Model `Lote`
+
+Degrau de preço do evento. Vale até uma data, até acabarem as vagas dele, ou até o que vier primeiro.
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+|--------|------|------|--------|-----------|
+| `id` | bigserial | não | — | — |
+| `evento_id` | bigint FK → `eventos` (restrict) | não | — | Evento a que pertence |
+| `nome` | varchar(80) | não | — | Ex.: "1º lote", "Lote promocional" |
+| `posicao` | integer | não | — | Ordena a sucessão; única dentro do evento |
+| `valor_centavos` | bigint | não | — | Valor deste degrau, em centavos |
+| `disponivel_ate` | timestamptz | sim | `null` | Limite por data |
+| `quantidade` | integer | sim | `null` | Limite por vagas |
+| `vagas_ocupadas` | integer | não | `0` | Contador atômico. **Só cresce** (RN-L6) |
+| `created_at` / `updated_at` | timestamptz | não | — | — |
+
+**Índices e restrições:** `unique(evento_id, posicao)` — que é também o índice de leitura por evento e posição —, mais quatro CHECK:
+
+| Restrição | O que cobra |
+|-----------|-------------|
+| `lotes_quantidade_check` | `quantidade IS NULL OR (quantidade > 0 AND vagas_ocupadas <= quantidade)` |
+| `lotes_vagas_nao_negativas_check` | `vagas_ocupadas >= 0` |
+| `lotes_valor_check` | `valor_centavos >= 0` |
+| `lotes_tem_limite_check` | `disponivel_ate IS NOT NULL OR quantidade IS NOT NULL` (RN-L1) |
+
+**Por quê:**
+
+- **Não há coluna de situação.** "Encerrado", "vigente" e "futuro" são derivados da data e do contador a cada leitura (RN-L3). Situação gravada envelhece no primeiro minuto em que ninguém roda a rotina que a atualizaria.
+- **`restrict` na exclusão do evento**, e não cascade como em `dias_evento`: lote tem dinheiro combinado dentro dele, e apagar um evento não pode levar junto o degrau pelo qual alguém entrou.
+- **O contador é movido só por UPDATE condicional**, no mesmo molde de `eventos.vagas_reservadas` — nunca por leitura seguida de gravação. O CHECK de quantidade é a última linha de defesa.
+- **`vagas_ocupadas` não desce.** Expiração e cancelamento devolvem a vaga ao evento e às atividades, nunca ao lote (RN-L6).
 
 ---
 

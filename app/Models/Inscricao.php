@@ -33,6 +33,7 @@ class Inscricao extends Model
         'codigo_publico',
         'evento_id',
         'grupo_participante_id',
+        'lote_id',
         'nome_completo',
         'email',
         'telefone',
@@ -81,6 +82,20 @@ class Inscricao extends Model
     public function evento(): BelongsTo
     {
         return $this->belongsTo(Evento::class);
+    }
+
+    /**
+     * O lote de onde esta inscricao veio.
+     *
+     * Nulo quando o evento nao trabalha com lotes. Serve a relatorio e a
+     * conferencia — nunca a calculo de cobranca: quanto esta pessoa deve
+     * continua sendo valor_centavos, fotografado no instante da inscricao.
+     *
+     * @return BelongsTo<Lote, $this>
+     */
+    public function lote(): BelongsTo
+    {
+        return $this->belongsTo(Lote::class);
     }
 
     /**

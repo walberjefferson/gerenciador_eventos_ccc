@@ -43,6 +43,14 @@ export type PassoDaInscricao = 'dados' | 'participacao' | 'revisao' | 'pagamento
  */
 export interface FormularioInscricao {
     evento_id: number;
+    /**
+     * O lote que a pessoa VIU na tela. Nulo em evento sem lotes.
+     *
+     * Ele não escolhe nada: viaja para que o servidor possa dizer "o lote virou
+     * enquanto você preenchia" em vez de cobrar em silêncio um preço diferente
+     * do que estava na tela (RN-L5).
+     */
+    lote_id: number | null;
     cidade_id: number | null;
     grupo_participante_id: number | null;
     nome_completo: string;

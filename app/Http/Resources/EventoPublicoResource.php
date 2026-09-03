@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Actions\Inscricoes\ResolverLoteVigente;
 use App\Enums\SituacaoEvento;
 use App\Models\Evento;
+use App\Models\Lote;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -19,6 +22,12 @@ use Illuminate\Support\Str;
  * vagas_confirmadas: a tela recebe vagas_disponiveis ja calculado e a
  * explicacao pronta de por que as inscricoes estao fechadas, quando estao.
  * Quem decide continua sendo o servidor.
+ *
+ * QUANDO O EVENTO TEM LOTES, "valor_centavos" e o valor do lote VIGENTE — o
+ * preco que vale agora, que e o que a pessoa vai pagar se se inscrever neste
+ * instante. Sem lotes, e o valor do proprio evento, como sempre foi (RN-L8). A
+ * lista completa vai junto, em "lotes", para a tela mostrar de onde o preco veio
+ * e para onde ele vai.
  *
  * @mixin Evento
  */
@@ -37,7 +46,21 @@ class EventoPublicoResource extends JsonResource
     public function toArray(Request $request): array
     {
         $vagasDisponiveis = $this->vagasDisponiveis();
-        $inscricoesAbertas = $this->inscricoesEstaoAbertas() && $this->temVagaDisponivel();
+
+        // Os lotes vem carregados pelos controllers publicos; a consulta de
+        // reserva existe para quem montar este Resource sem eles.
+        /** @var Collection<int, Lote> $lotes */
+        $lotes = $this->relationLoaded('lotes') ? $this->lotes : $this->lotes()->get();
+
+        // RN-L3 — a regra do lote vigente mora numa Action so, e e dela que
+        // esta tela recebe a resposta. Nada aqui recalcula data nem contador.
+        $loteVigente = app(ResolverLoteVigente::class)->daColecao($lotes);
+
+        // Tres perguntas, tres explicacoes possiveis: a janela esta aberta? ha
+        // vaga na capacidade? ha lote pelo qual entrar (RN-L9)?
+        $inscricoesAbertas = $this->inscricoesEstaoAbertas()
+            && $this->temVagaDisponivel()
+            && ($lotes->isEmpty() || $loteVigente !== null);
 
         return [
             'codigo_publico' => $this->codigo_publico,
@@ -63,7 +86,7 @@ class EventoPublicoResource extends JsonResource
             'inscricoes_abrem_em' => $this->inscricoes_abrem_em->toIso8601String(),
             'inscricoes_fecham_em' => $this->inscricoes_fecham_em->toIso8601String(),
             'prazo_rotulo' => $this->prazoEmPalavras(),
-            'valor_centavos' => $this->valor_centavos,
+            'valor_centavos' => $loteVigente?->valor_centavos ?? $this->valor_centavos,
             'moeda' => $this->moeda,
             'capacidade' => $this->capacidade,
             'vagas_disponiveis' => $vagasDisponiveis,
@@ -71,12 +94,15 @@ class EventoPublicoResource extends JsonResource
             'situacao' => $this->situacao->value,
             'situacao_rotulo' => $this->situacao->rotulo(),
             'inscricoes_abertas' => $inscricoesAbertas,
-            'motivo_inscricoes_fechadas' => $inscricoesAbertas ? null : $this->motivoEmPalavras(),
+            'motivo_inscricoes_fechadas' => $inscricoesAbertas ? null : $this->motivoEmPalavras($lotes->isNotEmpty(), $loteVigente),
             'regulamento' => $this->regulamento,
             'versao_termos' => $this->versao_termos,
             'contato_email' => $this->contato_email,
             'contato_telefone' => $this->contato_telefone,
             'dias' => DiaEventoResource::collection($this->whenLoaded('diasEvento')),
+            // Todos os lotes, na ordem — inclusive os que ja passaram (RN-L4).
+            'lotes' => LotePublicoResource::lista($lotes, $loteVigente?->id),
+            'lote_vigente_id' => $loteVigente?->id,
         ];
     }
 
@@ -108,7 +134,7 @@ class EventoPublicoResource extends JsonResource
      * Explica, em uma frase, por que nao da para se inscrever agora. A tela
      * mostra este texto no lugar do botao.
      */
-    private function motivoEmPalavras(): string
+    private function motivoEmPalavras(bool $temLotes, ?Lote $loteVigente): string
     {
         $agora = Carbon::now();
 
@@ -120,6 +146,13 @@ class EventoPublicoResource extends JsonResource
 
         if (! $this->temVagaDisponivel()) {
             return 'Todas as vagas deste evento já foram preenchidas.';
+        }
+
+        // RN-L9 — ha lotes e nenhum vale mais. A capacidade pode ate ter
+        // sobrado (RN-L10: os dois tetos sao independentes), mas nao ha preco
+        // pelo qual cobrar.
+        if ($temLotes && $loteVigente === null) {
+            return 'Os lotes de inscrição se esgotaram.';
         }
 
         if ($this->inscricoes_fecham_em < $agora || $this->situacao === SituacaoEvento::InscricoesEncerradas) {

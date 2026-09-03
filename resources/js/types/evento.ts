@@ -48,6 +48,34 @@ export interface DiaEventoPublico {
     grupos: GrupoAtividadePublico[];
 }
 
+/**
+ * Um lote de inscrição, como as telas públicas o recebem.
+ *
+ * A situação vem DECIDIDA pelo servidor, e a tela não a recalcula: dizer
+ * "encerrado" a partir de uma data no navegador seria um segundo lugar onde a
+ * regra mora — e o relógio do aparelho de quem lê não é o relógio que vende a
+ * vaga.
+ */
+export interface LotePublico {
+    id: number;
+    nome: string;
+    posicao: number;
+    valor_centavos: number;
+    /** Até quando o lote vale, em ISO. Nulo quando ele só encerra por vagas. */
+    disponivel_ate: string | null;
+    /** Quantas vagas o lote tem. Nulo quando ele só encerra por data. */
+    quantidade: number | null;
+    /** Quantas ainda cabem. Nulo quando não há limite de vagas. */
+    vagas_restantes: number | null;
+    situacao: 'encerrado' | 'vigente' | 'futuro';
+    /** "Lote atual", "Em breve", "Encerrado" — a situação escrita. */
+    situacao_rotulo: string;
+    /** "Até 10/10/2026 · restam 12 vagas", já montado pelo servidor. */
+    limite_rotulo: string;
+    /** Só o vigente. O servidor decide de novo no envio (RN-L5). */
+    selecionavel: boolean;
+}
+
 export interface EventoPublico {
     codigo_publico: string;
     nome: string;
@@ -73,6 +101,11 @@ export interface EventoPublico {
     inscricoes_fecham_em: string;
     /** "Encerram em 12 dias", ja escrito pelo servidor. null quando fechadas. */
     prazo_rotulo: string | null;
+    /**
+     * O valor que vale AGORA: o do lote vigente quando há lotes, o do próprio
+     * evento quando não há. A tela nunca escolhe entre os dois — o servidor já
+     * escolheu.
+     */
     valor_centavos: number;
     moeda: string;
     capacidade: number | null;
@@ -89,4 +122,8 @@ export interface EventoPublico {
     contato_email: string | null;
     contato_telefone: string | null;
     dias: DiaEventoPublico[];
+    /** Todos os lotes, na ordem — inclusive os encerrados. Vazio = sem lotes. */
+    lotes: LotePublico[];
+    /** O lote que vale agora. Nulo quando não há lotes ou todos se esgotaram. */
+    lote_vigente_id: number | null;
 }

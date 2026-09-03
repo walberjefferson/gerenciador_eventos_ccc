@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatarValor } from '@/lib/formato';
-import type { AtividadePublica, EventoPublico } from '@/types/evento';
+import type { AtividadePublica, EventoPublico, LotePublico } from '@/types/evento';
 import type { FormularioInscricao } from '@/types/inscricao';
 import { computed } from 'vue';
 
@@ -11,13 +11,25 @@ import { computed } from 'vue';
  * Terceira etapa: a pessoa confere tudo antes de gravar. Nada e enviado ate
  * aqui — e daqui em diante quem decide e o servidor.
  */
-const props = defineProps<{
-    evento: EventoPublico;
-    resumoPessoal: Array<{ rotulo: string; valor: string }>;
-    atividadesPorDia: Array<{ id: number; nome: string; data_rotulo: string; atividades: AtividadePublica[] }>;
-    erros: Record<string, string>;
-    enviando: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        evento: EventoPublico;
+        resumoPessoal: Array<{ rotulo: string; valor: string }>;
+        /**
+         * O lote que vale agora, quando o evento trabalha com lotes.
+         *
+         * O VALOR mostrado aqui continua vindo de `evento.valor_centavos`, que o
+         * servidor ja resolveu como sendo o do lote vigente: a tela não escolhe
+         * entre dois preços. O lote entra para dizer de ONDE aquele número veio —
+         * quem revisa precisa reconhecer o preço que viu na etapa anterior.
+         */
+        loteVigente?: LotePublico | null;
+        atividadesPorDia: Array<{ id: number; nome: string; data_rotulo: string; atividades: AtividadePublica[] }>;
+        erros: Record<string, string>;
+        enviando: boolean;
+    }>(),
+    { loteVigente: null },
+);
 
 const formulario = defineModel<FormularioInscricao>({ required: true });
 
@@ -131,6 +143,9 @@ const prazoEmPalavras = 'Depois de confirmar, você verá o código Pix e o praz
                 <!-- Bricolage Grotesque, como todo preco desta identidade -->
                 <p class="font-titulo text-[24px] font-semibold tracking-[-0.02em] tabular-nums">
                     {{ formatarValor(evento.valor_centavos, evento.moeda) }}
+                </p>
+                <p v-if="props.loteVigente" data-testid="lote-na-revisao" class="text-muted-foreground mt-1 text-[13.5px]">
+                    {{ props.loteVigente.nome }}<span v-if="props.loteVigente.limite_rotulo"> · {{ props.loteVigente.limite_rotulo }}</span>
                 </p>
                 <p class="text-muted-foreground mt-1 text-[13.5px]">{{ prazoEmPalavras }}</p>
             </div>
