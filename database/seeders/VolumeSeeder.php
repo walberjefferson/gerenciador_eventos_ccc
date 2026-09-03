@@ -38,6 +38,13 @@ use RuntimeException;
  *    corresponde, os contadores de vaga das atividades batem com as inscricoes
  *    criadas e as datas ficam espalhadas pelo periodo de inscricao. Volume
  *    incoerente produziria plano de execucao que nao acontece na vida real.
+ *
+ * 4. **O evento tem lotes, e as inscricoes sabem de qual vieram.** Sem isso,
+ *    toda consulta que passa por lote_id seria medida com a coluna inteira em
+ *    nulo — e uma coluna toda nula e o melhor caso possivel para o banco, nunca
+ *    o caso real. Os quatro lotes tambem dao ao contador vagas_ocupadas um
+ *    valor que bate com as inscricoes emitidas: ele so cresce (RN-L6), entao
+ *    inclui expiradas e canceladas.
  */
 class VolumeSeeder extends Seeder
 {
@@ -82,12 +89,14 @@ class VolumeSeeder extends Seeder
         $grupos = $this->gruposDeParticipantes($cidades);
         $evento = $this->evento();
         $atividades = $this->programacao($evento);
+        $lotes = $this->lotes($evento);
 
         $this->command?->info('Criando '.number_format(self::TOTAL, 0, ',', '.').' inscricoes...');
 
-        $contadores = $this->inscricoes($evento, $grupos, $atividades);
+        $contadores = $this->inscricoes($evento, $grupos, $atividades, $lotes);
 
         $this->ajustarContadores($evento, $contadores);
+        $this->ajustarLotes($contadores['lotes'] ?? []);
 
         DB::statement('ANALYZE');
 
@@ -277,7 +286,7 @@ class VolumeSeeder extends Seeder
      * @param  array<int, array<int, int>>  $atividadesPorDia
      * @return array{reservadas: array<int, int>, confirmadas: array<int, int>, evento_reservadas: int, evento_confirmadas: int}
      */
-    private function inscricoes(object $evento, array $grupos, array $atividadesPorDia): array
+    private function inscricoes(object $evento, array $grupos, array $atividadesPorDia, array $lotes = []): array
     {
         $abertura = Carbon::parse('2026-08-01 08:00:00');
         $situacoes = $this->situacoesSorteadas();
@@ -286,6 +295,7 @@ class VolumeSeeder extends Seeder
         $confirmadasPorAtividade = [];
         $eventoReservadas = 0;
         $eventoConfirmadas = 0;
+        $ocupadasPorLote = [];
 
         $linhasInscricao = [];
         $escolhas = [];
@@ -303,6 +313,16 @@ class VolumeSeeder extends Seeder
             $prazo = $criadaEm->copy()->addDay();
             $documento = $this->cpfSintetico($i);
 
+            // O lote e escolhido pela POSICAO na fila, e nao ao acaso: quem se
+            // inscreveu antes pegou o lote mais barato. E o que acontece na vida
+            // real, e e o que faz a distribuicao de lote_id ter a mesma forma
+            // que o banco vai encontrar no dia do evento.
+            $lote = $lotes === [] ? null : $lotes[$this->loteDoIndice($i, count($lotes))];
+
+            if ($lote !== null) {
+                $ocupadasPorLote[$lote['id']] = ($ocupadasPorLote[$lote['id']] ?? 0) + 1;
+            }
+
             $linhasInscricao[] = [
                 'id' => $id,
                 'codigo_publico' => (string) Str::ulid(),
@@ -315,7 +335,10 @@ class VolumeSeeder extends Seeder
                 'documento_hash' => Inscricao::hashDocumento($documento),
                 'data_nascimento' => Carbon::parse('1970-01-01')->addDays($i % 15_000)->toDateString(),
                 'situacao' => $situacao,
-                'valor_centavos' => 15_000,
+                // O valor e o do lote, fotografado na inscricao (RN-L7): alterar
+                // o lote depois nao mexe em inscricao nenhuma.
+                'lote_id' => $lote['id'] ?? null,
+                'valor_centavos' => $lote['valor_centavos'] ?? 15_000,
                 'versao_termos' => '2026.1',
                 'termos_aceitos_em' => $criadaEm->toDateTimeString(),
                 'chave_idempotencia' => (string) Str::uuid(),
@@ -356,7 +379,7 @@ class VolumeSeeder extends Seeder
                 $eventoReservadas++;
             }
 
-            foreach ($this->pagamentosDa($id, $situacao, $criadaEm, $prazo, $i) as $pagamento) {
+            foreach ($this->pagamentosDa($id, $situacao, $criadaEm, $prazo, $i, (int) ($lote['valor_centavos'] ?? 15_000)) as $pagamento) {
                 $pagamentos[] = $pagamento;
             }
 
@@ -374,6 +397,7 @@ class VolumeSeeder extends Seeder
             'confirmadas' => $confirmadasPorAtividade,
             'evento_reservadas' => $eventoReservadas,
             'evento_confirmadas' => $eventoConfirmadas,
+            'lotes' => $ocupadasPorLote,
         ];
     }
 
@@ -408,8 +432,14 @@ class VolumeSeeder extends Seeder
      *
      * @return array<int, array<string, mixed>>
      */
-    private function pagamentosDa(int $inscricaoId, string $situacao, Carbon $criadaEm, Carbon $prazo, int $indice): array
-    {
+    private function pagamentosDa(
+        int $inscricaoId,
+        string $situacao,
+        Carbon $criadaEm,
+        Carbon $prazo,
+        int $indice,
+        int $valorCentavos = 15_000,
+    ): array {
         // Todas as colunas aparecem em todas as linhas, mesmo as nulas: a
         // insercao em lote exige que cada linha tenha exatamente as mesmas
         // colunas, na mesma ordem.
@@ -419,7 +449,9 @@ class VolumeSeeder extends Seeder
             'gateway' => 'fake',
             'id_externo' => null,
             'metodo' => MetodoPagamento::Pix->value,
-            'valor_centavos' => 15_000,
+            // O mesmo valor da inscricao: cobranca que discorda do que foi
+            // fotografado no ato da inscricao e volume incoerente.
+            'valor_centavos' => $valorCentavos,
             'situacao' => SituacaoPagamento::Pendente->value,
             'pix_copia_e_cola' => '00020126volume'.$inscricaoId,
             'expira_em' => $prazo->toDateTimeString(),
@@ -477,6 +509,100 @@ class VolumeSeeder extends Seeder
      * @param  array<int, array<string, mixed>>  $escolhas
      * @param  array<int, array<string, mixed>>  $pagamentos
      */
+    /**
+     * Quatro lotes para o evento de volume.
+     *
+     * Os tres primeiros com quantidade fechada e o ultimo aberto ate o fim das
+     * inscricoes — o desenho mais comum de verdade. Como a distribuicao das
+     * dez mil inscricoes segue a ordem de chegada, os tres primeiros terminam
+     * exatamente cheios e o quarto com sobra, que e a fotografia de um evento
+     * no meio da venda.
+     *
+     * @return array<int, array{id: int, valor_centavos: int}>
+     */
+    private function lotes(object $evento): array
+    {
+        $existentes = DB::table('lotes')
+            ->where('evento_id', $evento->id)
+            ->orderBy('posicao')
+            ->get(['id', 'valor_centavos']);
+
+        if ($existentes->isNotEmpty()) {
+            return $existentes
+                ->map(fn (object $l): array => ['id' => (int) $l->id, 'valor_centavos' => (int) $l->valor_centavos])
+                ->all();
+        }
+
+        $definicao = [
+            ['1º lote', 10_000, 2_000],
+            ['2º lote', 12_500, 3_000],
+            ['3º lote', 15_000, 3_000],
+            ['4º lote', 18_000, null],
+        ];
+
+        $lotes = [];
+
+        foreach ($definicao as $posicao => [$nome, $valor, $quantidade]) {
+            $id = DB::table('lotes')->insertGetId([
+                'evento_id' => $evento->id,
+                'nome' => $nome,
+                'posicao' => $posicao + 1,
+                'valor_centavos' => $valor,
+                // O ultimo vale ate as inscricoes fecharem; os outros encerram
+                // por quantidade. Todo lote precisa de pelo menos um limite
+                // (RN-L1), e este e o do quarto.
+                'disponivel_ate' => $quantidade === null ? $evento->inscricoes_fecham_em : null,
+                'quantidade' => $quantidade,
+                'vagas_ocupadas' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $lotes[] = ['id' => $id, 'valor_centavos' => $valor];
+        }
+
+        return $lotes;
+    }
+
+    /**
+     * Em que lote caiu a inscricao de indice $i.
+     *
+     * Os cortes espelham as quantidades de lotes(): 2.000, 3.000, 3.000 e o
+     * resto. Ficam escritos aqui, e nao lidos de la, porque este metodo roda
+     * dez mil vezes — e uma consulta por chamada seria o proprio seeder
+     * virando o gargalo que ele existe para medir.
+     */
+    private function loteDoIndice(int $i, int $quantosLotes): int
+    {
+        $corte = match (true) {
+            $i < 2_000 => 0,
+            $i < 5_000 => 1,
+            $i < 8_000 => 2,
+            default => 3,
+        };
+
+        return min($corte, $quantosLotes - 1);
+    }
+
+    /**
+     * Grava em cada lote quantas inscricoes sairam dele.
+     *
+     * O contador SO CRESCE (RN-L6): inclui expirada e cancelada, porque a vaga
+     * do lote nao volta quando a inscricao morre. Medir com ele zerado seria
+     * medir um estado que o sistema nunca produz.
+     *
+     * @param  array<int, int>  $ocupadasPorLote
+     */
+    private function ajustarLotes(array $ocupadasPorLote): void
+    {
+        foreach ($ocupadasPorLote as $loteId => $ocupadas) {
+            DB::table('lotes')->where('id', $loteId)->update([
+                'vagas_ocupadas' => $ocupadas,
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
     private function descarregar(array &$inscricoes, array &$escolhas, array &$pagamentos): void
     {
         if ($inscricoes === []) {
