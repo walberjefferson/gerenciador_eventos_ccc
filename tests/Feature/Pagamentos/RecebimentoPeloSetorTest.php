@@ -18,6 +18,7 @@ use App\Models\Cidade;
 use App\Models\Evento;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
+use App\Models\Responsavel;
 use App\Models\User;
 use App\Services\Pagamentos\MontadorDeBrCodePix;
 use Database\Seeders\PapeisSeeder;
@@ -30,7 +31,7 @@ use Tests\Feature\Admin\Cenario as CenarioAdmin;
 use Tests\Feature\Inscricoes\Cenario;
 
 /*
- * O recebimento pela chave Pix do responsavel do setor.
+ * O recebimento pela chave Pix de um responsavel do setor.
  *
  * O que se prova aqui, em quatro frentes:
  *
@@ -44,7 +45,7 @@ use Tests\Feature\Inscricoes\Cenario;
  *    antes da extracao do montador. Refatoracao que muda payload de Pix e
  *    defeito, nao melhoria;
  * 4. RN-S4 — o evento nao e gravado no modo "setor" enquanto houver setor ativo
- *    sem chave ou sem responsavel, e a recusa NOMEIA quem falta.
+ *    sem nenhum responsavel apto, e a recusa NOMEIA quem falta.
  *
  * Prova junto, por travamento, uma verdade que ja existia por acidente: a
  * cobranca do setor tem `id_externo` nulo e por isso nunca entra na
@@ -105,25 +106,52 @@ final class ProvedorQueNaoPodeSerChamado implements PaymentGateway
 }
 
 /**
- * O cenario do modo setor: evento recebendo pelo setor, setor com chave e
- * responsavel, e o provedor trocado por um que explode se for chamado.
+ * O cenario do modo setor: evento recebendo pelo setor, setor com UM
+ * responsavel apto vinculado, e o provedor trocado por um que explode se for
+ * chamado.
+ *
+ * Um responsavel so, de proposito: com um unico candidato o sorteio da RN-R4
+ * tem uma resposta so, e estes testes podem continuar afirmando exatamente
+ * qual chave sai no BR Code. O equilibrio e a imprevisibilidade do sorteio sao
+ * provados noutro arquivo, onde ha mais de um candidato.
+ *
+ * @param  array<string, mixed>  $atributosDoEvento
+ * @param  array<string, mixed>  $atributosDoResponsavel
  */
-function cenarioDoSetor(array $atributosDoEvento = [], array $atributosDoSetor = []): Cenario
+function cenarioDoSetor(array $atributosDoEvento = [], array $atributosDoResponsavel = []): Cenario
 {
     $cenario = Cenario::montar(array_merge([
         'forma_recebimento' => FormaRecebimento::Setor,
         'prazo_pagamento_minutos' => 10080,
     ], $atributosDoEvento));
 
-    $responsavel = User::factory()->create(['name' => 'Joana Responsavel']);
+    $conta = User::factory()->create(['name' => 'Joana Responsavel']);
 
-    $cenario->cidade->update(array_merge([
-        'responsavel_id' => $responsavel->getKey(),
+    $responsavel = Responsavel::factory()->create(array_merge([
+        'nome' => 'Joana da Silva',
         'chave_pix' => 'joana.setor@example.com',
-        'titular_chave_pix' => 'Joana da Silva',
-    ], $atributosDoSetor));
+        'user_id' => $conta->getKey(),
+    ], $atributosDoResponsavel));
+
+    $cenario->cidade->responsaveis()->sync([$responsavel->getKey()]);
 
     return $cenario;
+}
+
+/**
+ * Um setor pronto para receber: ele existe e tem um responsavel apto.
+ *
+ * @param  array<string, mixed>  $atributos
+ */
+function setorPreparado(string $nome, string $chave, string $uf = 'AL'): Cidade
+{
+    $setor = Cidade::factory()->create(['nome' => $nome, 'uf' => $uf]);
+
+    $setor->responsaveis()->sync([
+        Responsavel::factory()->semConta()->create(['chave_pix' => $chave])->getKey(),
+    ]);
+
+    return $setor;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +225,9 @@ it('continua idempotente no modo setor: nao emite duas cobrancas para a mesma in
 it('recusa emitir cobranca quando o setor perdeu a chave pix', function (): void {
     app()->instance(PaymentGateway::class, new ProvedorQueNaoPodeSerChamado);
 
-    $cenario = cenarioDoSetor(atributosDoSetor: ['chave_pix' => null]);
+    // O unico responsavel do setor perdeu a chave: ele sai do sorteio na hora
+    // (RN-R9), e o setor fica sem ninguem apto.
+    $cenario = cenarioDoSetor(atributosDoResponsavel: ['chave_pix' => '']);
 
     // A cobranca e emitida dentro da propria criacao da inscricao: a recusa
     // acontece ali, e nao depois. Falhar alto e melhor do que emitir um Pix
@@ -396,20 +426,15 @@ it('recusa salvar o evento no modo setor nomeando os setores despreparados', fun
     $administrador = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_ADMINISTRADOR);
     $evento = Evento::factory()->create();
 
+    // Sem responsavel nenhum.
     Cidade::factory()->create(['nome' => 'Setor Norte', 'uf' => 'AL']);
-    Cidade::factory()->create([
-        'nome' => 'Setor Sul',
-        'uf' => 'AL',
-        'responsavel_id' => $administrador->getKey(),
-        'chave_pix' => null,
-    ]);
+
+    // Com responsavel vinculado, mas sem chave: nao esta pronto (RN-R3).
+    Cidade::factory()->create(['nome' => 'Setor Sul', 'uf' => 'AL'])
+        ->responsaveis()->sync([Responsavel::factory()->semChave()->create()->getKey()]);
+
     // Este esta pronto e NAO pode aparecer na mensagem.
-    Cidade::factory()->create([
-        'nome' => 'Setor Leste',
-        'uf' => 'AL',
-        'responsavel_id' => $administrador->getKey(),
-        'chave_pix' => 'leste@example.com',
-    ]);
+    setorPreparado('Setor Leste', 'leste@example.com');
 
     $resposta = $this->actingAs($administrador)->put("/admin/eventos/{$evento->getKey()}", dadosDoEventoParaFormulario($evento, [
         'forma_recebimento' => FormaRecebimento::Setor->value,
@@ -436,12 +461,7 @@ it('aceita salvar no modo setor quando todo setor ativo esta pronto', function (
     // Setor despreparado, porem INATIVO: ele nao aparece no formulario publico,
     // entao ninguem se inscreve por ele — e por isso ele nao trava nada.
     Cidade::factory()->inativa()->create(['nome' => 'Setor Antigo', 'uf' => 'AL']);
-    Cidade::factory()->create([
-        'nome' => 'Setor Central',
-        'uf' => 'AL',
-        'responsavel_id' => $administrador->getKey(),
-        'chave_pix' => 'central@example.com',
-    ]);
+    setorPreparado('Setor Central', 'central@example.com');
 
     $this->actingAs($administrador)
         ->put("/admin/eventos/{$evento->getKey()}", dadosDoEventoParaFormulario($evento, [
@@ -463,12 +483,7 @@ it('recusa prazo curto demais no modo setor e aceita o mesmo prazo no modo gatew
     $administrador = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_ADMINISTRADOR);
     $evento = Evento::factory()->create();
 
-    Cidade::factory()->create([
-        'nome' => 'Setor Central',
-        'uf' => 'AL',
-        'responsavel_id' => $administrador->getKey(),
-        'chave_pix' => 'central@example.com',
-    ]);
+    setorPreparado('Setor Central', 'central@example.com');
 
     $this->actingAs($administrador)
         ->put("/admin/eventos/{$evento->getKey()}", dadosDoEventoParaFormulario($evento, [

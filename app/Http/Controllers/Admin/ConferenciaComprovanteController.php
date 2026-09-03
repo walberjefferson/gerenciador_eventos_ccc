@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Comprovantes\ConferirComprovante;
+use App\Enums\SituacaoPagamento;
 use App\Exceptions\Pagamentos\ComprovanteRecusadoException;
 use App\Exceptions\Pagamentos\ConfirmacaoManualRecusadaException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ConferirComprovanteRequest;
 use App\Models\Cidade;
 use App\Models\ComprovantePagamento;
+use App\Models\Inscricao;
+use App\Models\Pagamento;
+use App\Models\Responsavel;
 use App\Policies\ComprovantePagamentoPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -37,6 +41,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * conta do responsavel. Por isso a fila vem ordenada pelo prazo MAIS PROXIMO, e
  * nao pela chegada, e destaca o que vence em menos de 24 horas. Isso reduz a
  * chance; nao a elimina.
+ *
+ * **Cada linha diz para QUEM aquele Pix foi (RN-R7).** No modo setor o
+ * responsavel e sorteado a cada cobranca emitida (RN-R5), entao duas pessoas do
+ * mesmo setor podem ter recebido de participantes diferentes — e uma delas pode
+ * aceitar, sem perceber, o comprovante de um Pix que caiu na conta da outra.
+ * Mostrar o nome e a chave do responsavel DAQUELA cobranca e o que transforma
+ * essa divergencia em algo que se enxerga em vez de algo em que se tropeca.
  */
 class ConferenciaComprovanteController extends Controller
 {
@@ -56,6 +67,11 @@ class ConferenciaComprovanteController extends Controller
                 'inscricao.evento:id,nome',
                 'inscricao.grupoParticipante:id,nome,cidade_id',
                 'inscricao.grupoParticipante.cidade:id,nome',
+                // A cobranca e quem recebeu por ela (RN-R7). Vem junto, e nao
+                // linha a linha, porque a fila de um setor movimentado
+                // faria uma consulta por comprovante.
+                'inscricao.pagamentos:id,inscricao_id,responsavel_id,situacao',
+                'inscricao.pagamentos.responsavel:id,nome,chave_pix',
                 'conferidoPor:id,name',
             ])
             ->when(
@@ -190,6 +206,10 @@ class ConferenciaComprovanteController extends Controller
             'enviado_em' => $comprovante->enviado_em?->toIso8601String(),
             'situacao' => $comprovante->situacao->value,
             'situacao_rotulo' => $comprovante->situacao->rotulo(),
+            // Quem recebeu o Pix desta cobranca. Nulo no modo gateway, onde nao
+            // ha sorteio nenhum: nesses a tela simplesmente nao mostra a
+            // coluna, em vez de mostrar um traco que ninguem sabe ler.
+            'recebedor' => $this->recebedorDaCobranca($inscricao),
             'inscricao' => [
                 'id' => (int) ($inscricao?->id ?? 0),
                 'codigo_publico' => $inscricao?->codigo_publico,
@@ -207,6 +227,45 @@ class ConferenciaComprovanteController extends Controller
             // Vence em menos de 24 horas (ou ja venceu): a fila pinta isso de
             // vermelho, porque e o caso em que a demora custa a vaga de alguem.
             'urgente' => $horasRestantes !== null && $horasRestantes < self::HORAS_DE_ALERTA,
+        ];
+    }
+
+    /**
+     * O responsavel da cobranca que este comprovante quita.
+     *
+     * A cobranca que interessa e a mesma que a tela do participante mostra: a
+     * que ainda pode ser paga; na falta dela, a ultima emitida. E ela que
+     * carrega a chave que a pessoa leu quando pagou.
+     *
+     * A leitura sai da relacao ja carregada, e nao de uma consulta nova: a fila
+     * inteira ja veio com as cobrancas junto.
+     *
+     * @return array<string, string>|null
+     */
+    private function recebedorDaCobranca(?Inscricao $inscricao): ?array
+    {
+        if (! $inscricao instanceof Inscricao) {
+            return null;
+        }
+
+        $cobranca = $inscricao->pagamentos
+            ->sortByDesc('id')
+            ->first(fn (Pagamento $pagamento): bool => $pagamento->situacao === SituacaoPagamento::Pendente)
+            ?? $inscricao->pagamentos->sortByDesc('id')->first();
+
+        $responsavel = $cobranca?->responsavel;
+
+        if (! $responsavel instanceof Responsavel) {
+            return null;
+        }
+
+        return [
+            'nome' => (string) $responsavel->nome,
+            // A chave aparece aqui pelo mesmo motivo que aparece na tela do
+            // participante (RN-S3): e por ela que quem confere reconhece a
+            // conta que consta no comprovante. Quem le esta pagina ja passou
+            // pelo escopo do setor.
+            'chave_pix' => (string) $responsavel->chave_pix,
         ];
     }
 }

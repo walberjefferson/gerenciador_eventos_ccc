@@ -8,9 +8,11 @@ use App\Enums\MetodoPagamento;
 use App\Enums\SituacaoComprovante;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
+use App\Models\Cidade;
 use App\Models\ComprovantePagamento;
 use App\Models\Inscricao;
 use App\Models\LogAuditoria;
+use App\Models\Responsavel;
 use App\Models\User;
 use Database\Seeders\PapeisSeeder;
 use Illuminate\Http\UploadedFile;
@@ -32,7 +34,14 @@ use Tests\Feature\Inscricoes\Cenario;
  *   vaga presa vira vaga paga, o metodo gravado e Transferencia e a auditoria
  *   fica com quem declarou e o que escreveu. Recusar exige motivo e NAO mexe na
  *   inscricao;
- * - RN-S11 — o arquivo so sai por rota autenticada, e com o mesmo escopo.
+ * - RN-S11 — o arquivo so sai por rota autenticada, e com o mesmo escopo;
+ * - RN-R6 — o escopo agora segue a cadeia
+ *   `users -> responsaveis -> responsaveis_setores -> cidades`: QUALQUER
+ *   responsavel do setor confere, um responsavel de dois setores alcanca os
+ *   dois, e conta sem ficha (ou ficha sem conta) nao alcanca nada;
+ * - RN-R7 — cada linha da fila diz para QUEM aquele Pix foi. Sem isso, com o
+ *   sorteio se repetindo a cada cobranca (RN-R5), alguem aceitaria o
+ *   comprovante de um Pix que caiu na conta de outra pessoa sem perceber.
  */
 
 beforeEach(function (): void {
@@ -41,27 +50,33 @@ beforeEach(function (): void {
 });
 
 /**
- * Um setor com dono, um evento recebendo por ele, e uma inscricao com
+ * Um setor com UM responsavel, um evento recebendo por ele, e uma inscricao com
  * comprovante ja enviado.
  *
- * @return array{responsavel: User, inscricao: Inscricao, comprovante: ComprovantePagamento}
+ * Um responsavel so: assim o sorteio da RN-R4 tem resposta unica e os testes de
+ * escopo continuam falando de uma pessoa por setor. Quem prova o alcance de
+ * varios responsaveis (RN-R6) monta o segundo por conta propria.
+ *
+ * @return array{responsavel: User, ficha: Responsavel, setor: Cidade, inscricao: Inscricao, comprovante: ComprovantePagamento}
  */
 function setorComComprovante(string $nomeDoSetor, string $uf = 'AL'): array
 {
-    $responsavel = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_RESPONSAVEL_SETOR);
+    $conta = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_RESPONSAVEL_SETOR);
 
     $cenario = Cenario::montar([
         'forma_recebimento' => FormaRecebimento::Setor,
         'prazo_pagamento_minutos' => 10080,
     ]);
 
-    $cenario->cidade->update([
-        'nome' => $nomeDoSetor,
-        'uf' => $uf,
-        'responsavel_id' => $responsavel->getKey(),
+    $cenario->cidade->update(['nome' => $nomeDoSetor, 'uf' => $uf]);
+
+    $ficha = Responsavel::factory()->create([
+        'nome' => 'Titular do '.$nomeDoSetor,
         'chave_pix' => Str::slug($nomeDoSetor).'@example.com',
-        'titular_chave_pix' => 'Titular do '.$nomeDoSetor,
+        'user_id' => $conta->getKey(),
     ]);
+
+    $cenario->cidade->responsaveis()->sync([$ficha->getKey()]);
 
     $inscricao = $cenario->inscrever();
 
@@ -74,7 +89,9 @@ function setorComComprovante(string $nomeDoSetor, string $uf = 'AL'): array
     test()->post($url, ['comprovante' => UploadedFile::fake()->image('recibo.jpg')])->assertRedirect();
 
     return [
-        'responsavel' => $responsavel->fresh(),
+        'responsavel' => $conta->fresh(),
+        'ficha' => $ficha,
+        'setor' => $cenario->cidade,
         'inscricao' => $inscricao->fresh(),
         'comprovante' => ComprovantePagamento::query()
             ->where('inscricao_id', $inscricao->getKey())
@@ -400,4 +417,159 @@ it('ordena a fila pelo prazo mais proximo e marca o que vence em menos de 24 hor
         ->and($props['comprovantes'][0]['urgente'])->toBeTrue()
         ->and($props['comprovantes'][1]['urgente'])->toBeFalse()
         ->and($props['horas_de_alerta'])->toBe(24);
+});
+
+// ---------------------------------------------------------------------------
+// RN-R6 — o escopo pela cadeia nova
+// ---------------------------------------------------------------------------
+
+it('deixa qualquer responsavel do setor conferir, e nao so o sorteado', function (): void {
+    $a = setorComComprovante('Setor A');
+
+    // O segundo responsavel do MESMO setor. Ele nunca foi sorteado para esta
+    // cobranca — e mesmo assim confere, porque senao a fila do setor pararia
+    // toda vez que o sorteado viajasse.
+    $outraConta = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_RESPONSAVEL_SETOR);
+    $outro = Responsavel::factory()->create([
+        'nome' => 'Segundo do Setor A',
+        'user_id' => $outraConta->getKey(),
+    ]);
+    $a['setor']->responsaveis()->attach($outro->getKey());
+
+    $props = $this->actingAs($outraConta)
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect(collect($props['comprovantes'])->pluck('inscricao.codigo_publico')->all())
+        ->toBe([$a['inscricao']->codigo_publico]);
+
+    $this->actingAs($outraConta)
+        ->post("/admin/comprovantes/{$a['comprovante']->getKey()}/aceitar", ['observacao' => 'Caiu na minha conta.'])
+        ->assertSessionHasNoErrors();
+
+    expect($a['inscricao']->fresh()->situacao)->toBe(SituacaoInscricao::Confirmada);
+});
+
+it('alcanca os dois setores quando a mesma pessoa atende os dois', function (): void {
+    $a = setorComComprovante('Setor A');
+    $b = setorComComprovante('Setor B');
+
+    // A ficha de A passa a atender B tambem.
+    $a['ficha']->setores()->attach($b['setor']->getKey());
+
+    $props = $this->actingAs($a['responsavel'])
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect(collect($props['comprovantes'])->pluck('inscricao.codigo_publico')->all())
+        ->toEqualCanonicalizing([$a['inscricao']->codigo_publico, $b['inscricao']->codigo_publico])
+        ->and($props['escopo']['setores'])->toEqualCanonicalizing(['Setor A', 'Setor B']);
+});
+
+it('nao alcanca nada quem tem o papel mas nao tem ficha de responsavel', function (): void {
+    $a = setorComComprovante('Setor A');
+
+    // Ter login e ter papel nao e atender setor: a fila abre, e abre VAZIA.
+    $solto = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_RESPONSAVEL_SETOR);
+
+    $props = $this->actingAs($solto)
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['comprovantes'])->toBe([])
+        ->and($props['escopo']['setores'])->toBe([]);
+
+    // E a URL direta continua sendo porta fechada, e nao lista filtrada.
+    $this->actingAs($solto)
+        ->get("/admin/comprovantes/{$a['comprovante']->getKey()}/arquivo")
+        ->assertForbidden();
+});
+
+it('nao da alcance a responsavel sem conta no painel', function (): void {
+    $a = setorComComprovante('Setor A');
+
+    // "Recebe, mas nao confere" (RN-R1): ele entra no sorteio e nao entra no
+    // painel, porque nao ha por onde entrar.
+    $semConta = Responsavel::factory()->semConta()->create();
+    $a['setor']->responsaveis()->attach($semConta->getKey());
+
+    expect($semConta->user)->toBeNull();
+
+    // O escopo do outro nao muda por causa dele.
+    $props = $this->actingAs($a['responsavel'])
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['escopo']['setores'])->toBe(['Setor A']);
+});
+
+// ---------------------------------------------------------------------------
+// RN-R7 — a fila mostra quem recebeu
+// ---------------------------------------------------------------------------
+
+it('mostra na linha o nome e a chave do responsavel daquela cobranca', function (): void {
+    $a = setorComComprovante('Setor A');
+
+    $props = $this->actingAs($a['responsavel'])
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['comprovantes'][0]['recebedor'])->toBe([
+        'nome' => 'Titular do Setor A',
+        'chave_pix' => 'setor-a@example.com',
+    ]);
+});
+
+it('continua mostrando quem recebeu depois de a chave da pessoa mudar de dono na tela', function (): void {
+    $a = setorComComprovante('Setor A');
+
+    // Um segundo responsavel entra no setor DEPOIS da cobranca emitida. A linha
+    // continua dizendo quem recebeu aquele Pix — nao quem esta no setor hoje.
+    $a['setor']->responsaveis()->attach(
+        Responsavel::factory()->semConta()->create(['nome' => 'Chegou Depois'])->getKey()
+    );
+
+    $props = $this->actingAs($a['responsavel'])
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['comprovantes'][0]['recebedor']['nome'])->toBe('Titular do Setor A');
+});
+
+it('nao mostra recebedor em cobranca do modo gateway, onde ninguem foi sorteado', function (): void {
+    $administrador = CenarioAdmin::usuarioCom(PapeisSeeder::PAPEL_ADMINISTRADOR);
+
+    // Evento pelo provedor: nao ha sorteio nenhum, e a fila nao inventa um nome.
+    $cenario = Cenario::montar();
+    $inscricao = $cenario->inscrever();
+
+    $url = URL::temporarySignedRoute(
+        'inscricoes.comprovante',
+        Carbon::now()->addDays(8),
+        ['codigo_publico' => $inscricao->codigo_publico],
+    );
+
+    ComprovantePagamento::create([
+        'inscricao_id' => $inscricao->getKey(),
+        'caminho' => 'comprovantes/gateway.jpg',
+        'nome_original' => 'gateway.jpg',
+        'mime' => 'image/jpeg',
+        'tamanho_bytes' => 1024,
+        'situacao' => SituacaoComprovante::Enviado,
+        'enviado_em' => Carbon::now(),
+    ]);
+
+    $props = $this->actingAs($administrador)
+        ->get('/admin/comprovantes')
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['comprovantes'][0]['recebedor'])->toBeNull()
+        ->and($url)->toBeString();
 });

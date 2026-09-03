@@ -402,13 +402,17 @@ Nenhum arquivo de domínio deve ser alterado em nenhuma dessas etapas. Se for ne
 
 ---
 
-## 11. Receber pela chave Pix do responsável do setor
+## 11. Receber pela chave Pix de um responsável do setor
 
 Nem todo evento passa pelo provedor. Um evento pode ser cadastrado para receber
-**pela chave Pix do responsável do setor** de cada participante: o dinheiro cai
-na conta de uma pessoa, ela confere e confirma. É a coluna
+**pela chave Pix de um responsável do setor** de cada participante: o dinheiro
+cai na conta de uma pessoa, ela confere e confirma. É a coluna
 `eventos.forma_recebimento`, que vale `gateway` (o padrão, o caminho descrito em
 todas as seções anteriores) ou `setor`.
+
+O setor pode ter **vários** responsáveis (RN-R2), e é por isso que a frase acima
+diz "um": quem recebe cada cobrança é sorteado na hora de emiti-la (RN-R4). O
+sorteio está descrito em 11.5.
 
 A escolha é lida **num lugar só** — `CriarPagamentoDaInscricao`, na hora de
 emitir a cobrança (RN-S1). Todo o resto do sistema não sabe qual delas
@@ -425,6 +429,7 @@ materializado, nenhum pacote sai pela rede (RN-S2). A cobrança nasce assim:
 |-------|-------|---------|
 | `gateway` | `'setor'` | não foi a Efí nem o simulado: foi a conta de uma pessoa |
 | `id_externo` | `null` | **inventar um identificador de provedor seria falsificar histórico de dinheiro** |
+| `responsavel_id` | quem foi sorteado | a cobrança guarda para sempre para quem ela apontou (RN-R5) |
 | `metodo` | `pix` | é um Pix; o que muda é para onde ele vai |
 | `expira_em` | o prazo da inscrição | a mesma regra de sempre (RN-P01) |
 | `pix_copia_e_cola` | BR Code **estático**, montado localmente | ver 11.2 |
@@ -475,15 +480,15 @@ leva os últimos 25 caracteres, que é tudo o que cabe nele. Escrever só no
    digita a chave paga o que quiser. Quem confere precisa olhar o valor no
    comprovante — e é por isso que a observação do aceite é obrigatória.
 
-### 11.3 A chave do setor não é cifrada, e a da credencial é
+### 11.3 A chave do responsável não é cifrada, e a da credencial é
 
 `credenciais_pagamento.chave_pix` é cifrada porque é segredo de instituição
 financeira: ela diz para qual conta o dinheiro do evento vai, mora ao lado do
 `client_secret` e do certificado, e nunca precisa voltar para tela nenhuma — nem
 mascarada.
 
-`cidades.chave_pix` é o oposto, e a diferença não é de grau: ela **existe para
-ser mostrada**. Todo participante de um setor, num evento que recebe pelo setor,
+`responsaveis.chave_pix` é o oposto, e a diferença não é de grau: ela **existe
+para ser mostrada**. Todo participante de um setor, num evento que recebe pelo setor,
 precisa enxergá-la na tela para conseguir pagar. Cifrar em repouso o valor que a
 própria aplicação publica na página seguinte protegeria contra um invasor com
 acesso ao banco e contra nenhum outro, enquanto tornaria impossível procurar,
@@ -501,10 +506,16 @@ PDF, até 5 MB, validado pelo **conteúdo** e não pela extensão (RN-S5). O arq
 vai para o disco privado `comprovantes`, com nome gerado pelo servidor.
 
 Enviar **não confirma nada** (RN-S7): a inscrição segue aguardando pagamento até
-alguém conferir. Quem confere é o responsável daquele setor — papel
+alguém conferir. Quem confere é **qualquer** responsável daquele setor — papel
 `responsavel-setor`, permissão `pagamentos.conferir-comprovante` — e ele enxerga
-**apenas o setor dele**, por escopo aplicado no servidor (RN-S9). Administrador
-vê tudo e também confere.
+**apenas os setores que atende**, por escopo aplicado no servidor (RN-S9 com a
+cadeia da RN-R6). Administrador vê tudo e também confere.
+
+A fila mostra, em cada linha, **o nome e a chave de quem recebeu aquela
+cobrança** (RN-R7). Não é enfeite: com o sorteio se repetindo a cada cobrança,
+duas pessoas do mesmo setor podem ter recebido de participantes diferentes, e
+sem essa coluna aceitar um Pix que caiu na conta do colega seria indistinguível
+de aceitar um que caiu na própria.
 
 Aceitar delega a `ConfirmarPagamentoManual` com `metodo = Transferencia` e a
 observação escrita: a vaga presa vira vaga paga, o anúncio é
@@ -518,3 +529,53 @@ inscrição.
 > 24 horas, e a tela do participante diz até quando a conferência precisa
 > acontecer — mitigações que reduzem a chance, não a eliminam. Eliminá-la
 > exigiria a situação "em conferência", e isso é outra entrega.
+
+### 11.5 O sorteio de quem recebe
+
+Quando o setor tem mais de um responsável, alguém precisa decidir para qual
+deles esta cobrança vai. A decisão é do `App\Actions\Pagamentos\SortearResponsavel`,
+e ela tem dois passos (RN-R4):
+
+1. **Quem pode.** Responsáveis **ativos**, **com chave**, vinculados ao setor da
+   inscrição. Inativo, sem chave ou de outro setor não entra — nunca.
+2. **Entre os menos carregados, ao acaso.** Carga é quantas inscrições ativas
+   daquele **evento** já apontam para cada candidato, por
+   `pagamentos.responsavel_id`. Toma-se o menor valor e sorteia-se entre os
+   empatados nele.
+
+Ordenar por carga e pegar o primeiro devolveria sempre o de menor `id` nos
+empates — o que é ordenação, não sorteio. Sortear sem olhar a carga deixaria
+alguém com o dobro do outro por azar. As duas metades juntas dão equilíbrio
+**e** imprevisibilidade: com dois responsáveis e dez inscrições, cada um fica
+com cinco; com três e nove, três cada.
+
+**Este passo também não conversa com provedor nenhum.** Ele é uma consulta a
+duas tabelas locais e um `array_rand`: nenhuma credencial é lida, nenhuma
+chamada sai pela rede, e o `PaymentGateway` falso que explode ao ser chamado
+continua intocado nos testes do modo setor (RN-S2). O sorteio acontece *depois*
+da bifurcação, dentro do ramo que já havia decidido não falar com ninguém.
+
+**Não há trava, e a ausência é decisão (RN-R8).** Duas inscrições simultâneas
+podem ler a mesma carga e sortear a mesma pessoa. É aceitável porque a carga é
+*balanceamento*, nunca capacidade: nada estoura, nada é vendido duas vezes, e o
+pior desfecho é um responsável com uma inscrição a mais que o outro. Um
+`SELECT ... FOR UPDATE` serializaria a emissão de cobrança do setor inteiro para
+corrigir um desequilíbrio de uma unidade.
+
+**O sorteio só acontece quando uma cobrança nova nasce (RN-R5).** A idempotência
+de `CriarPagamentoDaInscricao` devolve a cobrança pendente como está, sem
+sortear: a chave que o participante viu na tela continua sendo a dele enquanto o
+Pix valer. Reemissão depois do vencimento sorteia de novo — e a cobrança antiga
+continua apontando para quem apontava, porque a coluna mora no **pagamento**, e
+não na inscrição.
+
+> **O risco que este desenho aceita.** Sortear de novo a cada cobrança significa
+> que a chave **pode mudar entre uma visita e outra**. O caso concreto: a pessoa
+> abre a tela, anota a chave de A, não paga, o prazo vence; ela pede segunda
+> via, a cobrança nova sorteia B — e ela paga para A, pela chave anotada. Três
+> coisas contêm isso, e as três estão implementadas: (1) enquanto a cobrança
+> está pendente não há novo sorteio; (2) qualquer responsável do setor confere,
+> então A pode aceitar o comprovante que recebeu; (3) a fila mostra quem era o
+> responsável daquela cobrança, então quem aceita enxerga a divergência em vez
+> de tropeçar nela. O que eliminaria o risco é prender o sorteado à inscrição —
+> a mudança seria a coluna sair de `pagamentos` para `inscricoes`.

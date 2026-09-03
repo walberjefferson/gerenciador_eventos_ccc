@@ -65,7 +65,14 @@ class PapeisSeeder extends Seeder
      */
     public const PERMISSOES = [
         'painel.ver' => 'Abrir o painel com os numeros do evento',
-        'catalogo.gerenciar' => 'Cadastrar setores e grupos de participantes',
+        // "catalogo.gerenciar" passou a cobrir TAMBEM o cadastro de
+        // responsaveis — quem recebe o Pix dos setores. Nao nasceu permissao
+        // nova porque responsavel e catalogo, como setor e grupo: e a mesma
+        // lista global, na mesma tela lateral, feita pela mesma pessoa.
+        // Permissao separada so faria sentido para apartar quem cadastra chave
+        // Pix de quem cadastra setor — e isso e uma decisao de seguranca que a
+        // organizacao ainda nao pediu, nao uma decisao de organizacao de menu.
+        'catalogo.gerenciar' => 'Cadastrar setores, grupos de participantes e responsaveis',
         'eventos.gerenciar' => 'Cadastrar evento, dias, grupos, atividades e conflitos',
         'inscricoes.ver' => 'Consultar a lista de inscricoes',
         'inscricoes.exportar' => 'Baixar a lista de inscricoes',

@@ -43,18 +43,26 @@ export interface ComprovanteEnviado {
 }
 
 /**
- * O setor de quem se inscreveu, quando o evento recebe pela chave Pix dele.
+ * O setor de quem se inscreveu e QUEM RECEBE esta cobranca, quando o evento
+ * recebe pela chave Pix do setor.
  *
  * A chave aparece aqui porque ela existe para ser mostrada (RN-S3). O que a
  * protege e esta tela ser assinada e pertencer a UMA inscricao — e nao a
  * criptografia.
+ *
+ * **A chave e o titular vem da COBRANCA, e nao do setor.** O setor pode ter
+ * varios responsaveis, e um deles foi sorteado quando esta cobranca nasceu
+ * (RN-R4). Enquanto ela estiver pendente ninguem e sorteado de novo (RN-R5):
+ * o que aparece aqui hoje e o mesmo de amanha.
  */
 export interface SetorDaCobranca {
+    /** O nome do setor — o lugar. */
     nome: string;
+    /** A chave de quem foi sorteado para receber esta cobranca. */
     chave_pix: string;
-    titular: string | null;
-    responsavel: string | null;
-    /** Telefone de quem responde pelo setor. Nulo quando ninguem cadastrou. */
+    /** O nome de quem recebe: e ele que aparece no aplicativo de quem paga. */
+    titular: string;
+    /** Telefone de quem recebe, para duvidas. Nulo quando ninguem cadastrou. */
     telefone: string | null;
 }
 

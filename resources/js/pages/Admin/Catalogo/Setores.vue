@@ -2,10 +2,8 @@
 import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
 import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
-import CampoMascarado from '@/components/inscricao/CampoMascarado.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { mascararTelefone } from '@/lib/formato';
 import type { CidadeDoCatalogo, ResponsavelDisponivel } from '@/types/admin';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { CircleAlert, Pencil, Trash2 } from 'lucide-vue-next';
@@ -55,14 +53,23 @@ const formulario = useForm({
     // porque a coluna é obrigatória e entra na chave única (nome, uf).
     uf: 'AL',
     ativo: true as boolean,
-    // Os três campos do recebimento pelo setor. Ficam vazios por padrão e o
-    // setor continua valendo assim: só o evento que recebe pela chave Pix do
-    // setor precisa deles preenchidos (RN-S4).
-    responsavel_id: null as number | null,
-    chave_pix: '',
-    titular_chave_pix: '',
-    telefone_responsavel: '',
+    // Quem atende o setor (RN-R2). Vazio por padrão, e o setor continua valendo
+    // assim: só o evento que recebe pela chave Pix do setor exige ao menos um
+    // responsável apto aqui (RN-S4 com a redação da RN-R3).
+    responsaveis: [] as number[],
 });
+
+/**
+ * Existe alguém apto no cadastro para ser vinculado?
+ *
+ * Quando não existe, o modal avisa e aponta o caminho em vez de oferecer uma
+ * lista vazia sem explicação: sem responsável apto o setor nunca vai receber, e
+ * a pessoa precisa saber que o cadastro que falta é o de outra tela.
+ */
+const existeResponsavelApto = computed<boolean>(() => props.responsaveis.some((pessoa) => pessoa.apto));
+
+/** Este setor ficaria pronto para receber com o que está marcado agora? */
+const selecaoTemAlguemApto = computed<boolean>(() => props.responsaveis.some((pessoa) => pessoa.apto && formulario.responsaveis.includes(pessoa.id)));
 
 /**
  * O erro de exclusão não vem de um formulário: ele volta do servidor como erro
@@ -135,10 +142,7 @@ function editar(cidade: CidadeDoCatalogo): void {
     formulario.nome = cidade.nome;
     formulario.uf = cidade.uf;
     formulario.ativo = cidade.ativo;
-    formulario.responsavel_id = cidade.responsavel_id;
-    formulario.chave_pix = cidade.chave_pix ?? '';
-    formulario.titular_chave_pix = cidade.titular_chave_pix ?? '';
-    formulario.telefone_responsavel = cidade.telefone_responsavel ?? '';
+    formulario.responsaveis = cidade.responsaveis.map((pessoa) => pessoa.id);
 
     void nextTick(() => campoNome.value?.focus());
 }
@@ -269,105 +273,61 @@ function excluir(cidade: CidadeDoCatalogo): void {
                     </div>
 
                     <!--
-                        O recebimento pelo setor.
+                        Quem atende o setor.
 
-                        Os três campos ficam juntos e explicados porque só fazem
-                        sentido juntos: a chave diz para onde o dinheiro vai, o
-                        titular é o nome que aparece no aplicativo de quem paga,
-                        e o responsável é quem confere que ele chegou. Faltando
-                        qualquer um deles, o setor não recebe (RN-S4).
+                        A chave Pix, o titular e o telefone saíram daqui: eles
+                        descrevem uma pessoa, e a pessoa tem cadastro próprio.
+                        O que este bloco decide é o vínculo — e é ele que
+                        responde se o setor consegue receber (RN-R3).
                     -->
                     <fieldset class="border-border grid gap-3 rounded-md border p-3" data-testid="recebimento-do-setor">
-                        <legend class="px-1 text-sm font-medium">Recebimento pelo setor</legend>
+                        <legend class="px-1 text-sm font-medium">Quem recebe por este setor</legend>
 
                         <p class="text-muted-foreground text-sm">
-                            Preencha se algum evento for cobrar pela chave Pix deste setor. A chave aparece na tela de pagamento de quem se inscreve
-                            por aqui — e só para essas pessoas.
+                            Marque quem pode receber o Pix de quem se inscreve por aqui. A cada cobrança emitida o sistema sorteia um deles, entre os
+                            que estiverem com menos inscrições no evento — e qualquer um dos marcados confere os comprovantes do setor.
                         </p>
 
-                        <div class="flex flex-col gap-1">
-                            <label for="setor-responsavel" class="text-sm font-medium">Responsável pelo setor</label>
-                            <select
-                                id="setor-responsavel"
-                                v-model="formulario.responsavel_id"
-                                aria-describedby="ajuda-setor-responsavel"
-                                data-testid="campo-responsavel"
-                                class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                        <!-- Nenhum responsável apto no cadastro inteiro: o aviso
+                             aponta a tela onde o cadastro é feito, em vez de
+                             mostrar uma lista vazia que ninguém sabe por quê. -->
+                        <p
+                            v-if="!existeResponsavelApto"
+                            role="status"
+                            class="border-atencao/40 bg-atencao/10 rounded-md border px-3 py-2 text-sm"
+                            data-testid="sem-responsavel-apto"
+                        >
+                            Nenhum responsável ativo e com chave Pix está cadastrado ainda. Cadastre em
+                            <a :href="route('admin.catalogo.responsaveis')" class="text-acao-texto font-medium">Catálogo → Responsáveis</a>
+                            e volte aqui para vincular.
+                        </p>
+
+                        <div v-else class="grid gap-2" data-testid="campo-responsaveis">
+                            <label
+                                v-for="pessoa in props.responsaveis"
+                                :key="pessoa.id"
+                                class="flex items-center gap-2 text-sm"
+                                :data-testid="`responsavel-opcao-${pessoa.id}`"
                             >
-                                <option :value="null">Sem responsável</option>
-                                <option v-for="pessoa in props.responsaveis" :key="pessoa.id" :value="pessoa.id">
-                                    {{ pessoa.nome }} ({{ pessoa.email }})
-                                </option>
-                            </select>
-                            <p id="ajuda-setor-responsavel" class="text-muted-foreground text-sm">
-                                É quem confere os comprovantes deste setor — e só deste setor.
-                            </p>
-                            <p v-if="formulario.errors.responsavel_id" role="alert" class="text-destructive text-sm">
-                                {{ formulario.errors.responsavel_id }}
-                            </p>
+                                <input v-model="formulario.responsaveis" type="checkbox" :value="pessoa.id" class="border-input size-4 rounded" />
+                                <span>{{ pessoa.nome }}</span>
+                                <!-- Quem não está apto continua aparecendo: ele
+                                     pode já estar vinculado, e sumir da lista
+                                     faria o vínculo desaparecer sem aviso. -->
+                                <span v-if="!pessoa.apto" class="text-muted-foreground text-xs">
+                                    {{ pessoa.ativo ? 'sem chave Pix' : 'desativado' }} — não entra no sorteio
+                                </span>
+                            </label>
                         </div>
 
-                        <div class="flex flex-col gap-1">
-                            <label for="setor-chave-pix" class="text-sm font-medium">Chave Pix</label>
-                            <input
-                                id="setor-chave-pix"
-                                v-model="formulario.chave_pix"
-                                type="text"
-                                maxlength="140"
-                                aria-describedby="ajuda-setor-chave-pix"
-                                :aria-invalid="formulario.errors.chave_pix ? true : undefined"
-                                data-testid="campo-chave-pix"
-                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                            />
-                            <p id="ajuda-setor-chave-pix" class="text-muted-foreground text-sm">
-                                CPF, CNPJ, e-mail, telefone ou chave aleatória — do jeito que está no aplicativo do banco.
-                            </p>
-                            <p v-if="formulario.errors.chave_pix" role="alert" class="text-destructive text-sm">
-                                {{ formulario.errors.chave_pix }}
-                            </p>
-                        </div>
+                        <p v-if="existeResponsavelApto && !selecaoTemAlguemApto" class="text-muted-foreground text-sm">
+                            Sem ninguém apto marcado, este setor não consegue receber — e nenhum evento pode ser salvo no modo setor enquanto ele
+                            estiver ativo assim.
+                        </p>
 
-                        <div class="flex flex-col gap-1">
-                            <label for="setor-titular" class="text-sm font-medium">Titular da chave</label>
-                            <input
-                                id="setor-titular"
-                                v-model="formulario.titular_chave_pix"
-                                type="text"
-                                maxlength="120"
-                                aria-describedby="ajuda-setor-titular"
-                                data-testid="campo-titular"
-                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                            />
-                            <p id="ajuda-setor-titular" class="text-muted-foreground text-sm">
-                                O nome que aparece no aplicativo de quem paga. Sem ele, a pessoa transfere para um nome que não reconhece.
-                            </p>
-                            <p v-if="formulario.errors.titular_chave_pix" role="alert" class="text-destructive text-sm">
-                                {{ formulario.errors.titular_chave_pix }}
-                            </p>
-                        </div>
-
-                        <div class="flex flex-col gap-1">
-                            <label for="setor-telefone" class="text-sm font-medium">Telefone do responsável</label>
-                            <CampoMascarado
-                                id="setor-telefone"
-                                v-model="formulario.telefone_responsavel"
-                                :mascara="mascararTelefone"
-                                type="tel"
-                                inputmode="tel"
-                                maxlength="40"
-                                autocomplete="tel"
-                                aria-describedby="ajuda-setor-telefone"
-                                data-testid="campo-telefone-responsavel"
-                                :aria-invalid="formulario.errors.telefone_responsavel ? true : undefined"
-                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                            />
-                            <p id="ajuda-setor-telefone" class="text-muted-foreground text-sm">
-                                Aparece na tela de pagamento para quem se inscreve por este setor tirar dúvidas. Opcional.
-                            </p>
-                            <p v-if="formulario.errors.telefone_responsavel" role="alert" class="text-destructive text-sm">
-                                {{ formulario.errors.telefone_responsavel }}
-                            </p>
-                        </div>
+                        <p v-if="formulario.errors.responsaveis" role="alert" class="text-destructive text-sm">
+                            {{ formulario.errors.responsaveis }}
+                        </p>
                     </fieldset>
 
                     <DialogFooter>
@@ -442,7 +402,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
 
             <table v-else class="w-full text-sm">
                 <caption class="sr-only">
-                    Setores do catálogo, com o estado, a situação, quem responde pelo setor, se ele consegue receber pagamento e quantos grupos de
+                    Setores do catálogo, com o estado, a situação, quem atende o setor, se ele consegue receber pagamento e quantos grupos de
                     participantes dependem de cada um.
                 </caption>
                 <thead>
@@ -450,7 +410,7 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Estado</th>
                         <th scope="col" class="px-4 py-2 font-medium">Situação</th>
-                        <th scope="col" class="px-4 py-2 font-medium">Responsável</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Responsáveis</th>
                         <th scope="col" class="px-4 py-2 font-medium">Recebe Pix</th>
                         <th scope="col" class="px-4 py-2 font-medium">Grupos</th>
                         <th scope="col" class="px-4 py-2 font-medium">Ações</th>
@@ -464,13 +424,16 @@ function excluir(cidade: CidadeDoCatalogo): void {
                             <EtiquetaDeSituacao dominio="ativo" :situacao="cidade.ativo" :rotulo="cidade.ativo ? 'Ativo' : 'Desativado'" />
                         </td>
                         <td class="px-4 py-2">
-                            <span v-if="cidade.responsavel_nome">{{ cidade.responsavel_nome }}</span>
-                            <span v-else class="text-muted-foreground">—</span>
+                            <span v-if="cidade.responsaveis.length > 0" :data-testid="`responsaveis-${cidade.id}`">
+                                {{ cidade.responsaveis.map((pessoa) => pessoa.nome).join(', ') }}
+                            </span>
+                            <span v-else class="text-muted-foreground" :data-testid="`responsaveis-${cidade.id}`">—</span>
                         </td>
                         <td class="px-4 py-2">
                             <!-- O que a coluna responde é "este setor consegue
-                                 receber?", e não "ele tem chave?": faltar o
-                                 responsável impede tanto quanto faltar a chave. -->
+                                 receber?", e não "ele tem responsável": um
+                                 vínculo com quem está sem chave ou desativado
+                                 não faz o setor receber nada (RN-R3). -->
                             <span v-if="cidade.preparado_para_receber" class="text-sucesso-texto font-medium" :data-testid="`recebe-${cidade.id}`">
                                 Sim
                             </span>

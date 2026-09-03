@@ -367,21 +367,25 @@ certificado é materializado, nenhum pacote sai pela rede.
 O `id_externo` nulo é o que já mantém essa cobrança fora da reconciliação
 (`whereNotNull('id_externo')`) e fora do aviso de cancelamento ao provedor.
 
-### RN-S3 — A chave Pix do setor não é cifrada, e isso é decisão
+### RN-S3 — A chave Pix do responsável não é cifrada, e isso é decisão
 
 `CredencialPagamento.chave_pix` é cifrada porque é segredo de instituição
-financeira e nunca precisa voltar para tela nenhuma. A chave do setor é o
+financeira e nunca precisa voltar para tela nenhuma. A chave do responsável é o
 oposto: ela **existe para ser mostrada** a todo participante daquele setor.
 Cifrar o que a própria tela publica na página seguinte é teatro. O que protege
 esta chave é o escopo de quem a vê — só aparece dentro de uma inscrição daquele
 setor, nunca numa listagem pública.
 
+A chave mora em `responsaveis.chave_pix` desde a RN-R2. Antes ela morava em
+`cidades.chave_pix`, e a decisão de não cifrar é a mesma: mudou o dono da
+coluna, não a razão.
+
 ### RN-S4 — O setor precisa estar pronto antes de o evento ser salvo
 
 Salvar um evento com `forma_recebimento = setor` é recusado enquanto existir
-setor **ativo** sem `chave_pix` **ou** sem `responsavel_id`. A mensagem nomeia
-os setores que faltam. Um evento que cobra por chave que não existe é uma
-inscrição que ninguém consegue pagar.
+setor **ativo** sem **nenhum responsável apto** — ativo e com chave (a redação
+da RN-R3). A mensagem nomeia os setores que faltam. Um evento que cobra por
+chave que não existe é uma inscrição que ninguém consegue pagar.
 
 ### RN-S5 — O comprovante é do participante, pela tela dele
 
@@ -422,7 +426,7 @@ minutos** no modo `gateway` (como sempre) e de **2880** (2 dias) no modo
 `setor`, com **10080** (7 dias) sugerido pelo formulário. Uma transferência
 conferida por uma pessoa não cabe em 24 horas.
 
-### RN-S9 — Quem confere é o responsável daquele setor, e só enxerga o setor dele
+### RN-S9 — Quem confere é responsável daquele setor, e só enxerga os setores dele
 
 Papel `responsavel-setor`, com duas permissões: `inscricoes.ver` (que já
 existia) e `pagamentos.conferir-comprovante` (nova). Em toda consulta que ele
@@ -431,6 +435,10 @@ que ele possa mudar. Trocar `cidade_id` na URL só estreita; nunca amplia. A
 regra mora inteira em `ComprovantePagamentoPolicy`, e `FiltroDeInscricoes`,
 `InscricaoPolicy` e o controller da fila perguntam a ela. Administrador continua
 vendo tudo e também confere.
+
+O caminho do escopo mudou com a RN-R6: era `cidades.responsavel_id`, e hoje é a
+cadeia `users → responsaveis → responsaveis_setores → cidades`. O que não mudou
+é que ele é lido no servidor a cada pedido.
 
 ### RN-S10 — Aceitar o comprovante é confirmar o pagamento pelo caminho que já existe
 
@@ -472,6 +480,113 @@ sugestão e não trava.
 
 ---
 
+## Responsáveis do setor e sorteio de quem recebe (RN-R\*)
+
+Até aqui o setor tinha **um** responsável, e ele morava em quatro colunas de
+`cidades`: `responsavel_id`, `chave_pix`, `titular_chave_pix` e
+`telefone_responsavel`. Esses campos descreviam uma pessoa, não um lugar — e
+com mais de uma pessoa por setor deixaram de caber. As regras abaixo substituem
+esse arranjo; as RN-S\* continuam valendo com a redação ajustada.
+
+### RN-R1 — Responsável é cadastro próprio, e pode existir sem conta no painel
+
+`responsaveis` guarda `nome`, `chave_pix`, `telefone` e um `user_id` **opcional**.
+`user_id` nulo quer dizer "recebe, mas não confere": é o caso real do tesoureiro
+que não usa o sistema. Quem confere continua sendo quem tem conta **e** o papel
+— ou o administrador, que alcança tudo. Um índice único parcial garante que uma
+conta do painel corresponde a **um** cadastro de responsável: duas fichas para o
+mesmo login fariam o escopo de conferência responder duas coisas diferentes para
+a mesma pessoa.
+
+### RN-R2 — Um setor tem N responsáveis; um responsável atende N setores
+
+O vínculo mora em `responsaveis_setores` (chave primária composta, sem `id` e
+sem timestamps). **A chave Pix é da pessoa, não do vínculo**: o mesmo
+responsável usa a mesma chave em todos os setores que atende. Chave por vínculo
+foi considerada e recusada — ela cobriria a tesouraria que separa contas por
+setor ao preço de duplicar cadastro no caso comum. Se um dia for preciso, a
+coluna nasce na tabela de vínculo sem desfazer nada disto.
+
+### RN-R3 — Setor preparado é setor com pelo menos um responsável ativo e com chave
+
+Substitui a regra antiga (`responsavel_id` + `chave_pix` no próprio setor).
+`Cidade::estaPreparadaParaReceber()` responde sim quando existe ao menos um
+responsável **apto** vinculado. Um vínculo sozinho não basta: desativado ou sem
+chave, a pessoa não recebe nada.
+
+### RN-R4 — O sorteio acontece ao emitir a cobrança, e escolhe entre os menos carregados
+
+Candidatos: responsáveis **ativos**, **com chave**, vinculados ao setor da
+inscrição. Carga: quantas inscrições **ativas** (aguardando pagamento ou
+confirmadas) daquele **evento** já apontam para cada candidato, via
+`pagamentos.responsavel_id`. Toma-se o menor valor de carga e sorteia-se **entre
+os empatados** nele — assim ninguém recebe o dobro do outro por azar, e a
+escolha continua imprevisível. A regra inteira mora em
+`App\Actions\Pagamentos\SortearResponsavel`.
+
+A carga conta **o evento**, e não a história inteira: equilibrar entre eventos
+faria um responsável novo herdar a carga de outro e receber tudo do evento
+seguinte.
+
+### RN-R5 — Cada cobrança sorteia de novo
+
+`CriarPagamentoDaInscricao` continua idempotente: havendo cobrança pendente, ela
+é devolvida como está, **sem sortear**. O sorteio só acontece quando uma
+cobrança nova precisa nascer — primeira emissão, ou reemissão depois de a
+anterior vencer. Por isso a coluna do responsável mora em **`pagamentos`**, e
+não em `inscricoes`: o escolhido pertence àquela cobrança, e uma cobrança
+vencida guarda para sempre quem era o responsável dela.
+
+O risco que isso traz está escrito no `PROGRESS.md`, com as três mitigações.
+
+### RN-R6 — Qualquer responsável do setor confere, não só o sorteado
+
+O escopo da RN-S9 passa a ser "os setores que esta conta atende", pela cadeia
+`users → responsaveis → responsaveis_setores → cidades`. Responsável ausente não
+trava a fila do setor, e quem de fato recebeu o Pix consegue aceitar o
+comprovante do próprio dinheiro. Conta sem ficha de responsável não alcança
+nada: ter login não é atender setor.
+
+### RN-R7 — Quem confere precisa ver para quem o dinheiro foi
+
+A fila de conferência mostra, em cada linha, o nome e a chave do responsável
+**daquela cobrança**. Sem isso, com a RN-R5, alguém aceitaria um comprovante de
+um Pix que caiu na conta de outra pessoa sem perceber. É a peça que torna a
+RN-R5 segura.
+
+### RN-R8 — A carga é balanceamento, nunca capacidade
+
+Duas inscrições simultâneas podem sortear o mesmo responsável, e isso é
+aceitável: nada estoura, nada é vendido duas vezes. Por isso o sorteio **não**
+usa trava nem `SELECT ... FOR UPDATE` — serializar a emissão de cobrança do
+setor inteiro para corrigir um desequilíbrio de uma unidade é custo que não se
+paga.
+
+### RN-R9 — Responsável que já recebeu não se apaga, e sem chave não entra no sorteio
+
+`pagamentos.responsavel_id` é `restrictOnDelete`: excluir responsável com
+cobrança é recusado, com a mensagem indicando o caminho — desativar. Desativado
+ou sem chave, ele sai do sorteio na hora, sem tocar em cobrança nenhuma já
+emitida.
+
+### RN-R10 — Setor sem responsável apto recusa a inscrição com a mensagem de sempre
+
+Reaproveita `SetorSemChavePixException`, com o texto no plural: agora são várias
+pessoas que poderiam ter chave, e a mensagem manda cadastrar e vincular em vez
+de apontar um campo que não existe mais no setor.
+
+### A migração dos quatro campos
+
+`2026_09_03_120004_mover_responsavel_do_setor_para_responsaveis` faz **backfill
+antes do drop**: cada setor que tinha chave vira um registro em `responsaveis`
+(com `titular_chave_pix` virando `nome`, ou o nome do setor quando o titular
+estava vazio) e ganha o vínculo correspondente. Dois setores atendidos pela
+mesma pessoa viram uma ficha só; a mesma conta do painel com chaves diferentes
+preserva as duas chaves, e a segunda nasce sem conta — perder chave de
+recebimento no meio de uma migração é o pior desfecho possível.
+
+---
+
 ## Mapeamento com os testes obrigatórios do briefing
 
 O briefing exige oito testes com nomes em inglês. Como o domínio deste projeto é escrito em português, eles receberam nomes equivalentes. A correspondência é esta:
@@ -499,8 +614,11 @@ Testes adicionais criados além dos exigidos:
 | `tests/Feature/Admin/LotesAdminTest.php` | RN-L1, RN-L2 e RN-L12 no cadastro, com auditoria |
 | `tests/Feature/Pagamentos/RecebimentoPeloSetorTest.php` | RN-S1 a RN-S4, RN-S8, RN-S12 e RN-S13, com um provedor que explode se for chamado |
 | `tests/Feature/Comprovantes/EnvioDeComprovanteTest.php` | RN-S5, RN-S6, RN-S7 e RN-S11 |
-| `tests/Feature/Comprovantes/ConferenciaTest.php` | RN-S9 e RN-S10, incluindo o 403 pela URL direta |
-| `tests/e2e/pagamento-pelo-setor.spec.ts` | os quatro caminhos na tela: pagar, conferir, recusar e o isolamento entre setores |
+| `tests/Feature/Comprovantes/ConferenciaTest.php` | RN-S9, RN-S10, RN-R6 e RN-R7, incluindo o 403 pela URL direta |
+| `tests/Feature/Pagamentos/SorteioDeResponsavelTest.php` | RN-R4, RN-R5, RN-R8 e RN-R9: o equilíbrio, a imprevisibilidade no empate, quem nunca é sorteado e o histórico que não se reescreve |
+| `tests/Feature/Pagamentos/MigracaoDoResponsavelDoSetorTest.php` | o backfill dos quatro campos de `cidades`, campo a campo, antes do drop |
+| `tests/Feature/Admin/ResponsaveisTest.php` | o CRUD, o vínculo N:N e a RN-R9 pelos dois lados |
+| `tests/e2e/pagamento-pelo-setor.spec.ts` | os quatro caminhos na tela: pagar com dois responsáveis no setor, conferir pelo outro deles, recusar e o isolamento entre setores |
 
 ---
 
@@ -526,7 +644,9 @@ Testes adicionais criados além dos exigidos:
 | RN-L5 | "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}." / "As vagas do {lote} acabaram neste instante." |
 | RN-L9 | "Os lotes de inscrição se esgotaram." |
 | RN-L12 | "Não é possível excluir este lote: {n} inscrição(ões) vieram dele." / "Este lote já ocupou {n} vaga(s). A quantidade não pode ser menor do que isso." |
-| RN-S4 | "Para receber pela chave Pix do setor, todo setor ativo precisa ter responsável e chave Pix cadastrados. Faltam: {setores}." |
+| RN-S4 | "Para receber pela chave Pix do setor, todo setor ativo precisa ter ao menos um responsável ativo e com chave Pix. Faltam: {setores}." |
 | RN-S5 | "O comprovante precisa ser uma imagem (JPG, PNG ou WebP) ou um PDF. Trocar a extensão do arquivo não funciona: o servidor confere o conteúdo." / "O arquivo passou de 5 MB." |
 | RN-S8 | "Quando o evento recebe pela chave Pix do setor, o prazo precisa ter ao menos 2880 minutos (2 dias)." |
 | RN-S10 | "Descreva o que você conferiu no comprovante." / "Escreva por que o comprovante não foi aceito: é o que o participante vai ler para corrigir." |
+| RN-R9 | "Este responsável não pode ser excluído porque {n} cobrança(s) já apontam para ele. Desative o responsável para que ele saia do sorteio, sem apagar o registro de quem recebeu cada Pix." |
+| RN-R10 | "O setor desta inscrição não tem nenhum responsável com chave Pix cadastrada. Sem chave não há para onde o pagamento ir: cadastre os responsáveis do setor e vincule ao menos um deles, ativo e com chave." |

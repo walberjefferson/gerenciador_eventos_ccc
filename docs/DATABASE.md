@@ -30,6 +30,10 @@ erDiagram
     cidades ||--o{ grupos_participantes : "tem"
     grupos_participantes ||--o{ inscricoes : "agrupa"
 
+    cidades ||--o{ responsaveis_setores : "e atendida por"
+    responsaveis ||--o{ responsaveis_setores : "atende"
+    responsaveis ||--o{ pagamentos : "recebe"
+
     eventos ||--o{ dias_evento : "tem"
     dias_evento ||--o{ grupos_atividades : "tem"
     grupos_atividades ||--o{ atividades : "tem"
@@ -51,6 +55,22 @@ erDiagram
         boolean ativo
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    responsaveis {
+        bigserial id PK
+        varchar nome
+        varchar chave_pix
+        varchar telefone
+        bigint user_id FK
+        boolean ativo
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    responsaveis_setores {
+        bigint cidade_id PK_FK
+        bigint responsavel_id PK_FK
     }
 
     grupos_participantes {
@@ -241,10 +261,6 @@ Catálogo de cidades. Global, não pertence a nenhum evento.
 | `nome` | varchar(120) | não | — | Nome da cidade |
 | `uf` | char(2) | não | — | Sigla do estado |
 | `ativo` | boolean | não | `true` | Se aparece para escolha |
-| `responsavel_id` | bigint FK → `users` (null on delete) | sim | `null` | Quem responde pelo setor e confere os comprovantes dele |
-| `chave_pix` | varchar(140) | sim | `null` | Chave Pix do responsável, **em claro** (RN-S3) |
-| `titular_chave_pix` | varchar(120) | sim | `null` | Nome que aparece no aplicativo de quem paga |
-| `telefone_responsavel` | varchar(40) | sim | `null` | Contato de quem responde pelo setor, mostrado na tela de pagamento. **Opcional**: não entra em `estaPreparadaParaReceber()` nem trava a RN-S4 — telefone ausente não impede ninguém de pagar |
 | `created_at` / `updated_at` | timestamptz | sim | — | Carimbos do framework |
 
 **Índices e restrições:** `unique(nome, uf)`.
@@ -252,8 +268,48 @@ Catálogo de cidades. Global, não pertence a nenhum evento.
 **Por quê:**
 
 - Existe "São José do Rio Preto/SP" e "São José/SC". A dupla nome + estado é o que identifica de fato.
+- **Os quatro campos do responsável saíram daqui (RN-R2).** `responsavel_id`, `chave_pix`, `titular_chave_pix` e `telefone_responsavel` descreviam uma pessoa, não um lugar, e couberam enquanto o responsável era um só. Hoje eles moram em `responsaveis`, e o que liga o setor à pessoa é `responsaveis_setores`. A migração `2026_09_03_120004_mover_responsavel_do_setor_para_responsaveis` fez o backfill antes de dropar as colunas.
+
+### 3.1.1 `responsaveis` → Model `Responsavel`
+
+Quem recebe o Pix de um ou mais setores. Global, não pertence a nenhum evento.
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+|--------|------|------|--------|-----------|
+| `id` | bigserial | não | — | Identificador interno |
+| `nome` | varchar(120) | não | — | Nome do titular — é o que aparece no aplicativo de quem paga |
+| `chave_pix` | varchar(140) | não | — | Chave Pix, **em claro** (RN-S3) |
+| `telefone` | varchar(40) | sim | `null` | Contato para dúvidas, mostrado na tela de pagamento. **Opcional**: não entra em `estaApto()` nem trava a RN-S4 |
+| `user_id` | bigint FK → `users` (null on delete) | sim | `null` | A conta do painel, **quando existe** (RN-R1) |
+| `ativo` | boolean | não | `true` | Se entra no sorteio |
+| `created_at` / `updated_at` | timestamptz | sim | — | Carimbos do framework |
+
+**Índices e restrições:**
+
+- `index(ativo)`
+- **Unicidade parcial** `responsaveis_user_id_unique`: `UNIQUE (user_id) WHERE user_id IS NOT NULL`
+
+**Por quê:**
+
+- **`user_id` é opcional, e o nulo tem significado (RN-R1).** Nulo quer dizer "recebe, mas não confere": é o caso do tesoureiro que não usa o sistema. Exigir conta obrigaria a criar login para quem nunca vai entrar.
+- **O único é parcial** porque responsável sem conta é o caso normal e vários nulos precisam conviver. O que ele proíbe é duas fichas para o mesmo login — que fariam o escopo de conferência (RN-R6) responder duas coisas diferentes para a mesma pessoa.
 - **`chave_pix` NÃO é cifrada, e isso é decisão (RN-S3).** `credenciais_pagamento.chave_pix` é cifrada porque é segredo de instituição financeira e nunca volta para tela nenhuma. Esta é o oposto: ela existe para ser mostrada a todo participante daquele setor, na tela de pagamento. Cifrar o que a própria aplicação publica na página seguinte protegeria contra um invasor com acesso ao banco e contra nenhum outro. O que protege esta coluna é o escopo de quem a lê.
-- **`nullOnDelete` no responsável**, e não `restrict`: apagar a conta administrativa de alguém não pode fazer o setor — com todos os grupos e inscrições pendurados nele — virar refém de um usuário. O setor continua existindo, apenas sem responsável, e a RN-S4 recusa gravar evento no modo `setor` enquanto for assim.
+- **`nullOnDelete` na conta**, e não `restrict`: apagar o login de alguém não pode apagar a pessoa para quem o dinheiro já foi. O cadastro sobrevive sem a conta, exatamente como o de quem nunca teve uma.
+
+### 3.1.2 `responsaveis_setores` (tabela de vínculo, sem Model próprio)
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+|--------|------|------|--------|-----------|
+| `cidade_id` | bigint FK → `cidades` (cascade) | não | — | O setor |
+| `responsavel_id` | bigint FK → `responsaveis` (cascade) | não | — | Quem o atende |
+
+**Índices e restrições:** `primary key (cidade_id, responsavel_id)`, `index(responsavel_id)`.
+
+**Por quê:**
+
+- **Sem `id` próprio e sem timestamps.** Não há nada a dizer sobre o vínculo além de que ele existe; a chave primária composta é a própria regra "o mesmo par só entra uma vez".
+- **`cascadeOnDelete` dos dois lados apaga o VÍNCULO, e só ele.** Sumir o setor não apaga a pessoa, e sumir a pessoa não apaga o setor. Quem impede que uma pessoa que já recebeu seja apagada é a chave estrangeira de `pagamentos` (RN-R9), não esta.
+- **O índice em `responsavel_id`** é o caminho do escopo de conferência: dado o login, quais setores ele atende.
 
 ### 3.2 `grupos_participantes` → Model `GrupoParticipante`
 
@@ -484,6 +540,7 @@ Ligação entre a inscrição e cada atividade escolhida.
 | `id` | bigserial | não | — | — |
 | `codigo_publico` | char(26) ULID | não | — | Identificador público |
 | `inscricao_id` | bigint FK → `inscricoes` (restrict) | não | — | Inscrição cobrada |
+| `responsavel_id` | bigint FK → `responsaveis` (restrict) | sim | `null` | Quem foi sorteado para receber **esta** cobrança (RN-R4). Nula no modo `gateway` |
 | `gateway` | varchar(40) | não | — | Qual provedor gerou a cobrança |
 | `id_externo` | varchar(120) | sim | — | Identificador da cobrança no provedor |
 | `metodo` | varchar(30) | não | `'pix'` | Meio de pagamento (Enum `MetodoPagamento`) |
@@ -502,7 +559,7 @@ Ligação entre a inscrição e cada atividade escolhida.
 
 - `unique(codigo_publico)`
 - **Unicidade parcial** `pagamentos_gateway_id_externo_unique`: `UNIQUE (gateway, id_externo) WHERE id_externo IS NOT NULL`
-- `index(inscricao_id, situacao)`, `index(situacao, expira_em)` (usado pela reconciliação)
+- `index(inscricao_id, situacao)`, `index(situacao, expira_em)` (usado pela reconciliação), `index(responsavel_id)` (usado pelo sorteio)
 
 **Por quê:**
 
@@ -510,6 +567,8 @@ Ligação entre a inscrição e cada atividade escolhida.
 - **`pix_copia_e_cola` como texto.** É um texto longo do padrão Pix. Não é dado sensível: é o que o participante precisa copiar.
 - **Nunca guardamos dado de cartão.** Não existe coluna para número de cartão nem para código de segurança, e nunca existirá.
 - **Uma inscrição pode ter vários pagamentos.** Uma cobrança cancelada e outra gerada depois são duas linhas. Vale a mais recente com situação `pago`.
+- **`responsavel_id` mora AQUI, e não em `inscricoes` (RN-R5).** É a consequência direta de sortear de novo a cada cobrança: o escolhido pertence àquela cobrança, não à pessoa. Assim uma cobrança vencida guarda para sempre quem era o responsável dela, e a cobrança nova guarda o seu — o histórico conta a verdade em vez de ser reescrito. Se um dia a decisão virar "fica preso à inscrição", a coluna migra para `inscricoes` e o sorteio passa a ser condicional; nada mais muda.
+- **`restrictOnDelete` no responsável.** Apagar quem já recebeu apagaria a resposta à pergunta "para quem foi este dinheiro". A saída oferecida na tela é desativar, que tira do sorteio sem tocar em cobrança emitida (RN-R9).
 
 ### 3.11 `webhooks_pagamento` → Model `WebhookPagamento`
 

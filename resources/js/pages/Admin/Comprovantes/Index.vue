@@ -142,6 +142,7 @@ function prazoEmPalavras(linha: LinhaDaFilaDeComprovantes): string {
                     <tr class="border-border border-b text-left">
                         <th scope="col" class="px-4 py-2 font-medium">Participante</th>
                         <th scope="col" class="px-4 py-2 font-medium">Setor</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Recebeu</th>
                         <th scope="col" class="px-4 py-2 font-medium">Valor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Prazo</th>
                         <th scope="col" class="px-4 py-2 font-medium">Enviado em</th>
@@ -164,6 +165,18 @@ function prazoEmPalavras(linha: LinhaDaFilaDeComprovantes): string {
                         <td class="px-4 py-2">
                             <span class="block">{{ linha.inscricao.setor ?? '—' }}</span>
                             <span class="text-muted-foreground block text-xs">{{ linha.inscricao.grupo }}</span>
+                        </td>
+                        <!-- Para QUEM este Pix foi (RN-R7). O setor pode ter
+                             vários responsáveis, e o sorteio se repete a cada
+                             cobrança: sem esta coluna, quem confere aceitaria um
+                             comprovante de dinheiro que caiu na conta de outra
+                             pessoa sem enxergar a divergência. -->
+                        <td class="px-4 py-2" :data-testid="`recebeu-${linha.id}`">
+                            <template v-if="linha.recebedor">
+                                <span class="block">{{ linha.recebedor.nome }}</span>
+                                <span class="text-muted-foreground block font-mono text-xs break-all">{{ linha.recebedor.chave_pix }}</span>
+                            </template>
+                            <span v-else class="text-muted-foreground">—</span>
                         </td>
                         <td class="px-4 py-2 tabular-nums">{{ formatarValor(linha.inscricao.valor_centavos, 'BRL') }}</td>
                         <td class="px-4 py-2">
@@ -226,8 +239,10 @@ function prazoEmPalavras(linha: LinhaDaFilaDeComprovantes): string {
                     <DialogTitle>{{ tituloDoModal }}</DialogTitle>
                     <DialogDescription>
                         <template v-if="decisao === 'aceitar'">
-                            Confirmar aqui é declarar que o dinheiro entrou na conta do setor. A inscrição de
-                            {{ emConferencia?.inscricao.nome_completo }} passa a confirmada, e o que você escrever fica no histórico do pagamento.
+                            Confirmar aqui é declarar que o dinheiro entrou na conta de
+                            <strong>{{ emConferencia?.recebedor?.nome ?? 'quem recebe pelo setor' }}</strong
+                            >. A inscrição de {{ emConferencia?.inscricao.nome_completo }} passa a confirmada, e o que você escrever fica no histórico
+                            do pagamento.
                         </template>
                         <template v-else>
                             A inscrição continua aguardando pagamento até o prazo, e o participante pode enviar outro comprovante. O motivo é o que

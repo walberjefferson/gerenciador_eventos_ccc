@@ -209,6 +209,10 @@ const passosDoPagamento = computed<string[]>(() => {
                                         <dt class="text-muted-foreground">Setor</dt>
                                         <dd class="font-medium" data-testid="nome-do-setor">{{ setor?.nome }}</dd>
                                     </div>
+                                    <!-- Quem recebe ESTA cobrança. Ele foi
+                                         sorteado entre os responsáveis do setor
+                                         quando ela nasceu (RN-R4), e não muda
+                                         enquanto ela estiver valendo (RN-R5). -->
                                     <div v-if="setor?.titular">
                                         <dt class="text-muted-foreground">Titular da conta</dt>
                                         <dd class="font-medium" data-testid="titular-do-setor">{{ setor.titular }}</dd>
@@ -229,7 +233,7 @@ const passosDoPagamento = computed<string[]>(() => {
                                      ninguem cadastrou o numero — melhor nao
                                      oferecer contato do que oferecer um vazio. -->
                                 <p v-if="setor?.telefone" class="mt-2">
-                                    Dúvidas? Fale com {{ setor.responsavel ?? setor.titular ?? 'o responsável pelo setor' }}:
+                                    Dúvidas? Fale com {{ setor.titular }}:
                                     <a
                                         :href="`tel:${setor.telefone.replace(/\D/g, '')}`"
                                         class="font-medium underline underline-offset-4"

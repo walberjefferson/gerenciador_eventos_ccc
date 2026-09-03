@@ -8,6 +8,7 @@ use App\Models\Cidade;
 use App\Models\ComprovantePagamento;
 use App\Models\Inscricao;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Quem pode ver e quem pode conferir um comprovante de pagamento.
@@ -25,8 +26,9 @@ use App\Models\User;
  * mudar, e um unico arquivo a ler no dia em que alguem duvidar dela.
  *
  * O escopo NUNCA vem do navegador. O setor nao e parametro, nao e filtro e nao
- * e campo escondido de formulario: ele e lido de `cidades.responsavel_id`, no
- * servidor, a cada pedido.
+ * e campo escondido de formulario: ele e lido da cadeia
+ * `users -> responsaveis -> responsaveis_setores -> cidades`, no servidor, a
+ * cada pedido.
  */
 class ComprovantePagamentoPolicy
 {
@@ -63,7 +65,20 @@ class ComprovantePagamentoPolicy
     }
 
     /**
-     * Os setores pelos quais esta pessoa responde.
+     * Os setores que esta conta atende.
+     *
+     * A cadeia e `users -> responsaveis -> responsaveis_setores -> cidades`
+     * (RN-R6): QUALQUER responsavel do setor confere, e nao so o que foi
+     * sorteado para uma cobranca. Se so o sorteado conferisse, a fila do setor
+     * pararia toda vez que ele viajasse — e a pessoa que de fato recebeu o Pix
+     * na conta dela nao poderia aceitar o comprovante do proprio dinheiro.
+     *
+     * Duas ausencias sao propositais. Conta sem ficha de responsavel nao
+     * alcanca nada: ter login nao e atender setor. E responsavel DESATIVADO
+     * continua alcancando o que atendia — desativar tira do sorteio (RN-R9),
+     * nao da conferencia, e quem parou de receber hoje ainda precisa resolver o
+     * comprovante do dinheiro que caiu na conta dele ontem. Quem nao pode mais
+     * entrar no painel ja e barrado no login, que e onde essa decisao mora.
      *
      * Lista vazia quer dizer "nenhum", e nenhum quer dizer que ela nao alcanca
      * inscricao nenhuma — nao que ela alcanca todas. A diferenca entre esses
@@ -74,8 +89,11 @@ class ComprovantePagamentoPolicy
     public static function setoresDe(User $usuario): array
     {
         return Cidade::query()
-            ->where('responsavel_id', $usuario->getKey())
-            ->pluck('id')
+            ->whereHas(
+                'responsaveis',
+                fn (Builder $consulta) => $consulta->where('responsaveis.user_id', $usuario->getKey()),
+            )
+            ->pluck('cidades.id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }

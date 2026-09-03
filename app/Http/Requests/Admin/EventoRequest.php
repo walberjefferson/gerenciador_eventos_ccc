@@ -216,9 +216,13 @@ class EventoRequest extends FormRequest
      *
      * Um evento que cobra pela chave Pix do setor e uma promessa: a pessoa que
      * se inscrever vai abrir a tela de pagamento e encontrar uma chave la. Se
-     * algum setor ativo nao tem chave ou nao tem responsavel, essa promessa
-     * falha para todo mundo daquele setor — e falha depois, na inscricao, quando
-     * ja nao ha o que fazer.
+     * algum setor ativo nao tem NENHUM responsavel apto — ativo e com chave —,
+     * essa promessa falha para todo mundo daquele setor, e falha depois, na
+     * inscricao, quando ja nao ha o que fazer.
+     *
+     * A regra e a RN-S4 com a redacao da RN-R3: antes bastava um responsavel e
+     * uma chave no proprio setor; agora basta UM responsavel apto entre os que
+     * o atendem, porque e entre eles que a cobranca vai sortear (RN-R4).
      *
      * A mensagem NOMEIA os setores que faltam: "ajuste os setores" manda a
      * pessoa procurar; a lista manda ela resolver.
@@ -237,9 +241,10 @@ class EventoRequest extends FormRequest
 
         $validador->errors()->add(
             'forma_recebimento',
-            'Para receber pela chave Pix do setor, todo setor ativo precisa ter responsável e chave Pix cadastrados. '
+            'Para receber pela chave Pix do setor, todo setor ativo precisa ter ao menos um responsável ativo e com chave Pix. '
             .'Faltam: '.implode(', ', $faltando).'. '
-            .'Complete o cadastro em Catálogo → Setores e salve o evento de novo.'
+            .'Cadastre os responsáveis em Catálogo → Responsáveis, vincule-os em Catálogo → Setores '
+            .'e salve o evento de novo.'
         );
     }
 

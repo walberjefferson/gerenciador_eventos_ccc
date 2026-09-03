@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\LoteController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\Admin\PapelController;
 use App\Http\Controllers\Admin\PortariaController;
+use App\Http\Controllers\Admin\ResponsavelController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\ComprovanteController;
 use App\Http\Controllers\EventoPublicoController;
@@ -169,8 +170,9 @@ Route::middleware(['auth', 'verified'])
                     ->name('desfazer');
             });
 
-        // Catalogo global: setores e grupos de participantes. Sao listas que
-        // valem para todos os eventos, por isso vivem sob a mesma permissao.
+        // Catalogo global: setores, grupos de participantes e responsaveis. Sao
+        // listas que valem para todos os eventos, por isso vivem sob a mesma
+        // permissao.
         //
         // A URL e o parametro dizem "setor", que e como a comunidade chama isso.
         // O Model, a tabela e a coluna continuam sendo `Cidade`/`cidades`/
@@ -197,6 +199,16 @@ Route::middleware(['auth', 'verified'])
                     ->name('grupos-participantes.update');
                 Route::delete('grupos-participantes/{grupo_participante}', [GrupoParticipanteController::class, 'destroy'])
                     ->name('grupos-participantes.destroy');
+
+                // Quem recebe o Pix dos setores. Fica no catalogo, e nao em
+                // "usuarios", porque responsavel nao e conta do painel: ele
+                // pode existir sem nenhuma (RN-R1).
+                Route::get('responsaveis', [ResponsavelController::class, 'index'])->name('responsaveis');
+                Route::post('responsaveis', [ResponsavelController::class, 'store'])->name('responsaveis.store');
+                Route::put('responsaveis/{responsavel}', [ResponsavelController::class, 'update'])
+                    ->name('responsaveis.update');
+                Route::delete('responsaveis/{responsavel}', [ResponsavelController::class, 'destroy'])
+                    ->name('responsaveis.destroy');
             });
 
         // Estrutura do evento. Tudo o que pendura no evento — dias, grupos,

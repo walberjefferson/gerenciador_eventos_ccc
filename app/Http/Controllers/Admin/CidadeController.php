@@ -8,7 +8,7 @@ use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CidadeRequest;
 use App\Models\Cidade;
-use App\Models\User;
+use App\Models\Responsavel;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Response;
 
@@ -38,7 +38,10 @@ class CidadeController extends Controller
         return inertia('Admin/Catalogo/Setores', [
             'cidades' => Cidade::query()
                 ->withCount('gruposParticipantes')
-                ->with('responsavel:id,name')
+                // Os responsaveis vem junto porque a tela mostra quem atende
+                // cada setor E porque `estaPreparadaParaReceber()` le a relacao
+                // carregada: sem isto seria uma consulta por linha da lista.
+                ->with('responsaveis:id,nome,chave_pix,ativo')
                 ->orderBy('uf')
                 ->orderBy('nome')
                 ->get()
@@ -48,28 +51,29 @@ class CidadeController extends Controller
                     'uf' => $cidade->uf,
                     'ativo' => $cidade->ativo,
                     'grupos' => $cidade->grupos_participantes_count,
-                    'responsavel_id' => $cidade->responsavel_id,
-                    'responsavel_nome' => $cidade->responsavel?->name,
-                    // A chave aparece INTEIRA nesta tela, e so nesta e na tela
-                    // de pagamento de quem e do setor. Ela nao e segredo — foi
-                    // cadastrada para ser mostrada (RN-S3) —, mas quem a le
-                    // aqui ja passou por "catalogo.gerenciar".
-                    'chave_pix' => $cidade->chave_pix,
-                    'titular_chave_pix' => $cidade->titular_chave_pix,
-                    'telefone_responsavel' => $cidade->telefone_responsavel,
+                    'responsaveis' => $cidade->responsaveis
+                        ->map(fn (Responsavel $responsavel): array => [
+                            'id' => (int) $responsavel->id,
+                            'nome' => $responsavel->nome,
+                            'apto' => $responsavel->estaApto(),
+                        ])
+                        ->all(),
                     'preparado_para_receber' => $cidade->estaPreparadaParaReceber(),
                 ])
                 ->all(),
-            // As contas que podem responder por um setor. So as ativas: uma
-            // conta desativada nao consegue entrar para conferir nada.
-            'responsaveis' => User::query()
-                ->where('ativo', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'email'])
-                ->map(fn (User $usuario): array => [
-                    'id' => (int) $usuario->id,
-                    'nome' => $usuario->name,
-                    'email' => $usuario->email,
+            // Todo o cadastro de responsaveis, para a tela oferecer o vinculo.
+            // A chave e LIDA — e dela que sai a resposta de "esta apto?" —, mas
+            // nao viaja para a tela: aqui ela nao seria mostrada, e o que nao e
+            // mostrado nao precisa sair do servidor. Quem quer ver chave abre
+            // Catalogo -> Responsaveis.
+            'responsaveis' => Responsavel::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'ativo', 'chave_pix'])
+                ->map(fn (Responsavel $responsavel): array => [
+                    'id' => (int) $responsavel->id,
+                    'nome' => $responsavel->nome,
+                    'ativo' => $responsavel->ativo,
+                    'apto' => $responsavel->estaApto(),
                 ])
                 ->all(),
             'ufs' => CidadeRequest::UFS,
@@ -82,6 +86,7 @@ class CidadeController extends Controller
         $this->authorize('create', Cidade::class);
 
         $setor = Cidade::create($request->dadosDaCidade());
+        $setor->responsaveis()->sync($request->responsaveis());
 
         // A entidade da auditoria continua sendo 'cidade': ela e a chave do
         // rastro ja gravado, e renomea-la partiria o historico em dois.
@@ -97,6 +102,13 @@ class CidadeController extends Controller
         $antes = $setor->getRawOriginal();
 
         $setor->update($request->dadosDaCidade());
+
+        // O vinculo so e mexido quando a tela mandou a lista. Um formulario que
+        // nao fala de responsaveis nao pode esvaziar o setor por omissao —
+        // seria tirar o setor inteiro do ar sem ninguem pedir.
+        if ($request->has('responsaveis')) {
+            $setor->responsaveis()->sync($request->responsaveis());
+        }
 
         $this->auditarAlteracao($setor, $antes, 'cidade');
 

@@ -15,25 +15,66 @@ export interface CidadeDoCatalogo {
     ativo: boolean;
     /** Quantos grupos de participantes dependem deste setor. */
     grupos: number;
-    /** Quem responde pelo setor e confere os comprovantes de quem se inscreve nele. */
-    responsavel_id: number | null;
-    responsavel_nome: string | null;
     /**
-     * A chave Pix do responsável, em claro (RN-S3): ela existe para ser
-     * mostrada a quem vai pagar. O que a protege é o escopo de quem a vê.
+     * Quem atende este setor (RN-R2). Chave Pix, titular e telefone não moram
+     * mais aqui: eles descrevem uma pessoa, e a pessoa tem cadastro próprio.
      */
-    chave_pix: string | null;
-    titular_chave_pix: string | null;
-    telefone_responsavel: string | null;
-    /** Tem responsável E chave: só assim o setor consegue receber (RN-S4). */
+    responsaveis: ResponsavelVinculado[];
+    /** Tem ao menos um responsável ativo e com chave (RN-R3). */
     preparado_para_receber: boolean;
 }
 
-/** Uma conta do painel que pode responder por um setor. */
+/** Um responsável já vinculado a um setor, do jeito que a lista o mostra. */
+export interface ResponsavelVinculado {
+    id: number;
+    nome: string;
+    /** Ativo e com chave: só assim ele entra no sorteio (RN-R4). */
+    apto: boolean;
+}
+
+/** Um responsável do cadastro, oferecido para o vínculo na tela do setor. */
 export interface ResponsavelDisponivel {
     id: number;
     nome: string;
+    ativo: boolean;
+    apto: boolean;
+}
+
+/** Uma conta do painel que pode ser ligada a um responsável. */
+export interface ContaDoPainel {
+    id: number;
+    nome: string;
     email: string;
+}
+
+/** Um setor, do jeito que a tela de responsáveis o oferece para o vínculo. */
+export interface SetorParaVinculo {
+    id: number;
+    nome: string;
+    uf: string;
+    ativo: boolean;
+}
+
+/**
+ * Quem recebe o Pix de um ou mais setores.
+ *
+ * A chave aparece em claro (RN-S3): ela existe para ser mostrada a quem vai
+ * pagar. O que a protege é o escopo de quem a vê — aqui, quem já passou por
+ * "catalogo.gerenciar".
+ */
+export interface ResponsavelDoCatalogo {
+    id: number;
+    nome: string;
+    chave_pix: string;
+    telefone: string | null;
+    ativo: boolean;
+    /** A conta do painel, quando existe. Nula é "recebe, mas não confere" (RN-R1). */
+    user_id: number | null;
+    conta_nome: string | null;
+    setores: SetorParaVinculo[];
+    /** Quantas cobranças já apontaram para esta pessoa. Com uma que seja, ela não é excluída (RN-R9). */
+    cobrancas: number;
+    apto: boolean;
 }
 
 /** Um grupo de participantes do catálogo global. */
@@ -521,6 +562,15 @@ export interface LinhaDaFilaDeComprovantes {
     enviado_em: string | null;
     situacao: string;
     situacao_rotulo: string;
+    /**
+     * Quem recebeu o Pix desta cobrança (RN-R7).
+     *
+     * Nulo no modo gateway, onde ninguém foi sorteado. Ele aparece na fila
+     * porque o sorteio se repete a cada cobrança (RN-R5): sem o nome e a chave
+     * daquela cobrança, alguém aceitaria o comprovante de um Pix que caiu na
+     * conta de outra pessoa sem perceber.
+     */
+    recebedor: { nome: string; chave_pix: string } | null;
     inscricao: {
         id: number;
         codigo_publico: string | null;

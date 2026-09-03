@@ -12,6 +12,7 @@ use App\Models\DiaEvento;
 use App\Models\Evento;
 use App\Models\GrupoAtividade;
 use App\Models\Lote;
+use App\Models\Responsavel;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -208,11 +209,22 @@ class CobrancaDemoSeeder extends Seeder
     }
 
     /**
-     * Da a cada setor ativo um responsavel, uma chave Pix e um telefone.
+     * Da a cada setor ativo DOIS responsaveis, com chave e telefone.
      *
      * TODOS os setores ativos, e nao apenas um: a regra do cadastro de evento
-     * (RN-S4) recusa a forma "setor" enquanto existir setor ativo sem chave,
-     * porque um participante daquele setor nao teria para onde pagar.
+     * (RN-S4) recusa a forma "setor" enquanto existir setor ativo sem ninguem
+     * apto, porque um participante daquele setor nao teria para onde pagar.
+     *
+     * **Dois, e nao um, e a diferenca que faz a demonstracao mostrar alguma
+     * coisa.** Com um responsavel so o sorteio da RN-R4 teria sempre a mesma
+     * resposta, e quem abrisse a demonstracao veria um sistema que parece nao
+     * sortear nada. Com dois, as inscricoes se dividem entre eles, a fila de
+     * conferencia mostra nomes diferentes na coluna de quem recebeu (RN-R7) e
+     * os dois conseguem conferir o setor inteiro (RN-R6).
+     *
+     * O primeiro de cada setor tem conta no painel; o segundo NAO tem, de
+     * proposito: e o caso do tesoureiro que recebe e nao usa o sistema (RN-R1),
+     * e ele so aparece na demonstracao se estiver nela.
      *
      * A senha e a mesma do AdminDemoSeeder, e pelo mesmo motivo: e conta de
      * desenvolvimento, num seeder que ja se recusa a rodar fora de local.
@@ -226,7 +238,7 @@ class CobrancaDemoSeeder extends Seeder
 
             $apelido = Str::slug($setor->nome);
 
-            $responsavel = User::query()->firstOrCreate(
+            $conta = User::query()->firstOrCreate(
                 ['email' => "responsavel.{$apelido}@exemplo.test"],
                 [
                     'name' => 'Responsável do '.$setor->nome,
@@ -235,15 +247,33 @@ class CobrancaDemoSeeder extends Seeder
                 ],
             );
 
-            $responsavel->syncRoles([PapeisSeeder::PAPEL_RESPONSAVEL_SETOR]);
+            $conta->syncRoles([PapeisSeeder::PAPEL_RESPONSAVEL_SETOR]);
 
-            $setor->update([
-                'responsavel_id' => $responsavel->getKey(),
-                'chave_pix' => "responsavel.{$apelido}@exemplo.test",
-                'titular_chave_pix' => $responsavel->name,
-                // Formatado como a pessoa digitaria, porque e assim que a
-                // coluna guarda e assim que a tela mostra.
-                'telefone_responsavel' => sprintf('(82) 9%04d-%04d', 1000 + $indice, 1000 + $indice),
+            $comConta = Responsavel::query()->firstOrCreate(
+                ['user_id' => $conta->getKey()],
+                [
+                    'nome' => $conta->name,
+                    'chave_pix' => "responsavel.{$apelido}@exemplo.test",
+                    // Formatado como a pessoa digitaria, porque e assim que a
+                    // coluna guarda e assim que a tela mostra.
+                    'telefone' => sprintf('(82) 9%04d-%04d', 1000 + $indice, 1000 + $indice),
+                    'ativo' => true,
+                ],
+            );
+
+            $semConta = Responsavel::query()->firstOrCreate(
+                ['chave_pix' => "tesouraria.{$apelido}@exemplo.test"],
+                [
+                    'nome' => 'Tesouraria do '.$setor->nome,
+                    'telefone' => sprintf('(82) 9%04d-%04d', 2000 + $indice, 2000 + $indice),
+                    'user_id' => null,
+                    'ativo' => true,
+                ],
+            );
+
+            $setor->responsaveis()->syncWithoutDetaching([
+                $comConta->getKey(),
+                $semConta->getKey(),
             ]);
         });
     }

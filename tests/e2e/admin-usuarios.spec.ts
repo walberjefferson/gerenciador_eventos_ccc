@@ -167,7 +167,7 @@ test.describe('em tela grande', () => {
         await expect(page.getByRole('heading', { name: 'Papéis', level: 1 })).toBeVisible();
 
         // O texto em portugues do PapeisSeeder, e nao so o nome tecnico.
-        await expect(page.getByText('Cadastrar setores e grupos de participantes')).toBeVisible();
+        await expect(page.getByText('Cadastrar setores, grupos de participantes e responsaveis')).toBeVisible();
 
         // "Alcança"/"Não alcança" por extenso, nunca so a cor.
         await expect(page.getByTestId('organizador-usuarios.gerenciar')).toHaveText('Não alcança');

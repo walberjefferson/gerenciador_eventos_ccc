@@ -7,6 +7,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import {
     BellRing,
     CalendarDays,
+    HandCoins,
     KeyRound,
     LayoutGrid,
     MapPin,
@@ -65,6 +66,10 @@ const itensDoPainel = computed<NavItem[]>(() => {
     if (permissoes.includes('catalogo.gerenciar')) {
         itens.push({ title: 'Setores', href: '/admin/catalogo/setores', icon: MapPin });
         itens.push({ title: 'Grupos', href: '/admin/catalogo/grupos-participantes', icon: UsersRound });
+        // Responsáveis entra AQUI, e não em "Usuários": quem recebe o Pix não é
+        // uma conta do painel — ele pode não ter nenhuma (RN-R1). É catálogo,
+        // como setor e grupo, e vive sob a mesma permissão.
+        itens.push({ title: 'Responsáveis', href: '/admin/catalogo/responsaveis', icon: HandCoins });
     }
 
     // Quem entra no painel e com que papel. Mesma regra dos demais: o

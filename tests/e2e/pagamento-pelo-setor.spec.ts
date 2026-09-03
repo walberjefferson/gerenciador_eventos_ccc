@@ -6,25 +6,34 @@ import { expect, test } from './base';
 /**
  * O recebimento pela chave Pix do responsavel do setor, de ponta a ponta.
  *
- * Quatro cenarios, na ordem em que a vida acontece:
+ * **O Setor Batalha tem DOIS responsaveis**, e e isso que a suite passa a
+ * provar: a cobranca sorteia um deles (RN-R4), a tela mostra a chave DAQUELE, e
+ * o outro — que nao recebeu nada — confere o comprovante do mesmo jeito
+ * (RN-R6), vendo na fila para quem o Pix foi (RN-R7).
  *
- * 1. caminho feliz — a tela mostra chave, titular e QR Code do setor da pessoa,
- *    ela envia o comprovante e ve "em conferencia";
- * 2. conferencia — o responsavel entra, ve SO o seu setor, abre o comprovante,
- *    aceita com observacao e a inscricao fica confirmada;
+ * Cenarios, na ordem em que a vida acontece:
+ *
+ * 1. caminho feliz — a tela mostra o setor, a chave de UM dos dois responsaveis
+ *    e o QR Code; a chave nao muda ao recarregar (RN-R5), e a pessoa envia o
+ *    comprovante e ve "em conferencia";
+ * 2. conferencia pelo OUTRO responsavel — quem nao foi sorteado entra, ve o
+ *    setor na fila com o nome e a chave de quem recebeu, aceita com observacao
+ *    e a inscricao fica confirmada;
  * 3. recusa — recusa com motivo; o participante le o motivo e envia outro;
- * 4. isolamento — o responsavel do Setor A nao ve nem alcanca inscricao do
- *    Setor B, nem pela lista, nem pela URL direta.
+ * 4. isolamento — o responsavel do Setor Batalha nao ve nem alcanca inscricao do
+ *    Setor Delmiro, nem pela lista, nem pela URL direta.
  *
  * O evento de demonstracao e colocado no modo setor por linha de comando, e os
- * setores ganham chave e responsavel do mesmo jeito: sao gestos de quem
- * administra o sistema, e nao do navegador. No fim, tudo volta como estava —
- * este arquivo nao pode mudar o que os outros cenarios encontram.
+ * setores ganham responsaveis do mesmo jeito: sao gestos de quem administra o
+ * sistema, e nao do navegador. No fim, tudo volta como estava — este arquivo
+ * nao pode mudar o que os outros cenarios encontram.
  */
 
 const SENHA = 'senha-de-teste-do-painel';
 
 const RESPONSAVEL_A = 'setor.batalha@example.com';
+/** O SEGUNDO responsavel do Setor Batalha — a peca nova da RN-R2. */
+const RESPONSAVEL_A2 = 'setor.batalha.dois@example.com';
 const RESPONSAVEL_B = 'setor.delmiro@example.com';
 
 const SETOR_A = 'Setor Batalha';
@@ -33,8 +42,23 @@ const SETOR_B = 'Setor Delmiro';
 const GRUPO_A = 'Batalha (Sede)';
 const GRUPO_B = 'Mata Grande';
 
-const CHAVE_A = 'batalha.setor@example.com';
-const TITULAR_A = 'Joana Batalha da Silva';
+const CHAVE_A1 = 'batalha.um@example.com';
+const TITULAR_A1 = 'Joana Batalha da Silva';
+
+const CHAVE_A2 = 'batalha.dois@example.com';
+const TITULAR_A2 = 'Marcos Batalha de Souza';
+
+/** Os dois titulares do Setor Batalha, pela chave de cada um. */
+const CHAVE_POR_TITULAR: Record<string, string> = {
+    [TITULAR_A1]: CHAVE_A1,
+    [TITULAR_A2]: CHAVE_A2,
+};
+
+/** A conta do painel de cada titular do Setor Batalha. */
+const CONTA_POR_TITULAR: Record<string, string> = {
+    [TITULAR_A1]: RESPONSAVEL_A,
+    [TITULAR_A2]: RESPONSAVEL_A2,
+};
 
 const PESSOA_A: PessoaDeTeste = {
     nome: 'Marina do Setor Batalha',
@@ -77,7 +101,15 @@ function tinker(codigo: string): string {
     return artisan(['tinker', '--execute', codigo]);
 }
 
-/** Cria (ou reaproveita) a conta do responsavel e a amarra ao setor. */
+/**
+ * Cria (ou reaproveita) a conta do painel, a ficha de responsavel dela e o
+ * vinculo com o setor.
+ *
+ * Sao tres coisas separadas de proposito, porque agora elas SAO tres: a conta
+ * de quem entra no painel, a pessoa que recebe (com a chave dela) e o vinculo
+ * que diz qual setor ela atende. Chamar duas vezes para o mesmo setor acumula
+ * responsaveis — e e assim que o Setor Batalha fica com dois.
+ */
 function prepararResponsavel(email: string, nome: string, setor: string, chave: string, titular: string): void {
     tinker(
         `app(\\Spatie\\Permission\\PermissionRegistrar::class)->forgetCachedPermissions();` +
@@ -86,24 +118,35 @@ function prepararResponsavel(email: string, nome: string, setor: string, chave: 
             `['name' => '${nome}', 'password' => '${SENHA}', 'email_verified_at' => now(), 'ativo' => true]` +
             `);` +
             `$usuario->syncRoles(['responsavel-setor']);` +
-            `\\App\\Models\\Cidade::query()->where('nome', '${setor}')->update([` +
-            `'responsavel_id' => $usuario->id, 'chave_pix' => '${chave}', 'titular_chave_pix' => '${titular}'` +
-            `]);`,
+            `$ficha = \\App\\Models\\Responsavel::query()->updateOrCreate(` +
+            `['user_id' => $usuario->id],` +
+            `['nome' => '${titular}', 'chave_pix' => '${chave}', 'ativo' => true]` +
+            `);` +
+            `\\App\\Models\\Cidade::query()->where('nome', '${setor}')->firstOrFail()` +
+            `->responsaveis()->syncWithoutDetaching([$ficha->id]);`,
     );
 }
 
 /**
- * Todo setor ativo precisa estar pronto antes de o evento entrar no modo setor
- * (RN-S4). Os dois que os cenarios usam ganham dono; os demais ganham uma chave
- * generica, porque a regra olha o catalogo inteiro.
+ * Todo setor ativo precisa ter ao menos um responsavel apto antes de o evento
+ * entrar no modo setor (RN-S4 com a redacao da RN-R3). O Setor Batalha ganha
+ * DOIS, o Delmiro ganha um, e os demais ganham uma tesouraria generica — sem
+ * conta no painel, que e o caso da RN-R1 —, porque a regra olha o catalogo
+ * inteiro.
  */
 function prepararCatalogoInteiro(): void {
-    prepararResponsavel(RESPONSAVEL_A, 'Joana do Setor Batalha', SETOR_A, CHAVE_A, TITULAR_A);
+    prepararResponsavel(RESPONSAVEL_A, 'Joana do Setor Batalha', SETOR_A, CHAVE_A1, TITULAR_A1);
+    prepararResponsavel(RESPONSAVEL_A2, 'Marcos do Setor Batalha', SETOR_A, CHAVE_A2, TITULAR_A2);
     prepararResponsavel(RESPONSAVEL_B, 'Pedro do Setor Delmiro', SETOR_B, 'delmiro.setor@example.com', 'Pedro Delmiro');
 
     tinker(
-        `$dono = \\App\\Models\\User::query()->where('email', '${RESPONSAVEL_A}')->value('id');` +
-            `\\App\\Models\\Cidade::query()->whereNull('chave_pix')->update(['responsavel_id' => $dono, 'chave_pix' => 'outro.setor@example.com', 'titular_chave_pix' => 'Tesouraria']);`,
+        `$ficha = \\App\\Models\\Responsavel::query()->updateOrCreate(` +
+            `['chave_pix' => 'outro.setor@example.com'],` +
+            `['nome' => 'Tesouraria', 'user_id' => null, 'ativo' => true]` +
+            `);` +
+            `foreach (\\App\\Models\\Cidade::query()->ativos()->get() as $setor) {` +
+            `if ($setor->responsaveis()->count() === 0) { $setor->responsaveis()->attach($ficha->id); }` +
+            `}`,
     );
 }
 
@@ -162,26 +205,47 @@ test.afterAll(() => {
     definirFormaDoEvento('gateway');
 });
 
-test('a tela de pagamento mostra a chave do setor e aceita o comprovante', async ({ page }) => {
+/**
+ * Quem foi sorteado para a cobranca da PESSOA_A.
+ *
+ * O primeiro cenario descobre e guarda aqui, porque os dois seguintes precisam
+ * saber: um deles entra como o OUTRO responsavel, e o outro confere que a fila
+ * mostra este nome. Ler de novo do banco daria o mesmo — mas ler da tela prova
+ * que foi ISTO que a pessoa viu na hora de pagar.
+ */
+let sorteadoParaA = '';
+
+test('a tela de pagamento mostra a chave de um dos dois responsaveis, e ela nao muda', async ({ page }) => {
     const urlDaCobranca = await inscreverNoSetor(page, PESSOA_A, SETOR_A, GRUPO_A, 'Futebol');
 
-    // 1. Para quem a pessoa esta pagando.
+    // 1. Para quem a pessoa esta pagando. O setor tem dois responsaveis; a tela
+    //    mostra UM — o que foi sorteado quando a cobranca nasceu (RN-R4).
     await expect(page.getByTestId('pix-do-setor')).toBeVisible();
     await expect(page.getByTestId('nome-do-setor')).toHaveText(SETOR_A);
-    await expect(page.getByTestId('titular-do-setor')).toHaveText(TITULAR_A);
-    await expect(page.getByTestId('chave-pix-do-setor')).toHaveText(CHAVE_A);
 
-    // 2. O QR Code continua existindo: o BR Code e montado localmente, mas e um
+    sorteadoParaA = (await page.getByTestId('titular-do-setor').innerText()).trim();
+
+    expect(Object.keys(CHAVE_POR_TITULAR)).toContain(sorteadoParaA);
+    await expect(page.getByTestId('chave-pix-do-setor')).toHaveText(CHAVE_POR_TITULAR[sorteadoParaA]);
+
+    // 2. Recarregar NAO sorteia de novo (RN-R5): enquanto a cobranca esta
+    //    pendente, a chave que a pessoa anotou continua sendo a dela.
+    await page.reload();
+
+    await expect(page.getByTestId('titular-do-setor')).toHaveText(sorteadoParaA);
+    await expect(page.getByTestId('chave-pix-do-setor')).toHaveText(CHAVE_POR_TITULAR[sorteadoParaA]);
+
+    // 3. O QR Code continua existindo: o BR Code e montado localmente, mas e um
     //    Pix como qualquer outro.
     await expect(page.locator('svg[role="img"][aria-label="QR Code para pagar com Pix"]')).toBeVisible();
     await expect(page.getByTestId('codigo-copia-e-cola')).toHaveValue(/br\.gov\.bcb\.pix/);
 
-    // 3. O envio do comprovante.
+    // 4. O envio do comprovante.
     await expect(page.getByTestId('envio-de-comprovante')).toBeVisible();
     await page.getByTestId('campo-do-comprovante').setInputFiles(COMPROVANTE_JPEG);
     await page.getByTestId('botao-enviar-comprovante').click();
 
-    // 4. "Em conferência" — e a inscricao continua aguardando pagamento (RN-S7).
+    // 5. "Em conferência" — e a inscricao continua aguardando pagamento (RN-S7).
     await expect(page.getByTestId('comprovante-em-conferencia')).toBeVisible();
     await expect(page.getByTestId('comprovante-em-conferencia')).toContainText(COMPROVANTE_JPEG.name);
     await expect(page.getByTestId('cobranca-aguardando')).toBeVisible();
@@ -189,18 +253,31 @@ test('a tela de pagamento mostra a chave do setor e aceita o comprovante', async
     expect(urlDaCobranca).toContain('/pagamento');
 });
 
-test('o responsavel confere o comprovante do proprio setor e a inscricao fica confirmada', async ({ page }) => {
-    await entrar(page, RESPONSAVEL_A);
+test('o OUTRO responsavel do setor confere, vendo na fila para quem o Pix foi', async ({ page }) => {
+    expect(sorteadoParaA).not.toBe('');
+
+    // Quem entra e o responsavel que NAO recebeu esta cobranca. Ele confere do
+    // mesmo jeito (RN-R6): se so o sorteado pudesse, a fila do setor pararia
+    // toda vez que ele viajasse.
+    const outroTitular = sorteadoParaA === TITULAR_A1 ? TITULAR_A2 : TITULAR_A1;
+
+    await entrar(page, CONTA_POR_TITULAR[outroTitular]);
 
     await page.goto('/admin/comprovantes');
 
-    // Ele ve apenas o setor dele, e a tela diz isso.
+    // Ele ve o setor dele, e a tela diz isso.
     await expect(page.getByTestId('escopo-da-fila')).toContainText(SETOR_A);
 
     const linha = page.locator('tbody tr').filter({ hasText: PESSOA_A.nome });
 
     await expect(linha).toHaveCount(1);
     await expect(linha).toContainText(SETOR_A);
+
+    // E a linha diz PARA QUEM o dinheiro foi (RN-R7) — que pode nao ser ele.
+    // Sem isto, aceitar um Pix que caiu na conta do colega seria indistinguivel
+    // de aceitar um que caiu na propria.
+    await expect(linha).toContainText(sorteadoParaA);
+    await expect(linha).toContainText(CHAVE_POR_TITULAR[sorteadoParaA]);
 
     // O comprovante sai por rota autenticada, e nao por URL publica (RN-S11).
     const endereco = await linha.getByRole('link', { name: 'Abrir comprovante' }).getAttribute('href');

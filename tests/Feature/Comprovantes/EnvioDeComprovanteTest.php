@@ -7,6 +7,7 @@ use App\Enums\SituacaoComprovante;
 use App\Enums\SituacaoInscricao;
 use App\Models\ComprovantePagamento;
 use App\Models\Inscricao;
+use App\Models\Responsavel;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -47,10 +48,15 @@ function inscricaoNoModoSetor(): Inscricao
         'prazo_pagamento_minutos' => 10080,
     ]);
 
-    $cenario->cidade->update([
-        'responsavel_id' => User::factory()->create()->getKey(),
-        'chave_pix' => 'setor@example.com',
-        'titular_chave_pix' => 'Joana da Silva',
+    // Um responsavel so, para que o sorteio da RN-R4 tenha uma resposta unica e
+    // estes testes possam continuar afirmando qual chave aparece na tela.
+    $cenario->cidade->responsaveis()->sync([
+        Responsavel::factory()->create([
+            'nome' => 'Joana da Silva',
+            'chave_pix' => 'setor@example.com',
+            'telefone' => null,
+            'user_id' => User::factory()->create()->getKey(),
+        ])->getKey(),
     ]);
 
     return $cenario->inscrever();
@@ -302,7 +308,9 @@ it('a tela do participante conta o estado do comprovante sem inventar situacao d
 it('leva o telefone do responsavel para a tela, junto da chave', function (): void {
     $inscricao = inscricaoNoModoSetor();
 
-    $inscricao->setor()?->update(['telefone_responsavel' => '(82) 99999-1234']);
+    // O telefone e da PESSOA que recebeu, e nao do setor: e ela que atende a
+    // ligacao sobre o Pix que caiu na conta dela.
+    $inscricao->pagamentoPendente()?->responsavel?->update(['telefone' => '(82) 99999-1234']);
 
     $url = URL::temporarySignedRoute(
         'inscricoes.pagamento',
@@ -329,8 +337,8 @@ it('nao oferece contato quando ninguem cadastrou o telefone do responsavel', fun
     // Nulo, e nao string vazia: a tela decide pelo v-if, e "" seria verdadeiro
     // o bastante para desenhar um link de telefone sem telefone.
     expect($props['setor']['telefone'])->toBeNull()
-        // E o setor sem telefone continua podendo receber: RN-S4 trava em chave
-        // e responsavel, nunca no contato.
+        // E o responsavel sem telefone continua podendo receber: RN-S4 trava em
+        // chave e vinculo, nunca no contato.
         ->and($props['setor']['chave_pix'])->toBe('setor@example.com');
 });
 

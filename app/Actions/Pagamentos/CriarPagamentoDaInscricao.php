@@ -13,6 +13,7 @@ use App\Models\Cidade;
 use App\Models\Evento;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
+use App\Models\Responsavel;
 use App\Services\Pagamentos\MontadorDeBrCodePix;
 use Illuminate\Support\Str;
 
@@ -30,15 +31,22 @@ use Illuminate\Support\Str;
  * **Este e o unico lugar do sistema que le a forma de recebimento do evento**
  * (RN-S1). Ela bifurca o caminho aqui e em nenhum outro: ou a cobranca sai pelo
  * provedor, como sempre saiu, ou ela e montada localmente a partir da chave Pix
- * do responsavel pelo setor da pessoa. As duas terminam do mesmo jeito — uma
- * linha em "pagamentos" aguardando pagamento —, e e por isso que o resto do
- * sistema nao precisa saber qual delas aconteceu.
+ * de um dos responsaveis pelo setor da pessoa. As duas terminam do mesmo jeito
+ * — uma linha em "pagamentos" aguardando pagamento —, e e por isso que o resto
+ * do sistema nao precisa saber qual delas aconteceu.
+ *
+ * **A idempotencia acima e o que torna o sorteio seguro (RN-R5).** Havendo
+ * cobranca pendente, ela volta como esta e NINGUEM e sorteado de novo: a chave
+ * que o participante viu na tela continua sendo a chave dele enquanto o Pix
+ * valer. O sorteio so acontece quando uma cobranca nova precisa nascer —
+ * primeira emissao, ou reemissao depois de a anterior vencer.
  */
 class CriarPagamentoDaInscricao
 {
     public function __construct(
         private readonly PaymentGateway $gateway,
         private readonly MontadorDeBrCodePix $montador,
+        private readonly SortearResponsavel $sortear,
     ) {}
 
     public function __invoke(Inscricao $inscricao): Pagamento
@@ -95,7 +103,7 @@ class CriarPagamentoDaInscricao
     }
 
     /**
-     * A cobranca montada aqui dentro, pela chave Pix do responsavel do setor.
+     * A cobranca montada aqui dentro, pela chave Pix de um responsavel do setor.
      *
      * Ela e uma cobranca de verdade na tabela "pagamentos" — com valor, prazo e
      * copia e cola —, mas nao existe do lado de instituicao financeira nenhuma.
@@ -109,36 +117,50 @@ class CriarPagamentoDaInscricao
      *
      * Nada aqui confirma nada: quem reconhece o dinheiro e a pessoa que confere
      * o comprovante, pelo caminho de ConfirmarPagamentoManual (RN-S10).
+     *
+     * **E aqui que o sorteio acontece, e so aqui.** Este metodo so e alcancado
+     * quando uma cobranca nova vai nascer — a idempotencia la em cima ja
+     * devolveu a pendente, se havia. Quem escolhe e SortearResponsavel; o que
+     * este metodo faz com o escolhido e grava-lo na cobranca, para que ela
+     * saiba para sempre para quem apontou (RN-R5).
      */
     private function cobrancaDoSetor(Inscricao $inscricao, Evento $evento): Pagamento
     {
         $setor = $inscricao->setor();
 
-        if (! $setor instanceof Cidade || ! $setor->estaPreparadaParaReceber()) {
+        $responsavel = $setor instanceof Cidade
+            ? ($this->sortear)($setor, $evento)
+            : null;
+
+        if (! $setor instanceof Cidade || ! $responsavel instanceof Responsavel) {
             throw new SetorSemChavePixException(
-                'O setor desta inscrição ainda não tem chave Pix cadastrada. '
-                .'Sem ela não há para onde o pagamento ir: cadastre a chave e o responsável do setor.'
+                'O setor desta inscrição não tem nenhum responsável com chave Pix cadastrada. '
+                .'Sem chave não há para onde o pagamento ir: cadastre os responsáveis do setor '
+                .'e vincule ao menos um deles, ativo e com chave.'
             );
         }
 
         return Pagamento::create([
             'inscricao_id' => $inscricao->getKey(),
+            'responsavel_id' => $responsavel->getKey(),
             'gateway' => 'setor',
             'id_externo' => null,
             'metodo' => MetodoPagamento::Pix,
             'valor_centavos' => (int) $inscricao->valor_centavos,
             'situacao' => SituacaoPagamento::Pendente,
-            'pix_copia_e_cola' => $this->brCode($inscricao, $setor),
+            'pix_copia_e_cola' => $this->brCode($inscricao, $setor, $responsavel),
             'expira_em' => $inscricao->prazo_pagamento,
             'metadados' => [
                 'origem' => 'setor',
                 'setor_id' => (int) $setor->getKey(),
                 'setor' => $setor->nome,
                 'evento' => $evento->nome,
-                // A chave NAO e gravada aqui. Ela mora numa coluna so, em
-                // cidades: copiada para dentro do jsonb, ela sobreviveria a
-                // uma troca de chave e a cobranca antiga passaria a apontar
-                // para uma conta que o setor nao usa mais.
+                // Nem a chave nem o nome de quem recebe sao gravados aqui.
+                // Quem responde "para quem foi esta cobranca" e a coluna
+                // responsavel_id, com a relacao viva: copiados para dentro do
+                // jsonb, eles sobreviveriam a uma correcao de cadastro e a
+                // cobranca passaria a mostrar dois valores diferentes para a
+                // mesma pessoa, sem dizer qual vale.
             ],
         ]);
     }
@@ -159,16 +181,16 @@ class CriarPagamentoDaInscricao
      * inscricao; nenhuma decisao de dinheiro pode depender deles — inclusive o
      * valor do campo 54, que num BR Code estatico e sugestao e nao trava.
      */
-    private function brCode(Inscricao $inscricao, Cidade $setor): string
+    private function brCode(Inscricao $inscricao, Cidade $setor, Responsavel $responsavel): string
     {
         $codigo = (string) $inscricao->codigo_publico;
 
         return $this->montador->montar(
-            chave: (string) $setor->chave_pix,
+            chave: (string) $responsavel->chave_pix,
             valorCentavos: (int) $inscricao->valor_centavos,
-            // O titular e o nome que aparece no aplicativo de quem paga. Sem
-            // ele, o nome do setor — que ainda diz mais do que nada.
-            nomeDoRecebedor: (string) ($setor->titular_chave_pix ?? $setor->nome),
+            // O nome do sorteado e o que aparece no aplicativo de quem paga:
+            // e por ele que a pessoa reconhece para quem esta transferindo.
+            nomeDoRecebedor: (string) $responsavel->nome,
             cidade: $setor->nome,
             identificador: Str::substr($codigo, -25),
             // "Inscricao" sem acento de proposito: o campo EMV nao aceita

@@ -8,31 +8,18 @@ use Database\Factories\CidadeFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Cidade do catalogo global de participantes — o "setor", no vocabulario que a
  * comunidade usa e que a tela mostra.
  *
- * **Por que a chave Pix daqui NAO e cifrada, e a da credencial e.**
- *
- * CredencialPagamento::chave_pix e cifrada porque e segredo de instituicao
- * financeira: ela diz para qual conta o dinheiro do evento vai, mora ao lado do
- * client_secret e do certificado, e nunca precisa voltar para tela nenhuma —
- * nem mascarada. Quem a le e o servidor, para falar com o provedor.
- *
- * Esta chave e o oposto disso, e a diferenca nao e de grau: ela existe PARA SER
- * MOSTRADA. Todo participante de um setor num evento que recebe pelo setor
- * precisa enxerga-la na tela para conseguir pagar. Cifrar em repouso o valor
- * que a propria aplicacao publica na pagina seguinte seria teatro: protegeria
- * contra um invasor com acesso ao banco e a nenhum outro, enquanto cobraria o
- * preco de tornar impossivel procurar, conferir e exportar a chave.
- *
- * O que esta chave exige e outra protecao, e essa e obrigatoria: ela so pode
- * aparecer para quem ja esta numa inscricao daquele setor. Nunca numa listagem
- * publica de setores, nunca no formulario de inscricao, nunca na pagina do
- * evento (RN-S3).
+ * **O setor nao guarda mais chave Pix nem responsavel.** Ate a RN-R2 ele
+ * guardava quatro campos que descreviam uma pessoa — conta, chave, titular e
+ * telefone —, e eles couberam enquanto o responsavel era um so. Com varios,
+ * esses campos passaram para o cadastro proprio de `Responsavel`, e o que sobra
+ * aqui e o vinculo: quem atende este setor.
  */
 class Cidade extends Model
 {
@@ -45,10 +32,6 @@ class Cidade extends Model
         'nome',
         'uf',
         'ativo',
-        'responsavel_id',
-        'chave_pix',
-        'titular_chave_pix',
-        'telefone_responsavel',
     ];
 
     /**
@@ -60,32 +43,41 @@ class Cidade extends Model
     }
 
     /**
-     * A pessoa que responde por este setor.
+     * As pessoas que atendem este setor (RN-R2).
      *
-     * E quem recebe o Pix dos participantes daqui e quem confere os
-     * comprovantes deles — vendo, no painel, apenas este setor (RN-S9).
+     * Sao elas que recebem o Pix de quem se inscreve por aqui e que conferem
+     * os comprovantes deste setor — QUALQUER uma delas, e nao so a que foi
+     * sorteada para uma cobranca (RN-R6). Responsavel ausente nao trava a fila.
      *
-     * @return BelongsTo<User, $this>
+     * @return BelongsToMany<Responsavel, $this>
      */
-    public function responsavel(): BelongsTo
+    public function responsaveis(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'responsavel_id');
+        return $this->belongsToMany(Responsavel::class, 'responsaveis_setores', 'cidade_id', 'responsavel_id')
+            ->orderBy('responsaveis.nome');
     }
 
     /**
      * Este setor consegue receber pagamento?
      *
-     * Precisa das duas coisas ao mesmo tempo: a chave para onde o dinheiro vai
-     * e a pessoa que vai conferir se ele chegou. Chave sem responsavel receberia
-     * pagamento que ninguem confirma; responsavel sem chave nao teria o que
-     * mostrar ao participante. Um evento so pode ser gravado no modo "setor"
-     * quando todo setor ativo responde sim aqui (RN-S4).
+     * Sim quando existe ao menos um responsavel APTO vinculado a ele — ativo e
+     * com chave (RN-R3). Um vinculo sozinho nao basta: responsavel sem chave
+     * nao teria o que mostrar ao participante, e desativado nao entra em
+     * sorteio nenhum. Um evento so pode ser gravado no modo "setor" quando todo
+     * setor ativo responde sim aqui (RN-S4).
+     *
+     * Quando a relacao ja veio carregada a resposta sai da memoria: a lista de
+     * setores da tela de catalogo pergunta isto uma vez por linha, e uma
+     * consulta por linha seria o mesmo trabalho feito N vezes.
      */
     public function estaPreparadaParaReceber(): bool
     {
-        return $this->responsavel_id !== null
-            && is_string($this->chave_pix)
-            && trim($this->chave_pix) !== '';
+        if ($this->relationLoaded('responsaveis')) {
+            return $this->responsaveis
+                ->contains(fn (Responsavel $responsavel): bool => $responsavel->estaApto());
+        }
+
+        return $this->responsaveis()->aptos()->exists();
     }
 
     /**
@@ -101,10 +93,10 @@ class Cidade extends Model
     {
         return static::query()
             ->ativos()
-            ->where(fn (Builder $consulta) => $consulta
-                ->whereNull('responsavel_id')
-                ->orWhereNull('chave_pix')
-                ->orWhere('chave_pix', '=', ''))
+            ->whereDoesntHave(
+                'responsaveis',
+                fn (Builder $consulta) => $consulta->aptos(),
+            )
             ->orderBy('nome')
             ->pluck('nome')
             ->map(fn (mixed $nome): string => (string) $nome)
