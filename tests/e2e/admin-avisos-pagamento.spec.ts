@@ -28,6 +28,9 @@ const ORGANIZADOR = 'avisos.organizador@example.com';
 /** O identificador que só existe dentro do conteúdo do aviso, e não na linha. */
 const TXID_DO_AVISO = 'txid-do-cenario-de-avisos-9911';
 
+/** O provedor fictício que separa os avisos deste cenário dos demais. */
+const GATEWAY_DO_CENARIO = 'cenario-e2e';
+
 function prepararConta(email: string, nome: string, papel: string): void {
     artisan([
         'tinker',
@@ -107,7 +110,10 @@ test.describe('em tela grande', () => {
         await entrar(page, ADMINISTRADOR);
 
         // Pelo menu, e não pelo endereço digitado: é assim que a pessoa chega.
-        await page.getByRole('link', { name: 'Avisos do provedor' }).click();
+        // `exact` porque o painel também oferece um atalho para a mesma tela,
+        // "Ver os avisos do provedor": sem ele o nome casaria com os dois e o
+        // cenário morreria em ambiguidade em vez de provar o menu.
+        await page.getByRole('link', { name: 'Avisos do provedor', exact: true }).click();
 
         await expect(page).toHaveURL(/\/admin\/pagamentos\/avisos$/);
         await expect(page.getByRole('heading', { name: 'Avisos do provedor', level: 1 })).toBeVisible();
@@ -125,8 +131,11 @@ test.describe('em tela grande', () => {
         await expect(tabela).toContainText('Inválida');
         await expect(tabela).toContainText('Assinatura invalida.');
 
-        // E a explicação de que "ignorado" não é erro fica à vista, ao lado do
-        // filtro — não escondida atrás de um ícone.
+        // E a explicação de que "ignorado" não é erro fica escrita ao lado do
+        // campo de situação, e não atrás de um ícone de ajuda. O painel de
+        // filtros nasce recolhido quando nenhum filtro está valendo — abrir é o
+        // mesmo gesto de quem vai filtrar —, e é lá dentro que a frase mora.
+        await page.getByTestId('abrir-filtros').click();
         await expect(page.getByText('Ignorado não é erro')).toBeVisible();
     });
 
@@ -144,7 +153,11 @@ test.describe('em tela grande', () => {
         const tabela = page.getByTestId('tabela-avisos');
 
         await expect(tabela).toContainText('Falhou');
-        await expect(tabela).not.toContainText('Processado');
+
+        // A ausência se mede no CORPO da tabela, e não nela inteira: o
+        // cabeçalho tem uma coluna chamada "Processado em", que existe sempre e
+        // não diz nada sobre quais linhas sobraram.
+        await expect(tabela.locator('tbody')).not.toContainText('Processado');
 
         // O endereço guarda o filtro: recarregar ou virar a página não joga fora
         // o que a pessoa acabou de pedir.
@@ -153,11 +166,25 @@ test.describe('em tela grande', () => {
 
     test('o conteúdo do aviso abre a um clique, e o botão diz que abriu', async ({ page }) => {
         await entrar(page, ADMINISTRADOR);
-        await page.goto('/admin/pagamentos/avisos');
 
-        const botao = page.getByRole('button', { name: 'Ver conteúdo do aviso' }).first();
+        // A lista vem restrita ao provedor deste cenário. Os outros cenários da
+        // suíte pagam inscrições de verdade, e cada pagamento simulado grava um
+        // aviso mais recente do que estes três: sem o recorte, a primeira linha
+        // da tela seria de outro cenário e o conteúdo procurado aqui não estaria
+        // nela. É o mesmo filtro que a tela oferece, escrito no endereço.
+        await page.goto(`/admin/pagamentos/avisos?gateway=${GATEWAY_DO_CENARIO}`);
+
+        // A linha é escolhida pelo aviso que carrega o txid — e não por ser a
+        // primeira. O nome do botão MUDA quando ele abre, que é justamente o que
+        // este cenário prova, então o locator casa com os dois rótulos: preso a
+        // "Ver conteúdo do aviso", ele deixaria de apontar para o botão clicado
+        // no instante do clique e passaria a apontar para o da linha seguinte,
+        // que continua fechada.
+        const linha = page.getByRole('row').filter({ hasText: 'aviso-processado' });
+        const botao = linha.getByRole('button', { name: /conteúdo do aviso$/ });
 
         await expect(botao).toBeVisible();
+        await expect(botao).toHaveAccessibleName('Ver conteúdo do aviso');
         await expect(botao).toHaveAttribute('aria-expanded', 'false');
 
         // Alvo de dedo tem piso, mesmo numa tela de computador (DA-42).
@@ -172,11 +199,13 @@ test.describe('em tela grande', () => {
         await botao.click();
 
         await expect(botao).toHaveAttribute('aria-expanded', 'true');
+        await expect(botao).toHaveAccessibleName('Ocultar conteúdo do aviso');
         await expect(page.getByText(TXID_DO_AVISO)).toBeVisible();
 
         await botao.click();
 
         await expect(botao).toHaveAttribute('aria-expanded', 'false');
+        await expect(botao).toHaveAccessibleName('Ver conteúdo do aviso');
         await expect(page.getByText(TXID_DO_AVISO)).toHaveCount(0);
     });
 
