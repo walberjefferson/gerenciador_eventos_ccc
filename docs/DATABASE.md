@@ -244,6 +244,7 @@ Catálogo de cidades. Global, não pertence a nenhum evento.
 | `responsavel_id` | bigint FK → `users` (null on delete) | sim | `null` | Quem responde pelo setor e confere os comprovantes dele |
 | `chave_pix` | varchar(140) | sim | `null` | Chave Pix do responsável, **em claro** (RN-S3) |
 | `titular_chave_pix` | varchar(120) | sim | `null` | Nome que aparece no aplicativo de quem paga |
+| `telefone_responsavel` | varchar(40) | sim | `null` | Contato de quem responde pelo setor, mostrado na tela de pagamento. **Opcional**: não entra em `estaPreparadaParaReceber()` nem trava a RN-S4 — telefone ausente não impede ninguém de pagar |
 | `created_at` / `updated_at` | timestamptz | sim | — | Carimbos do framework |
 
 **Índices e restrições:** `unique(nome, uf)`.

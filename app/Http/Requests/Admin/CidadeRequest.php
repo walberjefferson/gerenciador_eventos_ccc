@@ -69,6 +69,11 @@ class CidadeRequest extends FormRequest
             // Quem confere de verdade e o aplicativo do banco de quem paga.
             'chave_pix' => ['nullable', 'string', 'max:140'],
             'titular_chave_pix' => ['nullable', 'string', 'max:120'],
+            // O telefone e OPCIONAL, e continua opcional de proposito: ele
+            // ajuda quem ficou com duvida, mas nao impede ninguem de pagar.
+            // Por isso ele nao entra em Cidade::estaPreparadaParaReceber() e
+            // nao trava o cadastro de um evento que recebe pelo setor (RN-S4).
+            'telefone_responsavel' => ['nullable', 'string', 'min:8', 'max:40'],
         ];
     }
 
@@ -83,6 +88,7 @@ class CidadeRequest extends FormRequest
             'responsavel_id' => 'responsável pelo setor',
             'chave_pix' => 'chave Pix',
             'titular_chave_pix' => 'titular da chave Pix',
+            'telefone_responsavel' => 'telefone do responsável',
         ];
     }
 
@@ -100,6 +106,8 @@ class CidadeRequest extends FormRequest
             'responsavel_id.exists' => 'Escolha uma conta ativa do painel para responder pelo setor.',
             'chave_pix.max' => 'A chave Pix pode ter no máximo 140 caracteres.',
             'titular_chave_pix.max' => 'O nome do titular pode ter no máximo 120 caracteres.',
+            'telefone_responsavel.min' => 'Informe o telefone com DDD.',
+            'telefone_responsavel.max' => 'O telefone pode ter no máximo 40 caracteres.',
         ];
     }
 
@@ -112,6 +120,7 @@ class CidadeRequest extends FormRequest
             // copiada com o espaço junto e recusada pelo banco de quem paga.
             'chave_pix' => $this->texto('chave_pix'),
             'titular_chave_pix' => $this->texto('titular_chave_pix'),
+            'telefone_responsavel' => $this->texto('telefone_responsavel'),
         ]);
     }
 
@@ -129,6 +138,7 @@ class CidadeRequest extends FormRequest
                 : $this->integer('responsavel_id'),
             'chave_pix' => $this->texto('chave_pix'),
             'titular_chave_pix' => $this->texto('titular_chave_pix'),
+            'telefone_responsavel' => $this->texto('telefone_responsavel'),
         ];
     }
 

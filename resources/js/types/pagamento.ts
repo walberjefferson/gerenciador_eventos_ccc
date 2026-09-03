@@ -54,6 +54,8 @@ export interface SetorDaCobranca {
     chave_pix: string;
     titular: string | null;
     responsavel: string | null;
+    /** Telefone de quem responde pelo setor. Nulo quando ninguem cadastrou. */
+    telefone: string | null;
 }
 
 export interface LimitesDoComprovante {

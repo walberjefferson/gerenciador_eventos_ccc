@@ -221,6 +221,22 @@ const passosDoPagamento = computed<string[]>(() => {
                                 <p class="mt-2">
                                     Confira este nome no aplicativo do banco antes de concluir. Depois de pagar, envie o comprovante aqui embaixo.
                                 </p>
+                                <!-- O contato de quem responde pelo setor. Fica
+                                     junto da chave, e nao no rodape: a duvida
+                                     ("e este nome mesmo?", "o valor confere?")
+                                     nasce aqui, com o aplicativo do banco aberto
+                                     e o dinheiro prestes a sair. Some quando
+                                     ninguem cadastrou o numero — melhor nao
+                                     oferecer contato do que oferecer um vazio. -->
+                                <p v-if="setor?.telefone" class="mt-2">
+                                    Dúvidas? Fale com {{ setor.responsavel ?? setor.titular ?? 'o responsável pelo setor' }}:
+                                    <a
+                                        :href="`tel:${setor.telefone.replace(/\D/g, '')}`"
+                                        class="font-medium underline underline-offset-4"
+                                        data-testid="telefone-do-setor"
+                                        >{{ setor.telefone }}</a
+                                    >
+                                </p>
                             </AlertDescription>
                         </Alert>
 

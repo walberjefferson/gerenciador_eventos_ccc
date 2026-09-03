@@ -56,6 +56,7 @@ class CidadeController extends Controller
                     // aqui ja passou por "catalogo.gerenciar".
                     'chave_pix' => $cidade->chave_pix,
                     'titular_chave_pix' => $cidade->titular_chave_pix,
+                    'telefone_responsavel' => $cidade->telefone_responsavel,
                     'preparado_para_receber' => $cidade->estaPreparadaParaReceber(),
                 ])
                 ->all(),

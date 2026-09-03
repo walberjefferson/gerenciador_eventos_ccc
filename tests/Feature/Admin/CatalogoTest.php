@@ -75,6 +75,54 @@ describe('setores', function () {
         expect($setor->fresh()->nome)->toBe('Setor Santana do Ipanema');
     });
 
+    /*
+    | O telefone do responsavel e OPCIONAL, e os dois testes abaixo guardam as
+    | duas metades dessa promessa: cadastrar sem ele continua funcionando, e
+    | limpar o campo devolve nulo — nunca texto vazio, que faria a tela de
+    | pagamento oferecer um link "ligue para" sem numero nenhum.
+    */
+    it('grava o telefone do responsavel quando ele e informado', function () {
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/catalogo/setores', [
+                'nome' => 'Setor Batalha',
+                'uf' => 'AL',
+                'telefone_responsavel' => '(82) 99999-1234',
+            ])
+            ->assertSessionHasNoErrors();
+
+        expect(Cidade::where('nome', 'Setor Batalha')->value('telefone_responsavel'))
+            ->toBe('(82) 99999-1234');
+    });
+
+    it('limpar o telefone do responsavel devolve nulo, e nao texto vazio', function () {
+        $setor = Cidade::factory()->create([
+            'nome' => 'Setor Delmiro',
+            'uf' => 'AL',
+            'telefone_responsavel' => '(82) 98888-4321',
+        ]);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->put(route('admin.catalogo.setores.update', ['setor' => $setor->id]), [
+                'nome' => 'Setor Delmiro',
+                'uf' => 'AL',
+                'ativo' => true,
+                'telefone_responsavel' => '   ',
+            ])
+            ->assertSessionHasNoErrors();
+
+        expect($setor->fresh()->telefone_responsavel)->toBeNull();
+    });
+
+    it('recusa telefone curto demais para ter DDD', function () {
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/catalogo/setores', [
+                'nome' => 'Setor Olho',
+                'uf' => 'AL',
+                'telefone_responsavel' => '99999',
+            ])
+            ->assertSessionHasErrors('telefone_responsavel');
+    });
+
     it('recusa nome repetido no mesmo estado antes de o banco reclamar', function () {
         Cidade::factory()->create(['nome' => 'Setor Batalha', 'uf' => 'AL']);
 

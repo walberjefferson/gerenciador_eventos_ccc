@@ -119,6 +119,11 @@ class PagamentoController extends Controller
             'chave_pix' => $setor->chave_pix,
             'titular' => $setor->titular_chave_pix,
             'responsavel' => $setor->responsavel?->name,
+            // O telefone de quem responde pelo setor, para a duvida que aparece
+            // com o dinheiro ja fora da conta. Nulo quando ninguem cadastrou —
+            // a tela simplesmente nao oferece o contato, em vez de mostrar um
+            // convite para ligar para lugar nenhum.
+            'telefone' => $setor->telefone_responsavel,
         ];
     }
 

@@ -48,6 +48,7 @@ class Cidade extends Model
         'responsavel_id',
         'chave_pix',
         'titular_chave_pix',
+        'telefone_responsavel',
     ];
 
     /**

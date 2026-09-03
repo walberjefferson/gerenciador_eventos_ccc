@@ -2,8 +2,10 @@
 import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
 import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
+import CampoMascarado from '@/components/inscricao/CampoMascarado.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import { mascararTelefone } from '@/lib/formato';
 import type { CidadeDoCatalogo, ResponsavelDisponivel } from '@/types/admin';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { CircleAlert, Pencil, Trash2 } from 'lucide-vue-next';
@@ -59,6 +61,7 @@ const formulario = useForm({
     responsavel_id: null as number | null,
     chave_pix: '',
     titular_chave_pix: '',
+    telefone_responsavel: '',
 });
 
 /**
@@ -135,6 +138,7 @@ function editar(cidade: CidadeDoCatalogo): void {
     formulario.responsavel_id = cidade.responsavel_id;
     formulario.chave_pix = cidade.chave_pix ?? '';
     formulario.titular_chave_pix = cidade.titular_chave_pix ?? '';
+    formulario.telefone_responsavel = cidade.telefone_responsavel ?? '';
 
     void nextTick(() => campoNome.value?.focus());
 }
@@ -339,6 +343,29 @@ function excluir(cidade: CidadeDoCatalogo): void {
                             </p>
                             <p v-if="formulario.errors.titular_chave_pix" role="alert" class="text-destructive text-sm">
                                 {{ formulario.errors.titular_chave_pix }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-1">
+                            <label for="setor-telefone" class="text-sm font-medium">Telefone do responsável</label>
+                            <CampoMascarado
+                                id="setor-telefone"
+                                v-model="formulario.telefone_responsavel"
+                                :mascara="mascararTelefone"
+                                type="tel"
+                                inputmode="tel"
+                                maxlength="40"
+                                autocomplete="tel"
+                                aria-describedby="ajuda-setor-telefone"
+                                data-testid="campo-telefone-responsavel"
+                                :aria-invalid="formulario.errors.telefone_responsavel ? true : undefined"
+                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            />
+                            <p id="ajuda-setor-telefone" class="text-muted-foreground text-sm">
+                                Aparece na tela de pagamento para quem se inscreve por este setor tirar dúvidas. Opcional.
+                            </p>
+                            <p v-if="formulario.errors.telefone_responsavel" role="alert" class="text-destructive text-sm">
+                                {{ formulario.errors.telefone_responsavel }}
                             </p>
                         </div>
                     </fieldset>

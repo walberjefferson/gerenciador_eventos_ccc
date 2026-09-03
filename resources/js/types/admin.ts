@@ -24,6 +24,7 @@ export interface CidadeDoCatalogo {
      */
     chave_pix: string | null;
     titular_chave_pix: string | null;
+    telefone_responsavel: string | null;
     /** Tem responsável E chave: só assim o setor consegue receber (RN-S4). */
     preparado_para_receber: boolean;
 }

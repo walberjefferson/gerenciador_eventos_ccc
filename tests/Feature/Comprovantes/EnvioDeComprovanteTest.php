@@ -291,6 +291,49 @@ it('a tela do participante conta o estado do comprovante sem inventar situacao d
         ->and($props['estado'])->toBe('aguardando');
 });
 
+/*
+| O telefone de quem responde pelo setor.
+|
+| Ele existe para a duvida que aparece com o dinheiro prestes a sair — "e este
+| nome mesmo?", "o valor confere?" — e por isso viaja junto da chave, na mesma
+| tela. E OPCIONAL: sem ele a tela simplesmente nao oferece contato, em vez de
+| convidar a pessoa a ligar para lugar nenhum.
+*/
+it('leva o telefone do responsavel para a tela, junto da chave', function (): void {
+    $inscricao = inscricaoNoModoSetor();
+
+    $inscricao->setor()?->update(['telefone_responsavel' => '(82) 99999-1234']);
+
+    $url = URL::temporarySignedRoute(
+        'inscricoes.pagamento',
+        Carbon::now()->addDays(8),
+        ['codigo_publico' => $inscricao->codigo_publico],
+    );
+
+    $props = $this->get($url)->assertOk()->viewData('page')['props'];
+
+    expect($props['setor']['telefone'])->toBe('(82) 99999-1234');
+});
+
+it('nao oferece contato quando ninguem cadastrou o telefone do responsavel', function (): void {
+    $inscricao = inscricaoNoModoSetor();
+
+    $url = URL::temporarySignedRoute(
+        'inscricoes.pagamento',
+        Carbon::now()->addDays(8),
+        ['codigo_publico' => $inscricao->codigo_publico],
+    );
+
+    $props = $this->get($url)->assertOk()->viewData('page')['props'];
+
+    // Nulo, e nao string vazia: a tela decide pelo v-if, e "" seria verdadeiro
+    // o bastante para desenhar um link de telefone sem telefone.
+    expect($props['setor']['telefone'])->toBeNull()
+        // E o setor sem telefone continua podendo receber: RN-S4 trava em chave
+        // e responsavel, nunca no contato.
+        ->and($props['setor']['chave_pix'])->toBe('setor@example.com');
+});
+
 it('nao mostra chave nem campo de comprovante em evento que recebe pelo provedor', function (): void {
     $cenario = Cenario::montar();
     $inscricao = $cenario->inscrever();
