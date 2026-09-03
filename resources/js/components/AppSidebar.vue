@@ -4,7 +4,19 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BellRing, CalendarDays, KeyRound, LayoutGrid, MapPin, ScanLine, ScrollText, ShieldCheck, Users, UsersRound } from 'lucide-vue-next';
+import {
+    BellRing,
+    CalendarDays,
+    KeyRound,
+    LayoutGrid,
+    MapPin,
+    ReceiptText,
+    ScanLine,
+    ScrollText,
+    ShieldCheck,
+    Users,
+    UsersRound,
+} from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -28,6 +40,10 @@ const itensPorPermissao: { permissao: string; item: NavItem }[] = [
     // A portaria vem logo depois das três de sempre: no dia do evento ela é a
     // tela mais usada do sistema, e para quem tem só ela é a única.
     { permissao: 'presenca.registrar', item: { title: 'Portaria', href: '/admin/portaria', icon: ScanLine } },
+    // A fila de conferência de comprovantes. Para quem responde por um setor
+    // ela é uma das duas telas que existem — e sem o item aqui, a única forma
+    // de chegar até ela seria digitar o endereço.
+    { permissao: 'pagamentos.conferir-comprovante', item: { title: 'Comprovantes', href: '/admin/comprovantes', icon: ReceiptText } },
 ];
 
 /**

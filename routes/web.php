@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\AuditoriaController;
 use App\Http\Controllers\Admin\AvisosPagamentoController;
 use App\Http\Controllers\Admin\CidadeController;
+use App\Http\Controllers\Admin\ConferenciaComprovanteController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
 use App\Http\Controllers\Admin\CredenciaisPagamentoController;
 use App\Http\Controllers\Admin\DiaEventoController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\Admin\PapelController;
 use App\Http\Controllers\Admin\PortariaController;
 use App\Http\Controllers\Admin\UsuarioController;
+use App\Http\Controllers\ComprovanteController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IngressoParticipanteController;
@@ -83,6 +85,14 @@ Route::get('inscricoes/{codigo_publico}/ingresso', [IngressoParticipanteControll
 Route::post('inscricoes/{codigo_publico}/segunda-via', [SegundaViaPagamentoController::class, 'store'])
     ->middleware(['signed', 'throttle:'.config('inscricoes.limites.segunda_via')])
     ->name('inscricoes.segunda-via');
+
+// O comprovante de pagamento, quando o evento recebe pela chave Pix do
+// responsavel do setor. Assinada como todas as do participante — e com limite
+// de tentativas, porque e a UNICA porta em que alguem de fora escreve arquivo
+// no servidor.
+Route::post('inscricoes/{codigo_publico}/comprovante', [ComprovanteController::class, 'store'])
+    ->middleware(['signed', 'throttle:'.config('inscricoes.limites.comprovante')])
+    ->name('inscricoes.comprovante');
 
 // Recuperacao do link de acesso. O limite de tentativas por IP e por e-mail
 // e contado dentro do controller, para que a resposta continue neutra; o
@@ -253,6 +263,35 @@ Route::middleware(['auth', 'verified'])
                 Route::post('{inscricao}/confirmar-pagamento', [AcaoInscricaoController::class, 'confirmarPagamento'])
                     ->middleware('permission:pagamentos.confirmar-manual')
                     ->name('confirmar-pagamento');
+            });
+
+        // A fila de conferencia de comprovantes.
+        //
+        // A permissao "pagamentos.conferir-comprovante" e da mesma familia da
+        // confirmacao manual, mas mais estreita: ela so age sobre inscricao do
+        // proprio setor e so a partir de um comprovante que alguem enviou (o
+        // motivo por extenso esta no PapeisSeeder).
+        //
+        // O ESCOPO DE SETOR NAO ESTA AQUI, e nao poderia estar: middleware nao
+        // sabe de qual setor e a inscricao. Ele mora em
+        // ComprovantePagamentoPolicy e em FiltroDeInscricoes, no servidor, e
+        // nunca depende de parametro que o navegador mande (RN-S9).
+        Route::middleware('permission:pagamentos.conferir-comprovante')
+            ->prefix('comprovantes')
+            ->name('comprovantes.')
+            ->group(function (): void {
+                Route::get('/', [ConferenciaComprovanteController::class, 'index'])->name('index');
+
+                // O arquivo nunca e servido direto do disco (RN-S11): esta rota
+                // confere quem pede antes de responder o download.
+                Route::get('{comprovante}/arquivo', [ConferenciaComprovanteController::class, 'show'])
+                    ->name('arquivo');
+
+                Route::post('{comprovante}/aceitar', [ConferenciaComprovanteController::class, 'aceitar'])
+                    ->name('aceitar');
+
+                Route::post('{comprovante}/recusar', [ConferenciaComprovanteController::class, 'recusar'])
+                    ->name('recusar');
             });
 
         // Quem entra no painel, com que papel, e ate quando. A permissao

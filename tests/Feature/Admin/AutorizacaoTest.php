@@ -15,11 +15,13 @@ use Tests\Feature\Admin\Cenario;
  * O numero e escrito a mao de proposito: contar `PapeisSeeder::PERMISSOES`
  * faria o teste concordar com qualquer coisa que alguem acrescentasse. Ele
  * subiu de 10 para 11 na tela dos avisos do provedor (permissao
- * "pagamentos.avisos-ver", so do administrador) e de 11 para 13 no controle de
- * presenca ("presenca.registrar" e "presenca.desfazer"). Quem mexer neste
- * numero esta dizendo, por escrito, que criou ou tirou uma permissao.
+ * "pagamentos.avisos-ver", so do administrador), de 11 para 13 no controle de
+ * presenca ("presenca.registrar" e "presenca.desfazer") e de 13 para 14 no
+ * recebimento pela chave Pix do setor ("pagamentos.conferir-comprovante", do
+ * administrador e do responsavel de setor). Quem mexer neste numero esta
+ * dizendo, por escrito, que criou ou tirou uma permissao.
  */
-const TOTAL_DE_PERMISSOES = 13;
+const TOTAL_DE_PERMISSOES = 14;
 
 /**
  * Quantos papeis existem.
@@ -27,16 +29,20 @@ const TOTAL_DE_PERMISSOES = 13;
  * Foram dois durante seis fases, e o comentario do `PapeisSeeder` explica por
  * que: perfil sem ninguem para ocupar e complexidade sem dono. O terceiro
  * ("portaria") nasceu com gente de verdade para ocupa-lo — o voluntario do
- * portao no dia do evento — e com uma permissao so.
+ * portao no dia do evento — e com uma permissao so. O quarto
+ * ("responsavel-setor") nasceu pelo mesmo criterio: nos eventos que recebem
+ * pela chave Pix do setor, o dinheiro cai na conta de uma pessoa, e e ela quem
+ * pode dizer se entrou.
  */
-const TOTAL_DE_PAPEIS = 3;
+const TOTAL_DE_PAPEIS = 4;
 
-it('cria os tres papeis e as treze permissoes', function (): void {
+it('cria os quatro papeis e as catorze permissoes', function (): void {
     Cenario::semearPapeis();
 
     expect(Role::count())->toBe(TOTAL_DE_PAPEIS)
         ->and(Permission::count())->toBe(TOTAL_DE_PERMISSOES)
-        ->and(Role::pluck('name')->sort()->values()->all())->toBe(['administrador', 'organizador', 'portaria']);
+        ->and(Role::pluck('name')->sort()->values()->all())
+        ->toBe(['administrador', 'organizador', 'portaria', 'responsavel-setor']);
 });
 
 it('roda duas vezes sem duplicar papel nem permissao', function (): void {

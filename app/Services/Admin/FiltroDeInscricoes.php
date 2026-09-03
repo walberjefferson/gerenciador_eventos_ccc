@@ -7,6 +7,8 @@ namespace App\Services\Admin;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Models\Inscricao;
+use App\Models\User;
+use App\Policies\ComprovantePagamentoPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,13 +24,26 @@ use Illuminate\Support\Carbon;
  * **CPF nao filtra e nao busca.** O documento e guardado cifrado (D-08) e a
  * impressao digital serve so para comparar o numero inteiro. Procurar por
  * pedaco e impossivel por construcao — e essa impossibilidade e a protecao.
+ *
+ * **O setor tem duas caras aqui, e elas nao se misturam.** `cidade_id` e um
+ * FILTRO: quem tem alcance amplo escolhe um setor para olhar e troca de setor a
+ * hora que quiser. O escopo da RN-S9 e outra coisa: para quem responde por um
+ * setor, o recorte e imposto pelo servidor, some da URL e nao aceita ser
+ * alterado — trocar `cidade_id` na barra de enderecos nao amplia nada, porque
+ * as duas condicoes valem ao mesmo tempo.
  */
 final class FiltroDeInscricoes
 {
     /**
      * @param  array<string, string|null>  $valores
+     * @param  array<int, int>|null  $setoresPermitidos  null quando o alcance e
+     *                                                   amplo; a lista (mesmo
+     *                                                   vazia) quando ha recorte
      */
-    private function __construct(private readonly array $valores) {}
+    private function __construct(
+        private readonly array $valores,
+        private readonly ?array $setoresPermitidos = null,
+    ) {}
 
     public static function doPedido(Request $pedido): self
     {
@@ -48,7 +63,31 @@ final class FiltroDeInscricoes
             'criada_de' => $texto($pedido->input('criada_de')),
             'criada_ate' => $texto($pedido->input('criada_ate')),
             'busca' => $texto($pedido->input('busca')),
-        ]);
+        ], self::escopoDoUsuario($pedido->user()));
+    }
+
+    /**
+     * O recorte de setor que vale para quem fez o pedido.
+     *
+     * Devolve `null` — "sem recorte" — para quem alcanca todos os setores, e a
+     * LISTA para quem responde por alguns. Lista vazia e uma resposta legitima
+     * e quer dizer "nenhuma inscricao": quem nao responde por setor nenhum e
+     * nao alcanca tudo nao tem o que ver aqui.
+     *
+     * A distincao entre `null` e `[]` e o coracao desta funcao. Se as duas
+     * fossem a mesma coisa, o dia em que um responsavel perdesse o setor ele
+     * passaria a ver o sistema inteiro — que e exatamente o erro que este
+     * arquivo existe para nao cometer.
+     *
+     * @return array<int, int>|null
+     */
+    private static function escopoDoUsuario(?User $usuario): ?array
+    {
+        if (! $usuario instanceof User || ComprovantePagamentoPolicy::alcancaTodosOsSetores($usuario)) {
+            return null;
+        }
+
+        return ComprovantePagamentoPolicy::setoresDe($usuario);
     }
 
     /**
@@ -95,6 +134,7 @@ final class FiltroDeInscricoes
             ->orderByDesc('inscricoes.created_at')
             ->orderByDesc('inscricoes.id');
 
+        $this->aplicarEscopoDeSetor($consulta);
         $this->porEvento($consulta);
         $this->porSituacao($consulta);
         $this->porCidade($consulta);
@@ -105,6 +145,27 @@ final class FiltroDeInscricoes
         $this->porBusca($consulta);
 
         return $consulta;
+    }
+
+    /**
+     * O escopo obrigatorio da RN-S9.
+     *
+     * Ele entra ANTES de qualquer filtro escolhido na tela, e nao vem de
+     * parametro nenhum: a lista de setores foi lida do banco a partir de quem
+     * esta logado. Quem responde pelo Setor A nao amplia isto trocando
+     * `cidade_id` na URL — no maximo estreita ainda mais, o que e inofensivo.
+     *
+     * @param  Builder<Inscricao>  $consulta
+     */
+    private function aplicarEscopoDeSetor(Builder $consulta): void
+    {
+        if ($this->setoresPermitidos === null) {
+            return;
+        }
+
+        $setores = $this->setoresPermitidos;
+
+        $consulta->whereHas('grupoParticipante', fn (Builder $grupo) => $grupo->whereIn('cidade_id', $setores));
     }
 
     /**

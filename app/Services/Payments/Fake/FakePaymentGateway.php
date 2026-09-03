@@ -11,6 +11,7 @@ use App\DTOs\Payments\PaymentStatusResult;
 use App\DTOs\Payments\RefundResult;
 use App\DTOs\Payments\WebhookRequestData;
 use App\DTOs\Payments\WebhookResult;
+use App\Services\Pagamentos\MontadorDeBrCodePix;
 use App\Services\Payments\MomentoDoProvedor;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\Request;
@@ -251,60 +252,26 @@ class FakePaymentGateway implements PaymentGateway
      * Monta um "Pix copia e cola" ficticio no formato EMV, o mesmo formato que
      * os bancos usam. E ficticio de proposito: a chave e o comerciante saem da
      * configuracao do provedor simulado e nao correspondem a conta nenhuma.
+     *
+     * A montagem em si nao mora mais aqui: ela foi extraida para
+     * MontadorDeBrCodePix quando ganhou um segundo chamador de verdade — o
+     * evento que recebe pela chave Pix do responsavel do setor. Este metodo
+     * continua existindo porque a ESCOLHA do que vai em cada campo e do
+     * provedor simulado, nao do montador.
+     *
+     * A descricao (campo 26-02) nao e passada: sem ela o payload sai exatamente
+     * como saia antes da extracao, e ha um teste comparando os dois byte a
+     * byte.
      */
     private function pixPayload(string $externalId, int $amountCents): string
     {
-        $chave = (string) ($this->config['pix_key'] ?? 'chave-pix-ficticia@example.com');
-        $nome = $this->emv26((string) ($this->config['merchant_name'] ?? 'EVENTOS DEMO'), 25);
-        $cidade = $this->emv26((string) ($this->config['merchant_city'] ?? 'SAO PAULO'), 15);
-        $identificador = $this->emv26(Str::upper(Str::substr($externalId, -20)), 25);
-
-        $conta = $this->campo('00', 'br.gov.bcb.pix').$this->campo('01', $chave);
-
-        $payload = $this->campo('00', '01')
-            .$this->campo('26', $conta)
-            .$this->campo('52', '0000')
-            .$this->campo('53', '986')
-            .$this->campo('54', number_format($amountCents / 100, 2, '.', ''))
-            .$this->campo('58', 'BR')
-            .$this->campo('59', $nome)
-            .$this->campo('60', $cidade)
-            .$this->campo('62', $this->campo('05', $identificador))
-            .'6304';
-
-        return $payload.$this->crc16($payload);
-    }
-
-    private function campo(string $id, string $valor): string
-    {
-        return $id.str_pad((string) mb_strlen($valor), 2, '0', STR_PAD_LEFT).$valor;
-    }
-
-    /**
-     * O formato EMV so aceita letras sem acento, numeros e espaco.
-     */
-    private function emv26(string $texto, int $limite): string
-    {
-        $limpo = preg_replace('/[^A-Za-z0-9 ]/', '', Str::ascii($texto)) ?? '';
-
-        return Str::upper(Str::substr(trim($limpo), 0, $limite));
-    }
-
-    private function crc16(string $payload): string
-    {
-        $crc = 0xFFFF;
-
-        for ($i = 0; $i < strlen($payload); $i++) {
-            $crc ^= ord($payload[$i]) << 8;
-
-            for ($bit = 0; $bit < 8; $bit++) {
-                $crc = ($crc & 0x8000) !== 0
-                    ? (($crc << 1) ^ 0x1021) & 0xFFFF
-                    : ($crc << 1) & 0xFFFF;
-            }
-        }
-
-        return Str::upper(str_pad(dechex($crc), 4, '0', STR_PAD_LEFT));
+        return (new MontadorDeBrCodePix)->montar(
+            chave: (string) ($this->config['pix_key'] ?? 'chave-pix-ficticia@example.com'),
+            valorCentavos: $amountCents,
+            nomeDoRecebedor: (string) ($this->config['merchant_name'] ?? 'EVENTOS DEMO'),
+            cidade: (string) ($this->config['merchant_city'] ?? 'SAO PAULO'),
+            identificador: Str::upper(Str::substr($externalId, -20)),
+        );
     }
 
     /**

@@ -341,6 +341,137 @@ Excluir lote que já tem inscrição é recusado (`restrictOnDelete`, com a expl
 
 ---
 
+## Regras do recebimento pela chave Pix do setor
+
+Um evento escolhe **por onde o dinheiro entra**: pelo provedor de pagamento,
+como sempre, ou pela chave Pix do responsável do setor de cada participante.
+No segundo caminho nenhuma chamada sai para o provedor, o participante envia o
+comprovante pela própria tela, e uma pessoa — o responsável do setor — confere
+e confirma.
+
+### RN-S1 — A forma de recebimento é do evento, e é uma só
+
+`eventos.forma_recebimento` vale `gateway` (o padrão) ou `setor`, e vale para
+todas as inscrições daquele evento. Ela é lida **num lugar só** —
+`CriarPagamentoDaInscricao`, na hora de emitir a cobrança — e em nenhum outro
+decide nada.
+
+### RN-S2 — No modo `setor`, nenhuma chamada sai para o provedor
+
+A bifurcação acontece **antes** de qualquer toque no `PaymentGateway`: cria-se
+um `Pagamento` com `gateway = 'setor'`, `id_externo = null`, `metodo = Pix`,
+`expira_em` igual ao prazo da inscrição e `pix_copia_e_cola` com um BR Code
+estático montado a partir da chave do setor. Nenhuma credencial é lida, nenhum
+certificado é materializado, nenhum pacote sai pela rede.
+
+O `id_externo` nulo é o que já mantém essa cobrança fora da reconciliação
+(`whereNotNull('id_externo')`) e fora do aviso de cancelamento ao provedor.
+
+### RN-S3 — A chave Pix do setor não é cifrada, e isso é decisão
+
+`CredencialPagamento.chave_pix` é cifrada porque é segredo de instituição
+financeira e nunca precisa voltar para tela nenhuma. A chave do setor é o
+oposto: ela **existe para ser mostrada** a todo participante daquele setor.
+Cifrar o que a própria tela publica na página seguinte é teatro. O que protege
+esta chave é o escopo de quem a vê — só aparece dentro de uma inscrição daquele
+setor, nunca numa listagem pública.
+
+### RN-S4 — O setor precisa estar pronto antes de o evento ser salvo
+
+Salvar um evento com `forma_recebimento = setor` é recusado enquanto existir
+setor **ativo** sem `chave_pix` **ou** sem `responsavel_id`. A mensagem nomeia
+os setores que faltam. Um evento que cobra por chave que não existe é uma
+inscrição que ninguém consegue pagar.
+
+### RN-S5 — O comprovante é do participante, pela tela dele
+
+Imagem (`jpeg`, `png`, `webp`) ou `pdf`, no máximo 5 MB, validado pelo
+**conteúdo** (`mimetypes`) e nunca pela extensão. Guardado em disco privado,
+sob `comprovantes/{ano}/{codigo_publico}/`, com nome gerado pelo servidor — o
+nome original vai para a coluna, nunca para o caminho. A rota de envio é
+assinada e tem limite de tentativas.
+
+### RN-S6 — Um comprovante em aberto por inscrição
+
+Enviar outro enquanto o anterior ainda está `enviado` **substitui** o anterior:
+a linha é sobrescrita e o arquivo antigo sai do disco. Depois de `recusado`, um
+envio novo cria linha nova — o histórico da recusa, e o motivo escrito nela, não
+se apaga. Quem garante isso no banco é o índice único parcial
+`comprovantes_um_em_aberto_por_inscricao`.
+
+### RN-S7 — Enviar comprovante não confirma nada
+
+A situação da inscrição continua `aguardando_pagamento` até uma pessoa
+conferir. O que a tela do participante mostra ("comprovante enviado, em
+conferência") vem do **comprovante**, não da situação da inscrição: é informação
+de tela, e não estado de domínio.
+
+> **Risco conhecido e aceito.** Não existe situação "em conferência", e o prazo
+> da inscrição corre enquanto o comprovante espera. A pessoa pode pagar no sexto
+> dia de um prazo de sete, o responsável abrir o painel no oitavo, e a rotina de
+> expiração já ter devolvido a vaga — com o dinheiro na conta dele. Duas
+> mitigações reduzem a chance sem mudar a máquina de estados: a fila de
+> conferência ordena pelo prazo mais próximo e destaca em vermelho o que vence
+> em menos de 24 horas, e a tela do participante diz, depois do envio, até
+> quando a conferência precisa acontecer.
+
+### RN-S8 — Evento no modo `setor` tem prazo mínimo maior
+
+`prazo_pagamento_minutos` passa a ser validado conforme a forma: mínimo de **5
+minutos** no modo `gateway` (como sempre) e de **2880** (2 dias) no modo
+`setor`, com **10080** (7 dias) sugerido pelo formulário. Uma transferência
+conferida por uma pessoa não cabe em 24 horas.
+
+### RN-S9 — Quem confere é o responsável daquele setor, e só enxerga o setor dele
+
+Papel `responsavel-setor`, com duas permissões: `inscricoes.ver` (que já
+existia) e `pagamentos.conferir-comprovante` (nova). Em toda consulta que ele
+alcança, o setor é **escopo obrigatório aplicado no servidor** — nunca um filtro
+que ele possa mudar. Trocar `cidade_id` na URL só estreita; nunca amplia. A
+regra mora inteira em `ComprovantePagamentoPolicy`, e `FiltroDeInscricoes`,
+`InscricaoPolicy` e o controller da fila perguntam a ela. Administrador continua
+vendo tudo e também confere.
+
+### RN-S10 — Aceitar o comprovante é confirmar o pagamento pelo caminho que já existe
+
+Aceitar delega a `ConfirmarPagamentoManual` com `metodo = Transferencia` e a
+observação escrita por quem conferiu. Nenhuma regra de dinheiro nova: a vaga
+presa vira vaga paga, o anúncio é `InscricaoConfirmada`, a auditoria é a mesma.
+Recusar exige motivo, marca o comprovante como `recusado` e **não mexe** na
+inscrição — ela segue aguardando pagamento até o prazo.
+
+### RN-S11 — O arquivo nunca é servido direto
+
+O disco `comprovantes` é privado, fora de `storage/app/public` e sem URL. O
+download passa por rota autenticada, com a mesma checagem de escopo da RN-S9, e
+responde `Storage::download()`.
+
+### RN-S12 — Evento no modo `gateway` não muda em nada
+
+Nenhuma tela, nenhum teste e nenhum caminho de cobrança se comporta diferente do
+que se comportava antes. O padrão da coluna é `gateway`, o formulário que não
+manda o campo continua no `gateway`, e o recorte de setor só alcança quem tem
+`pagamentos.conferir-comprovante` **e** não tem `pagamentos.confirmar-manual`.
+
+### RN-S13 — O código da inscrição viaja no BR Code, em dois campos
+
+| Campo EMV | Conteúdo | Limite | Por quê |
+|---|---|---|---|
+| `26-02` | `INSCRICAO <codigo_publico>` — o ULID inteiro | 72 | é o que os aplicativos de banco mostram como descrição, e é onde o código cabe sem mutilação |
+| `62-05` | os últimos 25 caracteres do código | 25 | é o identificador de transação; o ULID tem 26 caracteres e não cabe inteiro |
+
+A palavra sai em caixa alta porque o saneamento EMV é o mesmo do resto do
+payload — e é essa mesmice que garante a igualdade byte a byte com o código
+anterior à extração do `MontadorDeBrCodePix`.
+
+**Nem um nem outro é conciliação.** Nem todo aplicativo preserva esses campos a
+quem recebe, e nada impede a pessoa de copiar a chave e pagar pela mão. Eles
+ajudam quem confere a achar a inscrição; nenhuma decisão de dinheiro pode
+depender deles — inclusive o valor do campo `54`, que num BR Code estático é
+sugestão e não trava.
+
+---
+
 ## Mapeamento com os testes obrigatórios do briefing
 
 O briefing exige oito testes com nomes em inglês. Como o domínio deste projeto é escrito em português, eles receberam nomes equivalentes. A correspondência é esta:
@@ -366,6 +497,10 @@ Testes adicionais criados além dos exigidos:
 | `tests/Feature/Pagamentos/ReconciliacaoTest.php` | RN-P05 |
 | `tests/Feature/Inscricoes/LotesTest.php` | RN-L1 a RN-L11: vigência, fotografia do preço, corrida pela última vaga do lote e a vaga que não volta |
 | `tests/Feature/Admin/LotesAdminTest.php` | RN-L1, RN-L2 e RN-L12 no cadastro, com auditoria |
+| `tests/Feature/Pagamentos/RecebimentoPeloSetorTest.php` | RN-S1 a RN-S4, RN-S8, RN-S12 e RN-S13, com um provedor que explode se for chamado |
+| `tests/Feature/Comprovantes/EnvioDeComprovanteTest.php` | RN-S5, RN-S6, RN-S7 e RN-S11 |
+| `tests/Feature/Comprovantes/ConferenciaTest.php` | RN-S9 e RN-S10, incluindo o 403 pela URL direta |
+| `tests/e2e/pagamento-pelo-setor.spec.ts` | os quatro caminhos na tela: pagar, conferir, recusar e o isolamento entre setores |
 
 ---
 
@@ -391,3 +526,7 @@ Testes adicionais criados além dos exigidos:
 | RN-L5 | "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}." / "As vagas do {lote} acabaram neste instante." |
 | RN-L9 | "Os lotes de inscrição se esgotaram." |
 | RN-L12 | "Não é possível excluir este lote: {n} inscrição(ões) vieram dele." / "Este lote já ocupou {n} vaga(s). A quantidade não pode ser menor do que isso." |
+| RN-S4 | "Para receber pela chave Pix do setor, todo setor ativo precisa ter responsável e chave Pix cadastrados. Faltam: {setores}." |
+| RN-S5 | "O comprovante precisa ser uma imagem (JPG, PNG ou WebP) ou um PDF. Trocar a extensão do arquivo não funciona: o servidor confere o conteúdo." / "O arquivo passou de 5 MB." |
+| RN-S8 | "Quando o evento recebe pela chave Pix do setor, o prazo precisa ter ao menos 2880 minutos (2 dias)." |
+| RN-S10 | "Descreva o que você conferiu no comprovante." / "Escreva por que o comprovante não foi aceito: é o que o participante vai ler para corrigir." |

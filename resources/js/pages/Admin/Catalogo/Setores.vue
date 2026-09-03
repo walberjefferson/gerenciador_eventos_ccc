@@ -4,9 +4,9 @@ import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { CidadeDoCatalogo } from '@/types/admin';
+import type { CidadeDoCatalogo, ResponsavelDisponivel } from '@/types/admin';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import { CircleAlert, Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, ref } from 'vue';
 
 /**
@@ -26,6 +26,7 @@ import { computed, nextTick, ref } from 'vue';
 const props = defineProps<{
     cidades: CidadeDoCatalogo[];
     ufs: string[];
+    responsaveis: ResponsavelDisponivel[];
     sucesso: string | null;
 }>();
 
@@ -52,6 +53,12 @@ const formulario = useForm({
     // porque a coluna é obrigatória e entra na chave única (nome, uf).
     uf: 'AL',
     ativo: true as boolean,
+    // Os três campos do recebimento pelo setor. Ficam vazios por padrão e o
+    // setor continua valendo assim: só o evento que recebe pela chave Pix do
+    // setor precisa deles preenchidos (RN-S4).
+    responsavel_id: null as number | null,
+    chave_pix: '',
+    titular_chave_pix: '',
 });
 
 /**
@@ -125,6 +132,9 @@ function editar(cidade: CidadeDoCatalogo): void {
     formulario.nome = cidade.nome;
     formulario.uf = cidade.uf;
     formulario.ativo = cidade.ativo;
+    formulario.responsavel_id = cidade.responsavel_id;
+    formulario.chave_pix = cidade.chave_pix ?? '';
+    formulario.titular_chave_pix = cidade.titular_chave_pix ?? '';
 
     void nextTick(() => campoNome.value?.focus());
 }
@@ -254,6 +264,85 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         <label for="setor-ativo" class="text-sm font-medium">Ativo</label>
                     </div>
 
+                    <!--
+                        O recebimento pelo setor.
+
+                        Os três campos ficam juntos e explicados porque só fazem
+                        sentido juntos: a chave diz para onde o dinheiro vai, o
+                        titular é o nome que aparece no aplicativo de quem paga,
+                        e o responsável é quem confere que ele chegou. Faltando
+                        qualquer um deles, o setor não recebe (RN-S4).
+                    -->
+                    <fieldset class="border-border grid gap-3 rounded-md border p-3" data-testid="recebimento-do-setor">
+                        <legend class="px-1 text-sm font-medium">Recebimento pelo setor</legend>
+
+                        <p class="text-muted-foreground text-sm">
+                            Preencha se algum evento for cobrar pela chave Pix deste setor. A chave aparece na tela de pagamento de quem se inscreve
+                            por aqui — e só para essas pessoas.
+                        </p>
+
+                        <div class="flex flex-col gap-1">
+                            <label for="setor-responsavel" class="text-sm font-medium">Responsável pelo setor</label>
+                            <select
+                                id="setor-responsavel"
+                                v-model="formulario.responsavel_id"
+                                aria-describedby="ajuda-setor-responsavel"
+                                data-testid="campo-responsavel"
+                                class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            >
+                                <option :value="null">Sem responsável</option>
+                                <option v-for="pessoa in props.responsaveis" :key="pessoa.id" :value="pessoa.id">
+                                    {{ pessoa.nome }} ({{ pessoa.email }})
+                                </option>
+                            </select>
+                            <p id="ajuda-setor-responsavel" class="text-muted-foreground text-sm">
+                                É quem confere os comprovantes deste setor — e só deste setor.
+                            </p>
+                            <p v-if="formulario.errors.responsavel_id" role="alert" class="text-destructive text-sm">
+                                {{ formulario.errors.responsavel_id }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-1">
+                            <label for="setor-chave-pix" class="text-sm font-medium">Chave Pix</label>
+                            <input
+                                id="setor-chave-pix"
+                                v-model="formulario.chave_pix"
+                                type="text"
+                                maxlength="140"
+                                aria-describedby="ajuda-setor-chave-pix"
+                                :aria-invalid="formulario.errors.chave_pix ? true : undefined"
+                                data-testid="campo-chave-pix"
+                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            />
+                            <p id="ajuda-setor-chave-pix" class="text-muted-foreground text-sm">
+                                CPF, CNPJ, e-mail, telefone ou chave aleatória — do jeito que está no aplicativo do banco.
+                            </p>
+                            <p v-if="formulario.errors.chave_pix" role="alert" class="text-destructive text-sm">
+                                {{ formulario.errors.chave_pix }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-1">
+                            <label for="setor-titular" class="text-sm font-medium">Titular da chave</label>
+                            <input
+                                id="setor-titular"
+                                v-model="formulario.titular_chave_pix"
+                                type="text"
+                                maxlength="120"
+                                aria-describedby="ajuda-setor-titular"
+                                data-testid="campo-titular"
+                                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                            />
+                            <p id="ajuda-setor-titular" class="text-muted-foreground text-sm">
+                                O nome que aparece no aplicativo de quem paga. Sem ele, a pessoa transfere para um nome que não reconhece.
+                            </p>
+                            <p v-if="formulario.errors.titular_chave_pix" role="alert" class="text-destructive text-sm">
+                                {{ formulario.errors.titular_chave_pix }}
+                            </p>
+                        </div>
+                    </fieldset>
+
                     <DialogFooter>
                         <button
                             type="button"
@@ -326,13 +415,16 @@ function excluir(cidade: CidadeDoCatalogo): void {
 
             <table v-else class="w-full text-sm">
                 <caption class="sr-only">
-                    Setores do catálogo, com o estado, a situação e quantos grupos de participantes dependem de cada um.
+                    Setores do catálogo, com o estado, a situação, quem responde pelo setor, se ele consegue receber pagamento e quantos grupos de
+                    participantes dependem de cada um.
                 </caption>
                 <thead>
                     <tr class="border-border border-b text-left">
                         <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Estado</th>
                         <th scope="col" class="px-4 py-2 font-medium">Situação</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Responsável</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Recebe Pix</th>
                         <th scope="col" class="px-4 py-2 font-medium">Grupos</th>
                         <th scope="col" class="px-4 py-2 font-medium">Ações</th>
                     </tr>
@@ -343,6 +435,22 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         <td class="px-4 py-2">{{ cidade.uf }}</td>
                         <td class="px-4 py-2">
                             <EtiquetaDeSituacao dominio="ativo" :situacao="cidade.ativo" :rotulo="cidade.ativo ? 'Ativo' : 'Desativado'" />
+                        </td>
+                        <td class="px-4 py-2">
+                            <span v-if="cidade.responsavel_nome">{{ cidade.responsavel_nome }}</span>
+                            <span v-else class="text-muted-foreground">—</span>
+                        </td>
+                        <td class="px-4 py-2">
+                            <!-- O que a coluna responde é "este setor consegue
+                                 receber?", e não "ele tem chave?": faltar o
+                                 responsável impede tanto quanto faltar a chave. -->
+                            <span v-if="cidade.preparado_para_receber" class="text-sucesso-texto font-medium" :data-testid="`recebe-${cidade.id}`">
+                                Sim
+                            </span>
+                            <span v-else class="text-muted-foreground inline-flex items-center gap-1" :data-testid="`recebe-${cidade.id}`">
+                                <CircleAlert class="size-4" aria-hidden="true" />
+                                Falta cadastro
+                            </span>
                         </td>
                         <td class="px-4 py-2">{{ cidade.grupos }}</td>
                         <td class="px-4 py-2">

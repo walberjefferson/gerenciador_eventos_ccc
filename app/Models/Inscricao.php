@@ -153,6 +153,65 @@ class Inscricao extends Model
     }
 
     /**
+     * Os comprovantes que esta pessoa mandou, do mais recente para o mais
+     * antigo.
+     *
+     * Costuma ser um so. Sao varios quando um comprovante foi recusado e ela
+     * mandou outro: a recusa fica no historico, porque apagar a tentativa
+     * apagaria tambem o motivo pelo qual ela nao valeu.
+     *
+     * @return HasMany<ComprovantePagamento, $this>
+     */
+    public function comprovantes(): HasMany
+    {
+        return $this->hasMany(ComprovantePagamento::class)->orderByDesc('id');
+    }
+
+    /**
+     * O comprovante que ainda espera conferencia, se houver.
+     *
+     * E no maximo um — o indice unico parcial do banco garante isso (RN-S6).
+     */
+    public function comprovanteEmAberto(): ?ComprovantePagamento
+    {
+        return $this->comprovantes()->emAberto()->first();
+    }
+
+    /**
+     * O comprovante mais recente, em qualquer situacao.
+     *
+     * E o que a tela do participante mostra: aceito, recusado com o motivo, ou
+     * esperando. Nada disso e situacao de inscricao (RN-S7).
+     */
+    public function comprovanteMaisRecente(): ?ComprovantePagamento
+    {
+        return $this->comprovantes()->first();
+    }
+
+    /**
+     * O setor desta inscricao.
+     *
+     * Ele nao esta na inscricao: vem pelo grupo de participantes, que foi o que
+     * a pessoa escolheu no formulario. E o mesmo caminho que o filtro da lista
+     * administrativa percorre — e o mesmo pelo qual o escopo de quem confere
+     * comprovante e aplicado (RN-S9).
+     */
+    public function setor(): ?Cidade
+    {
+        $grupo = $this->relationLoaded('grupoParticipante')
+            ? $this->grupoParticipante
+            : $this->grupoParticipante()->first();
+
+        if (! $grupo instanceof GrupoParticipante) {
+            return null;
+        }
+
+        return $grupo->relationLoaded('cidade')
+            ? $grupo->cidade
+            : $grupo->cidade()->first();
+    }
+
+    /**
      * Ids das atividades escolhidas, em ordem crescente.
      *
      * @return array<int, int>

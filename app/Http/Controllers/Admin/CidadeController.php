@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CidadeRequest;
 use App\Models\Cidade;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Response;
 
@@ -37,6 +38,7 @@ class CidadeController extends Controller
         return inertia('Admin/Catalogo/Setores', [
             'cidades' => Cidade::query()
                 ->withCount('gruposParticipantes')
+                ->with('responsavel:id,name')
                 ->orderBy('uf')
                 ->orderBy('nome')
                 ->get()
@@ -46,6 +48,27 @@ class CidadeController extends Controller
                     'uf' => $cidade->uf,
                     'ativo' => $cidade->ativo,
                     'grupos' => $cidade->grupos_participantes_count,
+                    'responsavel_id' => $cidade->responsavel_id,
+                    'responsavel_nome' => $cidade->responsavel?->name,
+                    // A chave aparece INTEIRA nesta tela, e so nesta e na tela
+                    // de pagamento de quem e do setor. Ela nao e segredo — foi
+                    // cadastrada para ser mostrada (RN-S3) —, mas quem a le
+                    // aqui ja passou por "catalogo.gerenciar".
+                    'chave_pix' => $cidade->chave_pix,
+                    'titular_chave_pix' => $cidade->titular_chave_pix,
+                    'preparado_para_receber' => $cidade->estaPreparadaParaReceber(),
+                ])
+                ->all(),
+            // As contas que podem responder por um setor. So as ativas: uma
+            // conta desativada nao consegue entrar para conferir nada.
+            'responsaveis' => User::query()
+                ->where('ativo', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
+                ->map(fn (User $usuario): array => [
+                    'id' => (int) $usuario->id,
+                    'nome' => $usuario->name,
+                    'email' => $usuario->email,
                 ])
                 ->all(),
             'ufs' => CidadeRequest::UFS,

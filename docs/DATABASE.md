@@ -241,10 +241,18 @@ Catálogo de cidades. Global, não pertence a nenhum evento.
 | `nome` | varchar(120) | não | — | Nome da cidade |
 | `uf` | char(2) | não | — | Sigla do estado |
 | `ativo` | boolean | não | `true` | Se aparece para escolha |
+| `responsavel_id` | bigint FK → `users` (null on delete) | sim | `null` | Quem responde pelo setor e confere os comprovantes dele |
+| `chave_pix` | varchar(140) | sim | `null` | Chave Pix do responsável, **em claro** (RN-S3) |
+| `titular_chave_pix` | varchar(120) | sim | `null` | Nome que aparece no aplicativo de quem paga |
 | `created_at` / `updated_at` | timestamptz | sim | — | Carimbos do framework |
 
 **Índices e restrições:** `unique(nome, uf)`.
-**Por quê:** existe "São José do Rio Preto/SP" e "São José/SC". A dupla nome + estado é o que identifica de fato.
+
+**Por quê:**
+
+- Existe "São José do Rio Preto/SP" e "São José/SC". A dupla nome + estado é o que identifica de fato.
+- **`chave_pix` NÃO é cifrada, e isso é decisão (RN-S3).** `credenciais_pagamento.chave_pix` é cifrada porque é segredo de instituição financeira e nunca volta para tela nenhuma. Esta é o oposto: ela existe para ser mostrada a todo participante daquele setor, na tela de pagamento. Cifrar o que a própria aplicação publica na página seguinte protegeria contra um invasor com acesso ao banco e contra nenhum outro. O que protege esta coluna é o escopo de quem a lê.
+- **`nullOnDelete` no responsável**, e não `restrict`: apagar a conta administrativa de alguém não pode fazer o setor — com todos os grupos e inscrições pendurados nele — virar refém de um usuário. O setor continua existindo, apenas sem responsável, e a RN-S4 recusa gravar evento no modo `setor` enquanto for assim.
 
 ### 3.2 `grupos_participantes` → Model `GrupoParticipante`
 
@@ -279,6 +287,7 @@ Grupo de pessoas dentro de uma cidade. **Não confundir com `grupos_atividades`.
 | `valor_centavos` | bigint | não | — | Valor da inscrição em centavos |
 | `moeda` | char(3) | não | `'BRL'` | Moeda no padrão ISO 4217 |
 | `prazo_pagamento_minutos` | integer | não | `1440` | Prazo para pagar (1440 = 24 horas) |
+| `forma_recebimento` | varchar(20) | não | `'gateway'` | Por onde o dinheiro entra (Enum `FormaRecebimento`) |
 | `situacao` | varchar(40) | não | `'rascunho'` | Situação do evento (Enum `SituacaoEvento`) |
 | `regulamento` | text | não | — | Texto aceito pelo participante |
 | `versao_termos` | varchar(40) | não | — | Versão do regulamento, ex.: `2026.1` |
@@ -297,6 +306,9 @@ Grupo de pessoas dentro de uma cidade. **Não confundir com `grupos_atividades`.
 - `CHECK eventos_vagas_nao_negativas_check`: `vagas_reservadas >= 0 AND vagas_confirmadas >= 0`
 - `CHECK eventos_periodo_check`: `data_fim >= data_inicio`
 - `CHECK eventos_inscricoes_periodo_check`: `inscricoes_fecham_em > inscricoes_abrem_em`
+- `CHECK eventos_forma_recebimento_check`: `forma_recebimento IN ('gateway', 'setor')`
+
+**Sobre `forma_recebimento`:** o padrão é `gateway` de propósito — todo evento já cadastrado continua se comportando exatamente como se comportava (RN-S12). No modo `setor` a cobrança é montada localmente a partir da chave Pix do responsável do setor, e nenhuma chamada sai para o provedor (RN-S2). O prazo mínimo passa a ser 2880 minutos nesse modo (RN-S8) — regra de aplicação, não do banco: ela depende de outra coluna e a mensagem precisa chegar em português no campo certo.
 
 **Por quê:**
 
@@ -590,6 +602,43 @@ Degrau de preço do evento. Vale até uma data, até acabarem as vagas dele, ou 
 - **O contador é movido só por UPDATE condicional**, no mesmo molde de `eventos.vagas_reservadas` — nunca por leitura seguida de gravação. O CHECK de quantidade é a última linha de defesa.
 - **`vagas_ocupadas` não desce.** Expiração e cancelamento devolvem a vaga ao evento e às atividades, nunca ao lote (RN-L6).
 
+### 3.14 `comprovantes_pagamento` → Model `ComprovantePagamento`
+
+O comprovante que o participante enviou dizendo ter pago, nos eventos que recebem pela chave Pix do setor. Ele é a **prova de uma afirmação**, não a afirmação em si: existir um comprovante não significa que o dinheiro entrou (RN-S7).
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+|--------|------|------|--------|-----------|
+| `id` | bigserial | não | — | — |
+| `inscricao_id` | bigint FK → `inscricoes` (restrict) | não | — | A inscrição que este comprovante quer pagar |
+| `caminho` | varchar(255) | não | — | Caminho no disco **privado** `comprovantes` |
+| `nome_original` | varchar(180) | não | — | Como a pessoa chamou o arquivo |
+| `mime` | varchar(80) | não | — | Conferido pelo **conteúdo**, nunca pela extensão |
+| `tamanho_bytes` | integer | não | — | — |
+| `situacao` | varchar(20) | não | — | `enviado`, `aceito` ou `recusado` (Enum `SituacaoComprovante`) |
+| `enviado_em` | timestamptz | não | — | Quando chegou |
+| `conferido_por_id` | bigint FK → `users` (null on delete) | sim | `null` | Quem conferiu |
+| `conferido_em` | timestamptz | sim | `null` | Quando conferiu |
+| `motivo_recusa` | varchar(300) | sim | `null` | Obrigatório quando `situacao = 'recusado'` |
+| `created_at` / `updated_at` | timestamptz | não | — | — |
+
+**Índices e restrições:**
+
+| Restrição | O que cobra |
+|-----------|-------------|
+| `index(inscricao_id, situacao)` | "esta inscrição tem algo em aberto?" |
+| `index(situacao, enviado_em)` | a fila de quem confere |
+| `comprovantes_um_em_aberto_por_inscricao` | **único parcial**: `unique(inscricao_id) WHERE situacao = 'enviado'` |
+| `comprovantes_recusa_com_motivo_check` | `situacao <> 'recusado' OR motivo_recusa IS NOT NULL` |
+| `comprovantes_tamanho_check` | `tamanho_bytes > 0` |
+| `comprovantes_situacao_check` | `situacao IN ('enviado', 'aceito', 'recusado')` |
+
+**Por quê:**
+
+- **O único parcial é a trava da RN-S6.** Ele impede o duplo clique e a fila de comprovantes do mesmo pagamento, e ao mesmo tempo permite quantas linhas `recusado` forem necessárias: enviar de novo por cima do que ainda não foi conferido substitui a linha e apaga o arquivo antigo; enviar depois de uma recusa cria linha nova, porque o motivo escrito não pode se perder.
+- **`restrict` na exclusão da inscrição**: o comprovante é a prova de que alguém disse ter pago. Apagar a inscrição não pode levar a prova junto.
+- **O nome que a pessoa deu fica na coluna, nunca no caminho.** Nome vindo de terceiro em nome de arquivo do servidor é como se escreve travessia de diretório por acidente. O caminho é gerado com ULID e a extensão sai do tipo conferido.
+- **O disco é privado**, com raiz em `storage/app/comprovantes` — fora de `storage/app/public`, que o `storage:link` espelha para a web — e sem `url`. Não existe endereço público a adivinhar: o arquivo só sai por rota autenticada, com escopo de setor (RN-S11).
+
 ---
 
 ## 4. Enums (listas fechadas de situação)
@@ -604,6 +653,8 @@ Guardados como texto em português. A aplicação controla os valores por Enum d
 | `MetodoPagamento` | `pix`, `cartao_credito` | `pagamentos.metodo` |
 | `SituacaoWebhook` | `recebido`, `processado`, `ignorado`, `falhou` | `webhooks_pagamento.situacao` |
 | `TipoComunicacao` | `inscricao_recebida`, `lembrete_prazo`, `pagamento_confirmado`, `prazo_vencido`, `inscricao_cancelada` | `comunicacoes_enviadas.tipo` |
+| `FormaRecebimento` | `gateway`, `setor` | `eventos.forma_recebimento` |
+| `SituacaoComprovante` | `enviado`, `aceito`, `recusado` | `comprovantes_pagamento.situacao` |
 
 Todo Enum expõe `rotulo()`, que devolve o texto amigável para exibição ("Aguardando pagamento"). `SituacaoInscricao` expõe também `estaAtiva()`, verdadeiro para `aguardando_pagamento` e `confirmada` — exatamente as duas situações que ocupam vaga e que participam das unicidades parciais.
 

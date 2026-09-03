@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Admin;
 
+use App\Enums\FormaRecebimento;
 use App\Enums\SituacaoEvento;
+use App\Models\Cidade;
 use App\Models\Evento;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -50,7 +52,16 @@ class EventoRequest extends FormRequest
             'capacidade' => ['nullable', 'integer', 'min:0'],
             'valor_centavos' => ['required', 'integer', 'min:0'],
             'moeda' => ['required', 'string', 'size:3'],
-            'prazo_pagamento_minutos' => ['required', 'integer', 'min:5', 'max:43200'],
+            // O minimo depende da forma de recebimento (RN-S8): cinco minutos
+            // bastam para um Pix que o provedor reconhece em segundos; nao
+            // bastam para uma transferencia que uma pessoa precisa abrir e
+            // conferir. O teto e o mesmo nos dois casos.
+            'prazo_pagamento_minutos' => [
+                'required', 'integer',
+                'min:'.$this->formaEscolhida()->prazoMinimoEmMinutos(),
+                'max:43200',
+            ],
+            'forma_recebimento' => ['required', Rule::enum(FormaRecebimento::class)],
             'situacao' => ['required', Rule::enum(SituacaoEvento::class)],
             'regulamento' => ['required', 'string', 'min:10'],
             // As duas listas de conteudo da pagina do evento. Sao opcionais: a
@@ -74,6 +85,9 @@ class EventoRequest extends FormRequest
     {
         return [
             function (Validator $validador): void {
+                // Esta vale para evento novo tambem: um evento nasce cobrando.
+                $this->recusarFormaSetorComSetorDespreparado($validador);
+
                 $evento = $this->eventoEmEdicao();
 
                 if (! $evento instanceof Evento) {
@@ -100,7 +114,10 @@ class EventoRequest extends FormRequest
             'inscricoes_fecham_em.after' => 'O fechamento das inscrições precisa ser depois da abertura.',
             'capacidade.min' => 'A capacidade não pode ser negativa. Deixe em branco para evento sem limite de vagas.',
             'valor_centavos.min' => 'O valor não pode ser negativo. Use zero para evento gratuito.',
-            'prazo_pagamento_minutos.min' => 'O prazo de pagamento precisa ter ao menos 5 minutos.',
+            'prazo_pagamento_minutos.min' => $this->formaEscolhida()->exigeSetorPreparado()
+                ? 'Quando o evento recebe pela chave Pix do setor, o prazo precisa ter ao menos 2880 minutos (2 dias): '
+                    .'uma transferência conferida por uma pessoa não cabe em 24 horas.'
+                : 'O prazo de pagamento precisa ter ao menos 5 minutos.',
             'prazo_pagamento_minutos.max' => 'O prazo de pagamento não pode passar de 30 dias.',
             'regulamento.required' => 'O regulamento é obrigatório: é o texto que a pessoa aceita ao se inscrever.',
             'contato_email.email' => 'Informe um e-mail de contato válido.',
@@ -119,6 +136,7 @@ class EventoRequest extends FormRequest
             'inscricoes_fecham_em' => 'fechamento das inscrições',
             'valor_centavos' => 'valor',
             'prazo_pagamento_minutos' => 'prazo de pagamento',
+            'forma_recebimento' => 'forma de recebimento',
             'contato_email' => 'e-mail de contato',
             'local_detalhe' => 'como chegar',
             'itens_incluidos' => 'lista do que está incluído',
@@ -138,6 +156,15 @@ class EventoRequest extends FormRequest
             'slug' => $slug === '' ? Str::slug($nome) : Str::slug($slug),
             'moeda' => mb_strtoupper((string) $this->input('moeda', 'BRL')),
         ]);
+
+        // Campo AUSENTE quer dizer "pelo provedor de pagamento": e o padrao da
+        // coluna e o comportamento de todo evento que ja existe (RN-S12). Isto
+        // nao afrouxa a regra — um valor presente e desconhecido continua sendo
+        // recusado pelo Rule::enum abaixo; o que a ausencia faz e nao obrigar
+        // quem nunca ouviu falar desta escolha a tomar posicao sobre ela.
+        if ($this->input('forma_recebimento') === null) {
+            $this->merge(['forma_recebimento' => FormaRecebimento::Gateway->value]);
+        }
     }
 
     /**
@@ -159,6 +186,7 @@ class EventoRequest extends FormRequest
             'valor_centavos' => $this->integer('valor_centavos'),
             'moeda' => (string) $this->string('moeda'),
             'prazo_pagamento_minutos' => $this->integer('prazo_pagamento_minutos'),
+            'forma_recebimento' => $this->formaEscolhida()->value,
             'situacao' => (string) $this->string('situacao'),
             'regulamento' => (string) $this->string('regulamento'),
             'itens_incluidos' => $this->listaLimpa('itens_incluidos'),
@@ -167,6 +195,52 @@ class EventoRequest extends FormRequest
             'contato_email' => (string) $this->string('contato_email'),
             'contato_telefone' => $this->input('contato_telefone'),
         ];
+    }
+
+    /**
+     * A forma de recebimento que o formulario mandou.
+     *
+     * Cai em "gateway" quando vem vazia ou desconhecida — o padrao do banco e o
+     * comportamento de todo evento que ja existe (RN-S12). A regra de validacao
+     * ainda recusa um valor invalido; este metodo so precisa de uma resposta
+     * para montar as OUTRAS regras, que dependem dela.
+     */
+    private function formaEscolhida(): FormaRecebimento
+    {
+        return FormaRecebimento::tryFrom((string) $this->input('forma_recebimento'))
+            ?? FormaRecebimento::Gateway;
+    }
+
+    /**
+     * RN-S4 — o setor precisa estar pronto antes de o evento ser salvo.
+     *
+     * Um evento que cobra pela chave Pix do setor e uma promessa: a pessoa que
+     * se inscrever vai abrir a tela de pagamento e encontrar uma chave la. Se
+     * algum setor ativo nao tem chave ou nao tem responsavel, essa promessa
+     * falha para todo mundo daquele setor — e falha depois, na inscricao, quando
+     * ja nao ha o que fazer.
+     *
+     * A mensagem NOMEIA os setores que faltam: "ajuste os setores" manda a
+     * pessoa procurar; a lista manda ela resolver.
+     */
+    private function recusarFormaSetorComSetorDespreparado(Validator $validador): void
+    {
+        if (! $this->formaEscolhida()->exigeSetorPreparado()) {
+            return;
+        }
+
+        $faltando = Cidade::ativasDespreparadasParaReceber();
+
+        if ($faltando === []) {
+            return;
+        }
+
+        $validador->errors()->add(
+            'forma_recebimento',
+            'Para receber pela chave Pix do setor, todo setor ativo precisa ter responsável e chave Pix cadastrados. '
+            .'Faltam: '.implode(', ', $faltando).'. '
+            .'Complete o cadastro em Catálogo → Setores e salve o evento de novo.'
+        );
     }
 
     private function eventoEmEdicao(): ?Evento

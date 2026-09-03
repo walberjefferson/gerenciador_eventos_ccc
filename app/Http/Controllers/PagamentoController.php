@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\SituacaoInscricao;
+use App\Models\Cidade;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
 use App\Services\Pagamentos\GeradorQrCodePix;
@@ -35,6 +36,7 @@ class PagamentoController extends Controller
         $inscricao = $this->inscricao($codigoPublico);
         $pagamento = $this->pagamento($inscricao);
         $estado = $this->estado($inscricao, $pagamento);
+        $peloSetor = $inscricao->evento?->recebePeloSetor() ?? false;
 
         return Inertia::render('Inscricoes/Pagamento', [
             'codigo_publico' => $inscricao->codigo_publico,
@@ -43,6 +45,30 @@ class PagamentoController extends Controller
                 'nome' => $inscricao->evento?->nome,
                 'slug' => $inscricao->evento?->slug,
             ],
+            // Como este evento recebe. A tela desenha duas coisas bem
+            // diferentes conforme a resposta, e por isso ela precisa saber.
+            'recebe_pelo_setor' => $peloSetor,
+            // A chave, o titular e o setor. Vao para a tela SO quando o evento
+            // recebe pelo setor — e mesmo assim, so nesta tela, que e assinada
+            // e pertence a uma inscricao. A chave nao e segredo (RN-S3), mas
+            // ela tambem nao e informacao publica: quem a ve aqui e quem
+            // precisa pagar para este setor.
+            'setor' => $peloSetor ? $this->setorDaCobranca($inscricao) : null,
+            // O comprovante mais recente, se houver, e a URL para mandar outro.
+            // A tela le daqui o que dizer ao participante — "em conferência",
+            // "recusado, veja o motivo", "aceito". Nada disso e situacao de
+            // inscricao (RN-S7): a inscricao segue exatamente onde estava ate
+            // uma pessoa conferir.
+            'comprovante' => $peloSetor
+                ? $inscricao->comprovanteMaisRecente()?->paraTela()
+                : null,
+            'url_comprovante' => $peloSetor
+                ? $this->urlAssinada($inscricao, 'inscricoes.comprovante')
+                : null,
+            'limites_do_comprovante' => $peloSetor ? [
+                'tamanho_maximo_mb' => 5,
+                'tipos' => ['JPG', 'PNG', 'WebP', 'PDF'],
+            ] : null,
             'estado' => $estado,
             'situacao' => $inscricao->situacao->value,
             'situacao_rotulo' => $inscricao->situacao->rotulo(),
@@ -66,7 +92,34 @@ class PagamentoController extends Controller
             // A pagina do participante: linha do tempo e historico da
             // cobranca. Assinada tambem, pelo mesmo motivo.
             'url_acompanhamento' => $this->urlAssinada($inscricao, 'inscricoes.acompanhar'),
+            'sucesso' => session('sucesso'),
         ]);
+    }
+
+    /**
+     * O setor da inscricao, do jeito que a tela de pagamento precisa dele.
+     *
+     * Devolve nulo quando a inscricao nao tem setor ou o setor perdeu a chave
+     * entre o cadastro do evento e agora. Nesse caso a tela nao inventa um Pix:
+     * ela diz que a organizacao precisa ser procurada, que e a unica coisa
+     * verdadeira que ela pode dizer.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function setorDaCobranca(Inscricao $inscricao): ?array
+    {
+        $setor = $inscricao->setor();
+
+        if (! $setor instanceof Cidade || ! $setor->estaPreparadaParaReceber()) {
+            return null;
+        }
+
+        return [
+            'nome' => $setor->nome,
+            'chave_pix' => $setor->chave_pix,
+            'titular' => $setor->titular_chave_pix,
+            'responsavel' => $setor->responsavel?->name,
+        ];
     }
 
     /**

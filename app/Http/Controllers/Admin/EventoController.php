@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Inscricoes\ResolverLoteVigente;
+use App\Enums\FormaRecebimento;
 use App\Enums\SituacaoEvento;
 use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EventoRequest;
 use App\Http\Resources\Admin\EstruturaDoEventoResource;
+use App\Models\Cidade;
 use App\Models\DiaEvento;
 use App\Models\Evento;
 use App\Models\GrupoAtividade;
@@ -69,6 +71,8 @@ class EventoController extends Controller
         return inertia('Admin/Eventos/Formulario', [
             'evento' => null,
             'situacoes' => $this->situacoes(),
+            'formas_recebimento' => $this->formasDeRecebimento(),
+            'setores_despreparados' => Cidade::ativasDespreparadasParaReceber(),
         ]);
     }
 
@@ -148,6 +152,7 @@ class EventoController extends Controller
                 'valor_centavos' => $evento->valor_centavos,
                 'moeda' => $evento->moeda,
                 'prazo_pagamento_minutos' => $evento->prazo_pagamento_minutos,
+                'forma_recebimento' => $evento->forma_recebimento->value,
                 'situacao' => $evento->situacao->value,
                 'regulamento' => $evento->regulamento,
                 'versao_termos' => $evento->versao_termos,
@@ -157,6 +162,12 @@ class EventoController extends Controller
                 'inscricoes_ativas' => $evento->inscricoes()->ativas()->count(),
             ],
             'situacoes' => $this->situacoes(),
+            'formas_recebimento' => $this->formasDeRecebimento(),
+            // Os setores que ainda nao conseguem receber. A tela avisa ANTES de
+            // a pessoa tentar salvar no modo setor e levar a recusa da RN-S4 —
+            // que continua existindo no servidor, porque este aviso e cortesia
+            // e nao trava.
+            'setores_despreparados' => Cidade::ativasDespreparadasParaReceber(),
         ]);
     }
 
@@ -252,6 +263,27 @@ class EventoController extends Controller
         $this->auditarRemocao($evento, 'evento');
 
         return to_route('admin.eventos.index')->with('sucesso', "Evento {$nome} excluído.");
+    }
+
+    /**
+     * As formas de recebimento, com o rotulo, a explicacao e os dois numeros de
+     * prazo que a tela usa: o minimo que ela cobra e o que ela sugere ao trocar
+     * de forma (RN-S8).
+     *
+     * @return array<int, array{valor: string, rotulo: string, explicacao: string, prazo_minimo: int, prazo_sugerido: int}>
+     */
+    private function formasDeRecebimento(): array
+    {
+        return array_map(
+            fn (FormaRecebimento $forma): array => [
+                'valor' => $forma->value,
+                'rotulo' => $forma->rotulo(),
+                'explicacao' => $forma->explicacao(),
+                'prazo_minimo' => $forma->prazoMinimoEmMinutos(),
+                'prazo_sugerido' => $forma->prazoSugeridoEmMinutos(),
+            ],
+            FormaRecebimento::cases(),
+        );
     }
 
     /**

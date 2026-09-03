@@ -2,6 +2,7 @@
 import CodigoCopiaECola from '@/components/pagamento/CodigoCopiaECola.vue';
 import ContadorRegressivo from '@/components/pagamento/ContadorRegressivo.vue';
 import QrCodePix from '@/components/pagamento/QrCodePix.vue';
+import EnvioDeComprovante from '@/components/participante/EnvioDeComprovante.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { formatarDataHora, formatarValor } from '@/lib/formato';
 import type { EstadoDaCobranca, PropsDaCobranca, SituacaoDaCobranca } from '@/types/pagamento';
 import { Head, Link } from '@inertiajs/vue3';
 import { useIntervalFn } from '@vueuse/core';
-import { CalendarClock, CheckCircle2, CircleAlert, RefreshCw } from 'lucide-vue-next';
+import { CalendarClock, CheckCircle2, CircleAlert, Landmark, RefreshCw } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 /**
@@ -25,6 +26,14 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
  * algo mudou, por uma URL assinada. Nenhum parametro daqui declara pagamento:
  * a confirmacao nasce do aviso do provedor, no backend. A consulta para assim
  * que a resposta deixa de ser "aguardando".
+ *
+ * QUANDO O EVENTO RECEBE PELO SETOR o desenho muda de dentro para fora: o Pix
+ * continua sendo um Pix — chave, titular e QR Code —, mas ele aponta para a
+ * conta de uma PESSOA, e nao para o provedor. Por isso nao ha aviso automatico
+ * nenhum a esperar: a pessoa manda o comprovante por aqui mesmo, e quem
+ * reconhece o dinheiro e o responsavel pelo setor dela. A consulta periodica
+ * continua rodando do mesmo jeito — ela e que traz a confirmacao quando a
+ * conferencia acontecer.
  */
 const props = defineProps<PropsDaCobranca>();
 
@@ -41,6 +50,7 @@ const anuncio = ref('');
 
 const valor = computed(() => formatarValor(props.valor_centavos, props.moeda));
 const copiaECola = computed(() => props.pagamento?.pix_copia_e_cola ?? null);
+const peloSetor = computed(() => props.recebe_pelo_setor && props.setor !== null);
 const prazo = computed(() => props.pagamento?.expira_em ?? props.prazo_pagamento);
 const confirmadaEm = computed(() => pagoEm.value ?? props.confirmada_em);
 
@@ -115,14 +125,24 @@ onBeforeUnmount(() => pararConsulta());
  * `<strong>` sobrevive porque a frase inteira e escrita aqui, e nao montada com
  * dado de fora — nao ha o que um visitante consiga injetar.
  */
-const passosDoPagamento = computed<string[]>(() => [
-    'Abra o aplicativo do banco onde você tem conta.',
-    'Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou <strong>Pix copia e cola</strong>.',
-    'Se escolher QR Code, aponte a câmera do celular para a imagem acima.',
-    'Se preferir, toque em <strong>Copiar código Pix</strong> aqui e cole no campo do aplicativo.',
-    `Confira o valor de ${valor.value} e conclua o pagamento.`,
-    'Volte para esta página: assim que o pagamento for reconhecido, ela muda sozinha.',
-]);
+const passosDoPagamento = computed<string[]>(() => {
+    const comuns = [
+        'Abra o aplicativo do banco onde você tem conta.',
+        'Procure a opção <strong>Pix</strong> e escolha <strong>Pagar com QR Code</strong> ou <strong>Pix copia e cola</strong>.',
+        'Se escolher QR Code, aponte a câmera do celular para a imagem acima.',
+        'Se preferir, toque em <strong>Copiar código Pix</strong> aqui e cole no campo do aplicativo.',
+        `Confira o valor de ${valor.value} e conclua o pagamento.`,
+    ];
+
+    // No modo setor o ultimo passo e outro, e ele e o passo que importa: sem o
+    // comprovante ninguem do outro lado fica sabendo que o dinheiro entrou.
+    return peloSetor.value
+        ? [
+              ...comuns,
+              'Guarde o comprovante e <strong>envie o arquivo aqui embaixo</strong>: é por ele que o responsável do seu setor confirma sua inscrição.',
+          ]
+        : [...comuns, 'Volte para esta página: assim que o pagamento for reconhecido, ela muda sozinha.'];
+});
 </script>
 
 <template>
@@ -147,6 +167,14 @@ const passosDoPagamento = computed<string[]>(() => [
                 </p>
             </header>
 
+            <!-- O aviso do envio que acabou de acontecer. Ele some ao
+                 recarregar: e um recado, nao um estado. -->
+            <Alert v-if="sucesso" variant="sucesso" data-testid="aviso-do-envio">
+                <CheckCircle2 aria-hidden="true" />
+                <AlertTitle>Tudo certo</AlertTitle>
+                <AlertDescription>{{ sucesso }}</AlertDescription>
+            </Alert>
+
             <!-- ESTADO 1: aguardando pagamento -->
             <template v-if="estado === 'aguardando'">
                 <!--
@@ -167,6 +195,34 @@ const passosDoPagamento = computed<string[]>(() => [
 
                     <CardContent class="space-y-6 p-0">
                         <ContadorRegressivo :prazo="prazo" @expirou="consultarSituacao" />
+
+                        <!-- MODO SETOR: para quem a pessoa esta pagando.
+                             Ela vem ANTES do QR Code de proposito: quem paga
+                             precisa reconhecer o nome que vai aparecer no
+                             aplicativo do banco antes de apontar a camera. -->
+                        <Alert v-if="peloSetor" variant="informacao" data-testid="pix-do-setor">
+                            <Landmark aria-hidden="true" />
+                            <AlertTitle>O pagamento vai direto para o seu setor</AlertTitle>
+                            <AlertDescription>
+                                <dl class="mt-1 grid gap-2 text-sm">
+                                    <div>
+                                        <dt class="text-muted-foreground">Setor</dt>
+                                        <dd class="font-medium" data-testid="nome-do-setor">{{ setor?.nome }}</dd>
+                                    </div>
+                                    <div v-if="setor?.titular">
+                                        <dt class="text-muted-foreground">Titular da conta</dt>
+                                        <dd class="font-medium" data-testid="titular-do-setor">{{ setor.titular }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-muted-foreground">Chave Pix</dt>
+                                        <dd class="font-mono font-medium break-all" data-testid="chave-pix-do-setor">{{ setor?.chave_pix }}</dd>
+                                    </div>
+                                </dl>
+                                <p class="mt-2">
+                                    Confira este nome no aplicativo do banco antes de concluir. Depois de pagar, envie o comprovante aqui embaixo.
+                                </p>
+                            </AlertDescription>
+                        </Alert>
 
                         <QrCodePix :svg="props.pagamento?.qr_code_svg ?? null" />
 
@@ -195,10 +251,28 @@ const passosDoPagamento = computed<string[]>(() => [
                             </ol>
                         </div>
 
+                        <!-- MODO SETOR: o envio do comprovante. Sem provedor
+                             para avisar, e este arquivo que faz a conferencia
+                             acontecer. -->
+                        <EnvioDeComprovante
+                            v-if="peloSetor && url_comprovante && limites_do_comprovante"
+                            :url="url_comprovante"
+                            :comprovante="comprovante"
+                            :limites="limites_do_comprovante"
+                            :prazo="prazo"
+                        />
+
                         <div class="flex flex-col gap-2">
                             <p aria-live="polite" class="text-muted-foreground text-sm" data-testid="estado-da-consulta">
                                 <span v-if="falhaNaConsulta">
-                                    Não consegui conferir o pagamento agora. Confira sua conexão e toque em “Já paguei” abaixo.
+                                    Não consegui conferir o pagamento agora. Confira sua conexão e toque no botão abaixo.
+                                </span>
+                                <!-- No modo setor quem reconhece o dinheiro e uma
+                                     pessoa, e prometer que "estamos conferindo"
+                                     seria mentira: nao ha provedor nenhum
+                                     olhando. A frase muda para dizer a verdade. -->
+                                <span v-else-if="peloSetor">
+                                    Assim que o responsável do seu setor conferir o comprovante, esta página muda sozinha.
                                 </span>
                                 <span v-else>Estamos conferindo o pagamento para você. Pode deixar esta página aberta.</span>
                             </p>
@@ -212,7 +286,7 @@ const passosDoPagamento = computed<string[]>(() => [
                                 @click="consultarSituacao"
                             >
                                 <RefreshCw :class="consultando ? 'animate-spin' : ''" aria-hidden="true" />
-                                {{ consultando ? 'Conferindo...' : 'Já paguei, conferir agora' }}
+                                {{ consultando ? 'Conferindo...' : peloSetor ? 'Conferir agora' : 'Já paguei, conferir agora' }}
                             </Button>
                         </div>
 

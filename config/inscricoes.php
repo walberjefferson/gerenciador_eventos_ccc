@@ -75,6 +75,15 @@ return [
         'validar_ingresso' => env('PORTARIA_LIMITE_VALIDAR_INGRESSO', '240,1'),
 
         'segunda_via' => env('INSCRICOES_LIMITE_SEGUNDA_VIA', '5,1'),
+
+        // Envio do comprovante de pagamento, na tela do participante.
+        //
+        // E a unica porta em que alguem de fora escreve ARQUIVO no servidor, e
+        // por isso o teto e baixo. Baixo, mas nao apertado: quem manda a foto
+        // errada, ve que ficou tremida e manda de novo precisa conseguir — e
+        // seis tentativas por minuto cobrem isso com folga. Um script que
+        // quisesse encher o disco, nao.
+        'comprovante' => env('INSCRICOES_LIMITE_COMPROVANTE', '6,1'),
         'acesso_por_minuto' => env('INSCRICOES_LIMITE_ACESSO_MINUTO', '5,1'),
         'acesso_por_hora' => env('INSCRICOES_LIMITE_ACESSO_HORA', '15,60'),
     ],

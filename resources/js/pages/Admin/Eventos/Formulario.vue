@@ -2,7 +2,7 @@
 import CampoDeDataHora from '@/components/admin/CampoDeDataHora.vue';
 import { DateField } from '@/components/ui/date-field';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { EventoEmEdicao, OpcaoDeSituacao } from '@/types/admin';
+import type { EventoEmEdicao, OpcaoDeFormaDeRecebimento, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
 import { Plus, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick } from 'vue';
@@ -19,6 +19,9 @@ import { computed, nextTick } from 'vue';
 const props = defineProps<{
     evento: EventoEmEdicao | null;
     situacoes: OpcaoDeSituacao[];
+    formas_recebimento: OpcaoDeFormaDeRecebimento[];
+    /** Os setores ativos que ainda não conseguem receber (RN-S4). */
+    setores_despreparados: string[];
 }>();
 
 const editando = computed(() => props.evento !== null);
@@ -39,12 +42,40 @@ const formulario = useForm({
     valor_centavos: props.evento?.valor_centavos ?? 0,
     moeda: props.evento?.moeda ?? 'BRL',
     prazo_pagamento_minutos: props.evento?.prazo_pagamento_minutos ?? 60,
+    forma_recebimento: props.evento?.forma_recebimento ?? 'gateway',
     situacao: props.evento?.situacao ?? 'rascunho',
     regulamento: props.evento?.regulamento ?? '',
     versao_termos: props.evento?.versao_termos ?? '1.0',
     contato_email: props.evento?.contato_email ?? '',
     contato_telefone: props.evento?.contato_telefone ?? '',
 });
+
+const formaEscolhida = computed<OpcaoDeFormaDeRecebimento | undefined>(() =>
+    props.formas_recebimento.find((forma) => forma.valor === formulario.forma_recebimento),
+);
+
+/** O mínimo que o servidor cobra para a forma escolhida (RN-S8). */
+const prazoMinimo = computed(() => formaEscolhida.value?.prazo_minimo ?? 5);
+
+const recebePeloSetor = computed(() => formulario.forma_recebimento === 'setor');
+
+/**
+ * Trocar a forma sugere um prazo compatível — e só sugere.
+ *
+ * Ela só mexe no prazo quando o que está lá NÃO cabe no mínimo da forma nova:
+ * um prazo de 15 dias já escolhido a mão sobrevive à troca. Sem isso, quem
+ * marcasse "pelo setor" salvaria com o prazo de 60 minutos e levaria uma recusa
+ * que não explica de onde veio.
+ */
+function trocarForma(valor: string): void {
+    formulario.forma_recebimento = valor;
+
+    const forma = props.formas_recebimento.find((opcao) => opcao.valor === valor);
+
+    if (forma && formulario.prazo_pagamento_minutos < forma.prazo_minimo) {
+        formulario.prazo_pagamento_minutos = forma.prazo_sugerido;
+    }
+}
 
 /**
  * As duas listas de conteudo da pagina do evento.
@@ -306,15 +337,74 @@ function gravar(): void {
                             id="evento-prazo"
                             v-model.number="formulario.prazo_pagamento_minutos"
                             type="number"
-                            min="5"
+                            :min="prazoMinimo"
                             required
+                            aria-describedby="ajuda-evento-prazo"
+                            :aria-invalid="formulario.errors.prazo_pagamento_minutos ? true : undefined"
+                            data-testid="campo-prazo-pagamento"
                             class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
+                        <p id="ajuda-evento-prazo" class="text-muted-foreground text-sm">
+                            <template v-if="recebePeloSetor">
+                                No mínimo {{ prazoMinimo }} minutos (2 dias): uma transferência conferida por uma pessoa não cabe em 24 horas.
+                            </template>
+                            <template v-else>No mínimo {{ prazoMinimo }} minutos.</template>
+                        </p>
                         <p v-if="formulario.errors.prazo_pagamento_minutos" role="alert" class="text-destructive text-sm">
                             {{ formulario.errors.prazo_pagamento_minutos }}
                         </p>
                     </div>
                 </div>
+
+                <!--
+                    Por onde o dinheiro deste evento entra (RN-S1).
+
+                    É uma escolha só, e vale para todas as inscrições do evento.
+                    Fica junto do valor e do prazo porque é a mesma conversa: o
+                    que se cobra, em quanto tempo, e por qual caminho.
+                -->
+                <fieldset class="grid gap-3" data-testid="forma-de-recebimento">
+                    <legend class="text-sm font-medium">Forma de recebimento</legend>
+
+                    <div
+                        v-for="forma in formas_recebimento"
+                        :key="forma.valor"
+                        class="border-input has-[:checked]:border-primary flex items-start gap-3 rounded-md border p-3"
+                    >
+                        <input
+                            :id="`evento-forma-${forma.valor}`"
+                            type="radio"
+                            name="forma_recebimento"
+                            :value="forma.valor"
+                            :checked="formulario.forma_recebimento === forma.valor"
+                            class="mt-1 size-4"
+                            :data-testid="`forma-${forma.valor}`"
+                            @change="trocarForma(forma.valor)"
+                        />
+                        <label :for="`evento-forma-${forma.valor}`" class="flex-1 cursor-pointer">
+                            <span class="block text-sm font-medium">{{ forma.rotulo }}</span>
+                            <span class="text-muted-foreground block text-sm">{{ forma.explicacao }}</span>
+                        </label>
+                    </div>
+
+                    <p v-if="formulario.errors.forma_recebimento" role="alert" class="text-destructive text-sm" data-testid="erro-forma">
+                        {{ formulario.errors.forma_recebimento }}
+                    </p>
+
+                    <!-- O aviso vem ANTES da tentativa de salvar: o servidor
+                         recusa de qualquer jeito (RN-S4), mas descobrir isso
+                         depois de preencher a ficha inteira é pior. -->
+                    <p
+                        v-if="recebePeloSetor && setores_despreparados.length > 0"
+                        role="alert"
+                        class="border-atencao/60 bg-atencao/15 rounded-md border p-3 text-sm"
+                        data-testid="aviso-setores-despreparados"
+                    >
+                        Estes setores ainda não têm responsável e chave Pix cadastrados, e por isso o evento não pode ser salvo nesta forma:
+                        <strong>{{ setores_despreparados.join(', ') }}</strong
+                        >. Complete o cadastro em Catálogo → Setores.
+                    </p>
+                </fieldset>
             </section>
 
             <section aria-labelledby="titulo-termos" class="border-border grid gap-4 rounded-lg border p-4">

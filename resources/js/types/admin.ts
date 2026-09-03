@@ -15,6 +15,24 @@ export interface CidadeDoCatalogo {
     ativo: boolean;
     /** Quantos grupos de participantes dependem deste setor. */
     grupos: number;
+    /** Quem responde pelo setor e confere os comprovantes de quem se inscreve nele. */
+    responsavel_id: number | null;
+    responsavel_nome: string | null;
+    /**
+     * A chave Pix do responsável, em claro (RN-S3): ela existe para ser
+     * mostrada a quem vai pagar. O que a protege é o escopo de quem a vê.
+     */
+    chave_pix: string | null;
+    titular_chave_pix: string | null;
+    /** Tem responsável E chave: só assim o setor consegue receber (RN-S4). */
+    preparado_para_receber: boolean;
+}
+
+/** Uma conta do painel que pode responder por um setor. */
+export interface ResponsavelDisponivel {
+    id: number;
+    nome: string;
+    email: string;
 }
 
 /** Um grupo de participantes do catálogo global. */
@@ -59,6 +77,18 @@ export interface EventoDaLista {
 }
 
 /** O evento aberto no formulário de cadastro. */
+/**
+ * Uma forma de recebimento, com os dois numeros de prazo que a tela usa: o
+ * minimo que o servidor cobra e o que ela sugere ao trocar de forma (RN-S8).
+ */
+export interface OpcaoDeFormaDeRecebimento {
+    valor: string;
+    rotulo: string;
+    explicacao: string;
+    prazo_minimo: number;
+    prazo_sugerido: number;
+}
+
 export interface EventoEmEdicao {
     id: number;
     nome: string;
@@ -78,6 +108,8 @@ export interface EventoEmEdicao {
     valor_centavos: number;
     moeda: string;
     prazo_pagamento_minutos: number;
+    /** Por onde o dinheiro deste evento entra: 'gateway' ou 'setor'. */
+    forma_recebimento: string;
     situacao: string;
     regulamento: string;
     versao_termos: string;
@@ -471,4 +503,43 @@ export interface PapelDaMatriz {
 export interface PermissaoDaMatriz {
     nome: string;
     explicacao: string;
+}
+
+/**
+ * Uma linha da fila de conferência de comprovantes.
+ *
+ * O `urgente` e o `horas_ate_o_prazo` vêm calculados do servidor de propósito:
+ * o relógio do navegador de quem confere pode estar em qualquer fuso, e o da
+ * aplicação é um só.
+ */
+export interface LinhaDaFilaDeComprovantes {
+    id: number;
+    nome_original: string;
+    mime: string;
+    tamanho_bytes: number;
+    enviado_em: string | null;
+    situacao: string;
+    situacao_rotulo: string;
+    inscricao: {
+        id: number;
+        codigo_publico: string | null;
+        nome_completo: string | null;
+        email: string | null;
+        evento: string | null;
+        setor: string | null;
+        grupo: string | null;
+        valor_centavos: number;
+        situacao: string | null;
+        situacao_rotulo: string | null;
+        prazo_pagamento: string | null;
+    };
+    horas_ate_o_prazo: number | null;
+    /** Vence em menos de 24 horas (ou já venceu): a fila pinta isso de vermelho. */
+    urgente: boolean;
+}
+
+/** O recorte de setor de quem está olhando a fila (RN-S9). */
+export interface EscopoDaFilaDeComprovantes {
+    recortado_por_setor: boolean;
+    setores: string[];
 }

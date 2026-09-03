@@ -14,6 +14,12 @@ use App\Models\User;
  * pagamento que ninguem viu entrar e outra bem diferente. Por isso cada acao
  * tem a sua permissao, e a mais delicada — a confirmacao manual — e exclusiva
  * do administrador (DA-13).
+ *
+ * Ver UMA inscricao pede, alem da permissao, estar dentro do alcance de setor
+ * de quem pede (RN-S9). A regra do alcance nao mora aqui: ela mora inteira em
+ * ComprovantePagamentoPolicy, e este arquivo apenas pergunta a ela. Sem isso, o
+ * recorte da lista seria contornavel trocando o numero na URL da ficha — que e
+ * a primeira coisa que qualquer pessoa tenta.
  */
 class InscricaoPolicy
 {
@@ -24,7 +30,8 @@ class InscricaoPolicy
 
     public function view(User $usuario, Inscricao $inscricao): bool
     {
-        return $usuario->can('inscricoes.ver');
+        return $usuario->can('inscricoes.ver')
+            && ComprovantePagamentoPolicy::alcancaInscricao($usuario, $inscricao);
     }
 
     public function exportar(User $usuario): bool

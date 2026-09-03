@@ -200,11 +200,12 @@ describe('a lista', function (): void {
             ->assertInertia(fn (Assert $pagina) => $pagina
                 ->component('Admin/Usuarios/Index')
                 ->has('usuarios.dados', 2)
-                // Tres papeis atribuiveis desde o controle de presenca:
-                // administrador, organizador e portaria. A lista sai da tabela,
-                // e nao de um rol escrito a mao (D-50) — por isso o papel novo
-                // aparece aqui sem ninguem ter mexido na tela.
-                ->has('opcoes.papeis', 3)
+                // Quatro papeis atribuiveis desde o recebimento pela chave Pix
+                // do setor: administrador, organizador, portaria e
+                // responsavel-setor. A lista sai da tabela, e nao de um rol
+                // escrito a mao (D-50) — por isso o papel novo aparece aqui sem
+                // ninguem ter mexido na tela.
+                ->has('opcoes.papeis', 4)
             );
     });
 
@@ -291,7 +292,7 @@ describe('quem alcanca a tela', function (): void {
 
         expect($props['permissoes'])->toHaveCount(count(PapeisSeeder::PERMISSOES))
             ->and($props['permissoes'][0]['explicacao'])->toBe(PapeisSeeder::PERMISSOES['painel.ver'])
-            ->and($props['papeis'])->toHaveCount(3);
+            ->and($props['papeis'])->toHaveCount(4);
 
         $porNome = collect($props['papeis'])->keyBy('nome');
 

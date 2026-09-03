@@ -399,3 +399,122 @@ Enquanto não houver nenhum ambiente ativo cadastrado, o sistema continua lendo 
 6. Confirmar a taxa efetiva com o comercial e fechar a **P-06** aqui neste documento.
 
 Nenhum arquivo de domínio deve ser alterado em nenhuma dessas etapas. Se for necessário alterar, o contrato estava errado — e isso é sinal para revisar o desenho, não para abrir exceção.
+
+---
+
+## 11. Receber pela chave Pix do responsável do setor
+
+Nem todo evento passa pelo provedor. Um evento pode ser cadastrado para receber
+**pela chave Pix do responsável do setor** de cada participante: o dinheiro cai
+na conta de uma pessoa, ela confere e confirma. É a coluna
+`eventos.forma_recebimento`, que vale `gateway` (o padrão, o caminho descrito em
+todas as seções anteriores) ou `setor`.
+
+A escolha é lida **num lugar só** — `CriarPagamentoDaInscricao`, na hora de
+emitir a cobrança (RN-S1). Todo o resto do sistema não sabe qual delas
+aconteceu, e não precisa saber: as duas terminam do mesmo jeito, numa linha em
+`pagamentos` aguardando pagamento.
+
+### 11.1 Por que este caminho não conversa com provedor nenhum
+
+No modo `setor`, a bifurcação acontece **antes** de qualquer toque no
+`PaymentGateway`. Nenhuma credencial é lida, nenhum certificado é
+materializado, nenhum pacote sai pela rede (RN-S2). A cobrança nasce assim:
+
+| Campo | Valor | Por quê |
+|-------|-------|---------|
+| `gateway` | `'setor'` | não foi a Efí nem o simulado: foi a conta de uma pessoa |
+| `id_externo` | `null` | **inventar um identificador de provedor seria falsificar histórico de dinheiro** |
+| `metodo` | `pix` | é um Pix; o que muda é para onde ele vai |
+| `expira_em` | o prazo da inscrição | a mesma regra de sempre (RN-P01) |
+| `pix_copia_e_cola` | BR Code **estático**, montado localmente | ver 11.2 |
+
+O `id_externo` nulo não é um detalhe: é ele que já mantinha esta cobrança fora
+da reconciliação (`ReconciliarPagamentosPendentes` filtra por
+`whereNotNull('id_externo')`) e fora do aviso de cancelamento ao provedor
+(`CancelarPagamento` só chama `cancelPayment` quando há identificador). As duas
+verdades existiam por consequência; agora existem **por teste**, em
+`RecebimentoPeloSetorTest`, com um `PaymentGateway` falso que lança exceção se
+qualquer método seu for chamado.
+
+Não há webhook, não há consulta servidor a servidor e não há reembolso. Quem
+reconhece o dinheiro é uma pessoa — e o caminho que ela usa é
+`ConfirmarPagamentoManual`, o mesmo de sempre (RN-S10). Nenhuma regra de
+dinheiro nova foi escrita para esta entrega.
+
+### 11.2 O BR Code estático, e o que ele **não** é
+
+A montagem do "Pix copia e cola" no formato EMV já existia, privada, dentro do
+`FakePaymentGateway`. Ela foi **extraída** para
+`App\Services\Pagamentos\MontadorDeBrCodePix` quando ganhou um segundo chamador
+de verdade — duplicá-la seria manter duas implementações do mesmo padrão. Há um
+teste que compara a saída do montador com a do código antigo, **byte a byte,
+CRC16 incluído**: refatoração que muda payload de Pix é defeito, não melhoria.
+
+A extração corrigiu uma coisa, e só uma: o campo `54` era montado com
+`number_format($centavos / 100, 2, '.', '')` — divisão em ponto flutuante, o que
+a decisão **D-06** proíbe e o que `EfiPaymentGateway::emReais()` já evitava. Era
+inofensivo num provedor fictício; deixa de ser no instante em que o payload
+passa a cobrar pela chave real de uma pessoa. Hoje a conversão é por recorte de
+inteiro.
+
+O código da inscrição viaja em dois campos (RN-S13): o `26-02`, que os
+aplicativos de banco mostram como **descrição**, leva o ULID inteiro; o `62-05`
+leva os últimos 25 caracteres, que é tudo o que cabe nele. Escrever só no
+`62-05` entregaria um código truncado.
+
+**Três coisas que este BR Code não é, e que precisam estar escritas:**
+
+1. **Não é cobrança.** Não existe nada do lado do banco: ninguém é avisado
+   quando ele é pago, e o sistema não tem como perguntar.
+2. **Não é conciliação.** Nem todo aplicativo preserva ou exibe o `26-02` e o
+   `62-05` a quem recebe, e nada impede a pessoa de copiar a chave e pagar pela
+   mão, sem ler o QR. Eles ajudam quem confere a achar a inscrição; **nenhuma
+   decisão de dinheiro pode depender deles**.
+3. **O valor não é trava.** Num BR Code estático o campo `54` é sugestão: quem
+   digita a chave paga o que quiser. Quem confere precisa olhar o valor no
+   comprovante — e é por isso que a observação do aceite é obrigatória.
+
+### 11.3 A chave do setor não é cifrada, e a da credencial é
+
+`credenciais_pagamento.chave_pix` é cifrada porque é segredo de instituição
+financeira: ela diz para qual conta o dinheiro do evento vai, mora ao lado do
+`client_secret` e do certificado, e nunca precisa voltar para tela nenhuma — nem
+mascarada.
+
+`cidades.chave_pix` é o oposto, e a diferença não é de grau: ela **existe para
+ser mostrada**. Todo participante de um setor, num evento que recebe pelo setor,
+precisa enxergá-la na tela para conseguir pagar. Cifrar em repouso o valor que a
+própria aplicação publica na página seguinte protegeria contra um invasor com
+acesso ao banco e contra nenhum outro, enquanto tornaria impossível procurar,
+conferir e exportar a chave.
+
+O que esta chave exige é outra proteção, e essa é obrigatória: ela só aparece
+dentro de uma inscrição daquele setor, numa tela assinada, e no cadastro do
+catálogo. Nunca numa listagem pública de setores, nunca no formulário de
+inscrição, nunca na página do evento (RN-S3).
+
+### 11.4 O comprovante, e quem pode olhá-lo
+
+O participante envia o comprovante pela própria tela de pagamento: imagem ou
+PDF, até 5 MB, validado pelo **conteúdo** e não pela extensão (RN-S5). O arquivo
+vai para o disco privado `comprovantes`, com nome gerado pelo servidor.
+
+Enviar **não confirma nada** (RN-S7): a inscrição segue aguardando pagamento até
+alguém conferir. Quem confere é o responsável daquele setor — papel
+`responsavel-setor`, permissão `pagamentos.conferir-comprovante` — e ele enxerga
+**apenas o setor dele**, por escopo aplicado no servidor (RN-S9). Administrador
+vê tudo e também confere.
+
+Aceitar delega a `ConfirmarPagamentoManual` com `metodo = Transferencia` e a
+observação escrita: a vaga presa vira vaga paga, o anúncio é
+`InscricaoConfirmada`, a auditoria é a mesma. Recusar exige motivo e não toca na
+inscrição.
+
+> **O risco que este desenho aceita.** Não existe situação "em conferência", e o
+> prazo da inscrição corre enquanto o comprovante espera. É possível que a
+> expiração devolva a vaga com o dinheiro já na conta do responsável. A fila de
+> conferência ordena pelo prazo mais próximo e destaca o que vence em menos de
+> 24 horas, e a tela do participante diz até quando a conferência precisa
+> acontecer — mitigações que reduzem a chance, não a eliminam. Eliminá-la
+> exigiria a situação "em conferência", e isso é outra entrega.

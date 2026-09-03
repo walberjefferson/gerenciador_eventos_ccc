@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Actions\Inscricoes\ResolverLoteVigente;
+use App\Enums\FormaRecebimento;
 use App\Enums\SituacaoEvento;
 use Database\Factories\EventoFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -47,6 +48,7 @@ class Evento extends Model
         'valor_centavos',
         'moeda',
         'prazo_pagamento_minutos',
+        'forma_recebimento',
         'situacao',
         'regulamento',
         'versao_termos',
@@ -210,11 +212,25 @@ class Evento extends Model
     }
 
     /**
+     * Este evento recebe pela chave Pix do responsavel do setor?
+     *
+     * A pergunta e feita num lugar so — na emissao da cobranca (RN-S2) — e a
+     * resposta muda tudo o que acontece depois: no modo setor nenhuma chamada
+     * sai para o provedor, o Pix e montado aqui mesmo, e quem reconhece o
+     * dinheiro e uma pessoa olhando um comprovante.
+     */
+    public function recebePeloSetor(): bool
+    {
+        return $this->forma_recebimento === FormaRecebimento::Setor;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
+            'forma_recebimento' => FormaRecebimento::class,
             'data_inicio' => 'date',
             'data_fim' => 'date',
             'inscricoes_abrem_em' => 'datetime',
