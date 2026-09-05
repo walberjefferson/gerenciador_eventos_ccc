@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\SituacaoInscricao;
+use App\Models\Cidade;
 use App\Models\Inscricao;
 use App\Models\Pagamento;
+use App\Models\Responsavel;
 use App\Services\Pagamentos\GeradorQrCodePix;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -35,6 +37,7 @@ class PagamentoController extends Controller
         $inscricao = $this->inscricao($codigoPublico);
         $pagamento = $this->pagamento($inscricao);
         $estado = $this->estado($inscricao, $pagamento);
+        $peloSetor = $inscricao->evento?->recebePeloSetor() ?? false;
 
         return Inertia::render('Inscricoes/Pagamento', [
             'codigo_publico' => $inscricao->codigo_publico,
@@ -43,6 +46,30 @@ class PagamentoController extends Controller
                 'nome' => $inscricao->evento?->nome,
                 'slug' => $inscricao->evento?->slug,
             ],
+            // Como este evento recebe. A tela desenha duas coisas bem
+            // diferentes conforme a resposta, e por isso ela precisa saber.
+            'recebe_pelo_setor' => $peloSetor,
+            // A chave, o titular e o setor. Vao para a tela SO quando o evento
+            // recebe pelo setor — e mesmo assim, so nesta tela, que e assinada
+            // e pertence a uma inscricao. A chave nao e segredo (RN-S3), mas
+            // ela tambem nao e informacao publica: quem a ve aqui e quem
+            // precisa pagar para este setor.
+            'setor' => $peloSetor ? $this->setorDaCobranca($inscricao, $pagamento) : null,
+            // O comprovante mais recente, se houver, e a URL para mandar outro.
+            // A tela le daqui o que dizer ao participante — "em conferência",
+            // "recusado, veja o motivo", "aceito". Nada disso e situacao de
+            // inscricao (RN-S7): a inscricao segue exatamente onde estava ate
+            // uma pessoa conferir.
+            'comprovante' => $peloSetor
+                ? $inscricao->comprovanteMaisRecente()?->paraTela()
+                : null,
+            'url_comprovante' => $peloSetor
+                ? $this->urlAssinada($inscricao, 'inscricoes.comprovante')
+                : null,
+            'limites_do_comprovante' => $peloSetor ? [
+                'tamanho_maximo_mb' => 5,
+                'tipos' => ['JPG', 'PNG', 'WebP', 'PDF'],
+            ] : null,
             'estado' => $estado,
             'situacao' => $inscricao->situacao->value,
             'situacao_rotulo' => $inscricao->situacao->rotulo(),
@@ -66,7 +93,51 @@ class PagamentoController extends Controller
             // A pagina do participante: linha do tempo e historico da
             // cobranca. Assinada tambem, pelo mesmo motivo.
             'url_acompanhamento' => $this->urlAssinada($inscricao, 'inscricoes.acompanhar'),
+            'sucesso' => session('sucesso'),
         ]);
+    }
+
+    /**
+     * O setor da inscricao com os dados de quem recebe, do jeito que a tela de
+     * pagamento precisa deles.
+     *
+     * **A chave vem da COBRANCA, e nao do setor.** Quem recebe foi sorteado no
+     * instante em que a cobranca nasceu (RN-R4), e o setor inteiro nao tem uma
+     * chave so: tem varias pessoas com uma chave cada. Ler o setor aqui
+     * mostraria a chave de alguem que talvez nao seja o dono deste Pix — e o
+     * copia e cola logo abaixo apontaria para outra conta que a chave escrita
+     * na tela. Enquanto a cobranca esta pendente ninguem e sorteado de novo
+     * (RN-R5), entao o que aparece aqui hoje e o mesmo de amanha.
+     *
+     * Devolve nulo quando a inscricao nao tem setor ou quando a cobranca nao
+     * aponta para ninguem. Nesse caso a tela nao inventa um Pix: ela diz que a
+     * organizacao precisa ser procurada, que e a unica coisa verdadeira que ela
+     * pode dizer.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function setorDaCobranca(Inscricao $inscricao, ?Pagamento $pagamento): ?array
+    {
+        $setor = $inscricao->setor();
+        $responsavel = $pagamento?->responsavel;
+
+        if (! $setor instanceof Cidade || ! $responsavel instanceof Responsavel) {
+            return null;
+        }
+
+        return [
+            'nome' => $setor->nome,
+            'chave_pix' => (string) $responsavel->chave_pix,
+            // O nome do titular e o nome do sorteado: e ele que aparece no
+            // aplicativo de quem paga, e e por ele que a pessoa reconhece para
+            // quem esta transferindo.
+            'titular' => (string) $responsavel->nome,
+            // O telefone de quem recebeu, para a duvida que aparece com o
+            // dinheiro ja fora da conta. Nulo quando ninguem cadastrou — a tela
+            // simplesmente nao oferece o contato, em vez de mostrar um convite
+            // para ligar para lugar nenhum.
+            'telefone' => $responsavel->telefone,
+        ];
     }
 
     /**

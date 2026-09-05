@@ -25,6 +25,7 @@ class Pagamento extends Model
     protected $fillable = [
         'codigo_publico',
         'inscricao_id',
+        'responsavel_id',
         'gateway',
         'id_externo',
         'metodo',
@@ -52,6 +53,22 @@ class Pagamento extends Model
     public function inscricao(): BelongsTo
     {
         return $this->belongsTo(Inscricao::class);
+    }
+
+    /**
+     * Quem foi sorteado para receber ESTA cobranca (RN-R4).
+     *
+     * Nula em toda cobranca do modo gateway, que nao sorteia ninguem. A coluna
+     * mora aqui, e nao na inscricao, porque o sorteio se repete a cada cobranca
+     * emitida (RN-R5): o escolhido pertence aquela cobranca, nao a pessoa que
+     * se inscreveu. E o que faz uma cobranca vencida continuar dizendo para
+     * quem ela apontava, em vez de ter o passado reescrito pela cobranca nova.
+     *
+     * @return BelongsTo<Responsavel, $this>
+     */
+    public function responsavel(): BelongsTo
+    {
+        return $this->belongsTo(Responsavel::class, 'responsavel_id');
     }
 
     /**

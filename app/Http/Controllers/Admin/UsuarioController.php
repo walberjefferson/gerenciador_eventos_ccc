@@ -196,7 +196,7 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Os dois papeis que existem, com o rotulo que a pessoa le.
+     * Os papeis que existem, com o rotulo que a pessoa le.
      *
      * Sao lidos da tabela, e nao de uma lista escrita a mao: o `PapeisSeeder` e
      * a fonte (D-50), e a tela e uma janela para ele.

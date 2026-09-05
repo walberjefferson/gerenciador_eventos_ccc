@@ -86,8 +86,10 @@ class InscricaoController extends Controller
             'atividades' => $inscricao->atividades->map(fn (Atividade $atividade): array => [
                 'id' => $atividade->id,
                 'nome' => $atividade->nome,
-                'comeca_em' => $atividade->comeca_em->toIso8601String(),
-                'termina_em' => $atividade->termina_em->toIso8601String(),
+                // Nulos quando a atividade não tem hora marcada.
+                'comeca_em' => $atividade->comeca_em?->toIso8601String(),
+                'termina_em' => $atividade->termina_em?->toIso8601String(),
+                'data' => $atividade->data()->toDateString(),
             ])->all(),
         ];
     }

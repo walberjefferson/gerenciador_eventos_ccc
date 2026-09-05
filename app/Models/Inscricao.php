@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -32,6 +33,7 @@ class Inscricao extends Model
         'codigo_publico',
         'evento_id',
         'grupo_participante_id',
+        'lote_id',
         'nome_completo',
         'email',
         'telefone',
@@ -83,6 +85,20 @@ class Inscricao extends Model
     }
 
     /**
+     * O lote de onde esta inscricao veio.
+     *
+     * Nulo quando o evento nao trabalha com lotes. Serve a relatorio e a
+     * conferencia — nunca a calculo de cobranca: quanto esta pessoa deve
+     * continua sendo valor_centavos, fotografado no instante da inscricao.
+     *
+     * @return BelongsTo<Lote, $this>
+     */
+    public function lote(): BelongsTo
+    {
+        return $this->belongsTo(Lote::class);
+    }
+
+    /**
      * @return BelongsTo<GrupoParticipante, $this>
      */
     public function grupoParticipante(): BelongsTo
@@ -104,6 +120,20 @@ class Inscricao extends Model
     }
 
     /**
+     * O ingresso desta inscricao, quando ela ja foi confirmada.
+     *
+     * E sempre um so — a unicidade de "inscricao_id" na tabela "ingressos"
+     * garante isso no banco. Fica nulo enquanto o pagamento nao e reconhecido:
+     * quem nao pagou nao tem o que apresentar na entrada.
+     *
+     * @return HasOne<Ingresso, $this>
+     */
+    public function ingresso(): HasOne
+    {
+        return $this->hasOne(Ingresso::class);
+    }
+
+    /**
      * Cobrancas emitidas para esta inscricao. Normalmente e uma so; podem ser
      * mais se a primeira vencer e outra for emitida no lugar.
      *
@@ -120,6 +150,65 @@ class Inscricao extends Model
     public function pagamentoPendente(): ?Pagamento
     {
         return $this->pagamentos()->pendentes()->orderByDesc('id')->first();
+    }
+
+    /**
+     * Os comprovantes que esta pessoa mandou, do mais recente para o mais
+     * antigo.
+     *
+     * Costuma ser um so. Sao varios quando um comprovante foi recusado e ela
+     * mandou outro: a recusa fica no historico, porque apagar a tentativa
+     * apagaria tambem o motivo pelo qual ela nao valeu.
+     *
+     * @return HasMany<ComprovantePagamento, $this>
+     */
+    public function comprovantes(): HasMany
+    {
+        return $this->hasMany(ComprovantePagamento::class)->orderByDesc('id');
+    }
+
+    /**
+     * O comprovante que ainda espera conferencia, se houver.
+     *
+     * E no maximo um — o indice unico parcial do banco garante isso (RN-S6).
+     */
+    public function comprovanteEmAberto(): ?ComprovantePagamento
+    {
+        return $this->comprovantes()->emAberto()->first();
+    }
+
+    /**
+     * O comprovante mais recente, em qualquer situacao.
+     *
+     * E o que a tela do participante mostra: aceito, recusado com o motivo, ou
+     * esperando. Nada disso e situacao de inscricao (RN-S7).
+     */
+    public function comprovanteMaisRecente(): ?ComprovantePagamento
+    {
+        return $this->comprovantes()->first();
+    }
+
+    /**
+     * O setor desta inscricao.
+     *
+     * Ele nao esta na inscricao: vem pelo grupo de participantes, que foi o que
+     * a pessoa escolheu no formulario. E o mesmo caminho que o filtro da lista
+     * administrativa percorre — e o mesmo pelo qual o escopo de quem confere
+     * comprovante e aplicado (RN-S9).
+     */
+    public function setor(): ?Cidade
+    {
+        $grupo = $this->relationLoaded('grupoParticipante')
+            ? $this->grupoParticipante
+            : $this->grupoParticipante()->first();
+
+        if (! $grupo instanceof GrupoParticipante) {
+            return null;
+        }
+
+        return $grupo->relationLoaded('cidade')
+            ? $grupo->cidade
+            : $grupo->cidade()->first();
     }
 
     /**

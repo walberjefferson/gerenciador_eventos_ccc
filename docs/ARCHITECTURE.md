@@ -507,7 +507,7 @@ O arquivo materializado do certificado é **cache, não fonte da verdade**: pode
 | `ProcessarWebhookPagamento` (job) | Assim que um aviso é recebido | Traduz o aviso e aplica o efeito no pagamento e na inscrição |
 | `inscricoes:expirar-vencidas` (comando) | A cada minuto | Expira inscrições com prazo vencido e devolve as vagas |
 | `pagamentos:reconciliar` (comando) | A cada 5 minutos | Consulta o provedor para pagamentos pendentes e confirma o que já foi pago |
-| `inscricoes:lembrar-prazo` (comando) | A cada 15 minutos | Avisa quem está a menos de 24 horas do fim do prazo de pagamento |
+| `inscricoes:lembrar-prazo` (comando) | A cada 15 minutos | Avisa quem já gastou metade do prazo que recebeu e ainda não pagou |
 | Envio de e-mail (ouvintes e mensagens) | Assim que o domínio anuncia um fato | Monta e entrega os cinco e-mails do participante, na fila `emails` |
 
 A expiração processa em lotes com `chunkById` (percorre por faixas de identificador), para funcionar bem mesmo com muitos registros.
@@ -583,7 +583,7 @@ a regra de "uma vez só".
 
 ## 10. Tempo e fuso horário
 
-- A aplicação opera em `America/Sao_Paulo` (`APP_TIMEZONE`).
+- A aplicação opera em `America/Maceio` (`APP_TIMEZONE`), que é também o padrão do código quando a variável não é definida.
 - Todas as datas e horas de domínio usam `timestamptz`, o tipo do PostgreSQL que guarda o instante com o fuso embutido.
 - O banco opera internamente em UTC.
 

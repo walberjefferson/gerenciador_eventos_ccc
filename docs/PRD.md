@@ -288,7 +288,7 @@ Formato: *como [quem], quero [o quê], para [para quê]*.
 | RNF-03 | Disponibilidade do recebimento | O endereço que recebe os avisos do provedor responde "recebido" imediatamente e processa depois, para nunca perder um aviso por lentidão |
 | RNF-04 | Segurança | Dados pessoais sensíveis guardados de forma cifrada; nenhuma senha, chave ou segredo em registro de log |
 | RNF-05 | Rastreabilidade | Toda mudança de situação guarda o momento em que aconteceu |
-| RNF-06 | Fuso horário | A aplicação opera em `America/Sao_Paulo`; o banco guarda tudo em UTC com o fuso embutido, evitando erro no horário de verão e em servidores de outro fuso |
+| RNF-06 | Fuso horário | A aplicação opera em `America/Maceio`, a sede da organização; o banco guarda tudo em UTC com o fuso embutido, evitando erro no horário de verão e em servidores de outro fuso |
 | RNF-07 | Dinheiro | Valores monetários são sempre números inteiros em centavos. Nunca número decimal aproximado |
 | RNF-08 | Manutenibilidade | Regras de negócio concentradas em classes de ação de propósito único; controladores enxutos |
 | RNF-09 | Testabilidade | Regras críticas cobertas por testes automatizados, incluindo teste de concorrência |
@@ -576,7 +576,7 @@ Todo envio será processado em segundo plano, para que uma lentidão do servidor
 | R5 | Vazamento de dados pessoais | Alto | CPF cifrado, impressão digital para duplicidade, sem segredo em log, identificadores públicos não sequenciais |
 | R6 | Taxa de gateway desatualizada no documento | Médio | Toda taxa registrada com data da consulta; o que não é confirmável fica "a validar" |
 | R7 | Mudança de escopo durante a execução | Médio | Fases fechadas; o que sai do escopo vira decisão do dono do produto |
-| R8 | Erro de fuso horário no horário de verão | Médio | Datas com fuso embutido, banco em UTC, aplicação em `America/Sao_Paulo` |
+| R8 | Erro de fuso horário no horário de verão | Médio | Datas com fuso embutido, banco em UTC, aplicação em `America/Maceio` |
 | R9 | Dependência de um único fornecedor de pagamento | Médio | Contrato de pagamento e escolha por configuração |
 | R10 | Participante paga depois do prazo | Médio | Reconciliação identifica o pagamento; a decisão de reativar ou estornar é da organização (ver seção 24) |
 

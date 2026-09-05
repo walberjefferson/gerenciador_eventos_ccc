@@ -7,6 +7,7 @@ namespace App\Http\Requests\Admin;
 use App\Models\Atividade;
 use App\Models\GrupoAtividade;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -17,6 +18,10 @@ use Illuminate\Validation\Validator;
  * capacidade que nao fica abaixo do ocupado) e acrescenta as travas de bom
  * senso: idade minima nao passa da maxima, e atividade que ja tem gente
  * escolhida nao muda de grupo.
+ *
+ * O horário é opcional, mas em par: uma atividade pode não ter hora marcada —
+ * e então acontece no dia inteiro do dia de programação —, mas nunca pode ter
+ * só o começo ou só o fim.
  */
 class AtividadeRequest extends FormRequest
 {
@@ -29,9 +34,17 @@ class AtividadeRequest extends FormRequest
             'grupo_atividade_id' => ['required', 'integer', Rule::exists('grupos_atividades', 'id')],
             'nome' => ['required', 'string', 'min:2', 'max:120'],
             'descricao' => ['nullable', 'string'],
-            'comeca_em' => ['required', 'date'],
-            // Espelha atividades_horario_check.
-            'termina_em' => ['required', 'date', 'after:comeca_em'],
+            // O horário é opcional EM PAR (RN-A1): atividade sem hora marcada
+            // acontece no dia inteiro do dia de programação a que pertence.
+            // Metade preenchida não descreve nada e o banco recusaria, então a
+            // recusa vem antes, com nome de campo e frase em português.
+            'comeca_em' => ['nullable', 'date', 'required_with:termina_em'],
+            // Espelha atividades_horario_check. O "after" só entra quando os
+            // dois vieram: comparar com um campo vazio produziria uma recusa
+            // sobre algo que a pessoa nem preencheu.
+            'termina_em' => $this->horarioCompleto()
+                ? ['nullable', 'date', 'required_with:comeca_em', 'after:comeca_em']
+                : ['nullable', 'date', 'required_with:comeca_em'],
             'capacidade' => ['nullable', 'integer', 'min:0'],
             'idade_minima' => ['nullable', 'integer', 'min:0', 'max:120'],
             'idade_maxima' => ['nullable', 'integer', 'min:0', 'max:120', 'gte:idade_minima'],
@@ -64,7 +77,10 @@ class AtividadeRequest extends FormRequest
         return [
             'grupo_atividade_id.required' => 'Escolha o grupo a que esta atividade pertence.',
             'nome.required' => 'Informe o nome da atividade.',
-            'comeca_em.required' => 'Informe a hora de início.',
+            'comeca_em.required_with' => 'Informe também a hora de início. O horário é opcional, mas, quando existe, precisa ter começo e fim.',
+            'comeca_em.date' => 'Informe a data e a hora de início por completo, ou deixe o horário todo em branco.',
+            'termina_em.required_with' => 'Informe também a hora de término. O horário é opcional, mas, quando existe, precisa ter começo e fim.',
+            'termina_em.date' => 'Informe a data e a hora de término por completo, ou deixe o horário todo em branco.',
             'termina_em.after' => 'A atividade precisa terminar depois de começar.',
             'capacidade.min' => 'A capacidade não pode ser negativa. Deixe em branco para atividade sem limite.',
             'idade_maxima.gte' => 'A idade máxima não pode ser menor que a mínima.',
@@ -94,14 +110,41 @@ class AtividadeRequest extends FormRequest
             'grupo_atividade_id' => $this->integer('grupo_atividade_id'),
             'nome' => trim((string) $this->string('nome')),
             'descricao' => $this->input('descricao'),
-            'comeca_em' => $this->date('comeca_em'),
-            'termina_em' => $this->date('termina_em'),
+            'comeca_em' => $this->horarioOuNulo('comeca_em'),
+            'termina_em' => $this->horarioOuNulo('termina_em'),
             'capacidade' => $this->input('capacidade') === null ? null : $this->integer('capacidade'),
             'idade_minima' => $this->input('idade_minima') === null ? null : $this->integer('idade_minima'),
             'idade_maxima' => $this->input('idade_maxima') === null ? null : $this->integer('idade_maxima'),
             'posicao' => $this->integer('posicao'),
             'ativo' => $this->boolean('ativo', true),
         ];
+    }
+
+    /**
+     * Os dois campos do horário vieram preenchidos?
+     *
+     * O formulário manda string vazia quando a pessoa não preenche, e o campo
+     * de data e hora manda "AAAA-MM-DDT" quando ela escolheu a data e não
+     * digitou a hora. Nenhum dos dois é horário — mas os dois chegam aqui.
+     */
+    private function horarioCompleto(): bool
+    {
+        return $this->horarioInformado('comeca_em') && $this->horarioInformado('termina_em');
+    }
+
+    private function horarioInformado(string $campo): bool
+    {
+        $valor = $this->input($campo);
+
+        return $valor !== null && trim((string) $valor) !== '';
+    }
+
+    /**
+     * O horário como o banco o guarda: a data e a hora, ou nada.
+     */
+    private function horarioOuNulo(string $campo): ?Carbon
+    {
+        return $this->horarioInformado($campo) ? $this->date($campo) : null;
     }
 
     /**

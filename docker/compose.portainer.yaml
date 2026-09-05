@@ -41,7 +41,7 @@ x-app-env: &app-env
   # Fuso da aplicacao. O banco guarda em UTC e a aplicacao converte (decisao
   # D-10). Errar aqui e mostrar o prazo de pagamento tres horas deslocado — e
   # vaga perdida por conta disso nao volta.
-  APP_TIMEZONE: "${APP_TIMEZONE:-America/Sao_Paulo}"
+  APP_TIMEZONE: "${APP_TIMEZONE:-America/Maceio}"
   APP_LOCALE: "${APP_LOCALE:-pt_BR}"
   APP_FALLBACK_LOCALE: "${APP_FALLBACK_LOCALE:-en}"
 

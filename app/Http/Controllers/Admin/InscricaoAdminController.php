@@ -110,8 +110,9 @@ class InscricaoAdminController extends Controller
                     ->map(fn ($atividade): array => [
                         'id' => (int) $atividade->id,
                         'nome' => $atividade->nome,
-                        'comeca_em' => $atividade->comeca_em->toIso8601String(),
-                        'termina_em' => $atividade->termina_em->toIso8601String(),
+                        // Nulos quando a atividade não tem hora marcada.
+                        'comeca_em' => $atividade->comeca_em?->toIso8601String(),
+                        'termina_em' => $atividade->termina_em?->toIso8601String(),
                     ])
                     ->all(),
                 'esta_ativa' => $inscricao->situacao->estaAtiva(),

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AtividadeController;
 use App\Http\Controllers\Admin\AuditoriaController;
 use App\Http\Controllers\Admin\AvisosPagamentoController;
 use App\Http\Controllers\Admin\CidadeController;
+use App\Http\Controllers\Admin\ConferenciaComprovanteController;
 use App\Http\Controllers\Admin\ConflitoAtividadeController;
 use App\Http\Controllers\Admin\CredenciaisPagamentoController;
 use App\Http\Controllers\Admin\DiaEventoController;
@@ -15,11 +16,16 @@ use App\Http\Controllers\Admin\ExportarInscricoesController;
 use App\Http\Controllers\Admin\GrupoAtividadeController;
 use App\Http\Controllers\Admin\GrupoParticipanteController;
 use App\Http\Controllers\Admin\InscricaoAdminController;
+use App\Http\Controllers\Admin\LoteController;
 use App\Http\Controllers\Admin\PainelController;
 use App\Http\Controllers\Admin\PapelController;
+use App\Http\Controllers\Admin\PortariaController;
+use App\Http\Controllers\Admin\ResponsavelController;
 use App\Http\Controllers\Admin\UsuarioController;
+use App\Http\Controllers\ComprovanteController;
 use App\Http\Controllers\EventoPublicoController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\IngressoParticipanteController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\InscricaoPublicaController;
 use App\Http\Controllers\PagamentoController;
@@ -69,11 +75,25 @@ Route::get('inscricoes/{codigo_publico}/acompanhar', [AcompanhamentoController::
     ->middleware('signed')
     ->name('inscricoes.acompanhar');
 
+// O ingresso em PDF, para imprimir e levar. Assinada, como todas as do
+// participante — e, dentro do controller, so entrega a quem esta confirmado.
+Route::get('inscricoes/{codigo_publico}/ingresso', [IngressoParticipanteController::class, 'show'])
+    ->middleware('signed')
+    ->name('inscricoes.ingresso');
+
 // Segunda via do Pix, a pedido do participante. Assinada e com limite de
 // tentativas: a Action e idempotente, mas ninguem pede cobranca em serie.
 Route::post('inscricoes/{codigo_publico}/segunda-via', [SegundaViaPagamentoController::class, 'store'])
     ->middleware(['signed', 'throttle:'.config('inscricoes.limites.segunda_via')])
     ->name('inscricoes.segunda-via');
+
+// O comprovante de pagamento, quando o evento recebe pela chave Pix do
+// responsavel do setor. Assinada como todas as do participante — e com limite
+// de tentativas, porque e a UNICA porta em que alguem de fora escreve arquivo
+// no servidor.
+Route::post('inscricoes/{codigo_publico}/comprovante', [ComprovanteController::class, 'store'])
+    ->middleware(['signed', 'throttle:'.config('inscricoes.limites.comprovante')])
+    ->name('inscricoes.comprovante');
 
 // Recuperacao do link de acesso. O limite de tentativas por IP e por e-mail
 // e contado dentro do controller, para que a resposta continue neutra; o
@@ -99,13 +119,60 @@ Route::middleware(['auth', 'verified'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
-        Route::redirect('/', 'painel');
+        // A porta de entrada do painel. Ela EXISTE como rota, e nao como um
+        // `Route::redirect` fixo, por duas razoes:
+        //
+        // 1. O destino depende do papel. Quem tem "painel.ver" vai para os
+        //    numeros do evento; quem so tem o portao vai para a portaria. Com o
+        //    desvio fixo, o voluntario da portaria entrava pelo endereco mais
+        //    obvio do sistema e levava 403.
+        // 2. O `Route::redirect` herdava o prefixo de nome do grupo e virava
+        //    uma rota `admin.` sem permissao nenhuma — a unica do painel nessa
+        //    condicao. O AutorizacaoTest existe justamente para pegar isso.
+        //
+        // O `permission:` com barra vertical e um OU: basta uma das duas. Quem
+        // nao tem nenhuma nao tem destino no painel, e recebe 403 aqui mesmo.
+        Route::get('/', [PainelController::class, 'entrada'])
+            ->middleware('permission:painel.ver|presenca.registrar')
+            ->name('inicio');
+
         Route::get('painel', [PainelController::class, 'index'])
             ->middleware('permission:painel.ver')
             ->name('painel');
 
-        // Catalogo global: setores e grupos de participantes. Sao listas que
-        // valem para todos os eventos, por isso vivem sob a mesma permissao.
+        // O portao, no dia do evento. E a unica tela que o papel "portaria"
+        // alcanca, e ela cobra permissoes diferentes em cada acao:
+        //
+        // - ver e conferir pedem "presenca.registrar";
+        // - desfazer pede "presenca.desfazer", que a portaria NAO tem (o
+        //   motivo esta escrito no PapeisSeeder).
+        //
+        // A conferencia leva throttle. O codigo tem ~60 bits de entropia e
+        // adivinhar um valido por tentativa e inviavel, mas rota de conferencia
+        // sem limite e convite a varredura — e o teto e alto o bastante para
+        // dois voluntarios conferindo sem parar no mesmo portao.
+        Route::prefix('portaria')
+            ->name('portaria.')
+            ->group(function (): void {
+                Route::get('/', [PortariaController::class, 'index'])
+                    ->middleware('permission:presenca.registrar')
+                    ->name('index');
+
+                Route::post('validar', [PortariaController::class, 'validar'])
+                    ->middleware([
+                        'permission:presenca.registrar',
+                        'throttle:'.config('inscricoes.limites.validar_ingresso'),
+                    ])
+                    ->name('validar');
+
+                Route::post('ingressos/{ingresso}/desfazer', [PortariaController::class, 'desfazer'])
+                    ->middleware('permission:presenca.desfazer')
+                    ->name('desfazer');
+            });
+
+        // Catalogo global: setores, grupos de participantes e responsaveis. Sao
+        // listas que valem para todos os eventos, por isso vivem sob a mesma
+        // permissao.
         //
         // A URL e o parametro dizem "setor", que e como a comunidade chama isso.
         // O Model, a tabela e a coluna continuam sendo `Cidade`/`cidades`/
@@ -132,6 +199,16 @@ Route::middleware(['auth', 'verified'])
                     ->name('grupos-participantes.update');
                 Route::delete('grupos-participantes/{grupo_participante}', [GrupoParticipanteController::class, 'destroy'])
                     ->name('grupos-participantes.destroy');
+
+                // Quem recebe o Pix dos setores. Fica no catalogo, e nao em
+                // "usuarios", porque responsavel nao e conta do painel: ele
+                // pode existir sem nenhuma (RN-R1).
+                Route::get('responsaveis', [ResponsavelController::class, 'index'])->name('responsaveis');
+                Route::post('responsaveis', [ResponsavelController::class, 'store'])->name('responsaveis.store');
+                Route::put('responsaveis/{responsavel}', [ResponsavelController::class, 'update'])
+                    ->name('responsaveis.update');
+                Route::delete('responsaveis/{responsavel}', [ResponsavelController::class, 'destroy'])
+                    ->name('responsaveis.destroy');
             });
 
         // Estrutura do evento. Tudo o que pendura no evento — dias, grupos,
@@ -153,6 +230,11 @@ Route::middleware(['auth', 'verified'])
                 Route::post('{evento}/dias', [DiaEventoController::class, 'store'])->name('dias.store');
                 Route::put('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'update'])->name('dias.update');
                 Route::delete('{evento}/dias/{dia_evento}', [DiaEventoController::class, 'destroy'])->name('dias.destroy');
+
+                // Os lotes de inscricao: os degraus de preco do evento.
+                Route::post('{evento}/lotes', [LoteController::class, 'store'])->name('lotes.store');
+                Route::put('{evento}/lotes/{lote}', [LoteController::class, 'update'])->name('lotes.update');
+                Route::delete('{evento}/lotes/{lote}', [LoteController::class, 'destroy'])->name('lotes.destroy');
 
                 Route::post('{evento}/grupos', [GrupoAtividadeController::class, 'store'])->name('grupos.store');
                 Route::put('{evento}/grupos/{grupo_atividade}', [GrupoAtividadeController::class, 'update'])->name('grupos.update');
@@ -193,6 +275,35 @@ Route::middleware(['auth', 'verified'])
                 Route::post('{inscricao}/confirmar-pagamento', [AcaoInscricaoController::class, 'confirmarPagamento'])
                     ->middleware('permission:pagamentos.confirmar-manual')
                     ->name('confirmar-pagamento');
+            });
+
+        // A fila de conferencia de comprovantes.
+        //
+        // A permissao "pagamentos.conferir-comprovante" e da mesma familia da
+        // confirmacao manual, mas mais estreita: ela so age sobre inscricao do
+        // proprio setor e so a partir de um comprovante que alguem enviou (o
+        // motivo por extenso esta no PapeisSeeder).
+        //
+        // O ESCOPO DE SETOR NAO ESTA AQUI, e nao poderia estar: middleware nao
+        // sabe de qual setor e a inscricao. Ele mora em
+        // ComprovantePagamentoPolicy e em FiltroDeInscricoes, no servidor, e
+        // nunca depende de parametro que o navegador mande (RN-S9).
+        Route::middleware('permission:pagamentos.conferir-comprovante')
+            ->prefix('comprovantes')
+            ->name('comprovantes.')
+            ->group(function (): void {
+                Route::get('/', [ConferenciaComprovanteController::class, 'index'])->name('index');
+
+                // O arquivo nunca e servido direto do disco (RN-S11): esta rota
+                // confere quem pede antes de responder o download.
+                Route::get('{comprovante}/arquivo', [ConferenciaComprovanteController::class, 'show'])
+                    ->name('arquivo');
+
+                Route::post('{comprovante}/aceitar', [ConferenciaComprovanteController::class, 'aceitar'])
+                    ->name('aceitar');
+
+                Route::post('{comprovante}/recusar', [ConferenciaComprovanteController::class, 'recusar'])
+                    ->name('recusar');
             });
 
         // Quem entra no painel, com que papel, e ate quando. A permissao

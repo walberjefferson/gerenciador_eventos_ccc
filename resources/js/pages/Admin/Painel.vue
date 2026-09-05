@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CartaoDeNumero from '@/components/admin/CartaoDeNumero.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import TabelaDeVagas from '@/components/admin/TabelaDeVagas.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { formatarValor } from '@/lib/formato';
@@ -83,6 +84,15 @@ const eventoAindaSemInscricao = computed<boolean>(() => props.numeros !== null &
 const dinheiro = computed(() => props.numeros?.dinheiro ?? null);
 
 /**
+ * Quem já entrou pelo portão e quem ainda falta.
+ *
+ * Fica ao lado das inscrições, e não junto do dinheiro, porque responde à mesma
+ * pergunta que elas — "quanta gente?" —, só que no dia do evento em vez de
+ * antes dele. Os três números sempre fecham: presentes + faltantes = esperados.
+ */
+const presenca = computed(() => props.numeros?.presenca ?? null);
+
+/**
  * O último aviso do provedor de pagamento.
  *
  * Ele é global, e não do evento escolhido no seletor: aviso de provedor fala de
@@ -125,9 +135,9 @@ function haQuantoTempo(minutos: number | null): string {
 <template>
     <AdminLayout titulo="Painel" descricao="Como está o evento agora: quem se inscreveu, quantas vagas restam e quanto dinheiro entrou.">
         <!-- Sem nenhum evento publicado não há o que acompanhar; a tela diz isso em vez de mostrar zeros sem contexto. -->
-        <div v-if="props.eventos.length === 0" class="rounded-lg border border-border bg-muted/40 p-6">
+        <div v-if="props.eventos.length === 0" class="border-border bg-muted/40 rounded-lg border p-6">
             <h2 class="text-base font-semibold">Nenhum evento publicado ainda</h2>
-            <p class="mt-1 text-sm text-muted-foreground">
+            <p class="text-muted-foreground mt-1 text-sm">
                 Assim que um evento sair do rascunho, os números dele aparecem aqui: inscrições, vagas por atividade e dinheiro.
             </p>
         </div>
@@ -138,7 +148,7 @@ function haQuantoTempo(minutos: number | null): string {
                 <select
                     id="seletor-de-evento"
                     v-model.number="eventoSelecionado"
-                    class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full"
+                    class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
                     @change="trocarEvento"
                 >
                     <option v-for="item in props.eventos" :key="item.id" :value="item.id">{{ item.nome }} — {{ item.situacao_rotulo }}</option>
@@ -146,7 +156,7 @@ function haQuantoTempo(minutos: number | null): string {
             </div>
 
             <!-- Enquanto os números do outro evento não chegam, a tela avisa em vez de piscar em silêncio. -->
-            <p v-if="trocandoDeEvento" class="text-sm text-muted-foreground" role="status" data-testid="painel-carregando">
+            <p v-if="trocandoDeEvento" class="text-muted-foreground text-sm" role="status" data-testid="painel-carregando">
                 Carregando os números do evento…
             </p>
 
@@ -159,7 +169,7 @@ function haQuantoTempo(minutos: number | null): string {
                 <!-- Zero não é defeito: é a resposta certa para um evento que acabou de abrir. -->
                 <p
                     v-if="eventoAindaSemInscricao"
-                    class="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
+                    class="border-border bg-muted/40 text-muted-foreground rounded-lg border p-4 text-sm"
                     data-testid="painel-sem-inscricao"
                 >
                     Ninguém se inscreveu neste evento ainda. Os números abaixo estão zerados porque não há o que contar — assim que a primeira
@@ -182,6 +192,42 @@ function haQuantoTempo(minutos: number | null): string {
                             :valor="String(linha.total)"
                             :tom="tomDe(linha)"
                             :significado="significadoDe(linha)"
+                        />
+                    </div>
+                </section>
+
+                <!--
+                    A presença no portão. Aparece sempre, inclusive zerada:
+                    antes do evento "0 já entraram, 40 ainda faltam" é a
+                    resposta certa, e não uma tela faltando.
+                -->
+                <section v-if="presenca" aria-labelledby="titulo-presenca" class="flex flex-col gap-3" data-testid="painel-presenca">
+                    <!--
+                        "Presença no portão", e não "presença no evento": o
+                        `<section>` tem nome acessível, e um título com a
+                        palavra "evento" faz o rótulo desta seção competir com o
+                        do seletor de evento — para o leitor de tela e para
+                        quem procura o campo pelo nome.
+                    -->
+                    <h2 id="titulo-presenca" class="text-lg font-semibold">Presença no portão</h2>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <CartaoDeNumero
+                            rotulo="Já entraram"
+                            :valor="String(presenca.presentes)"
+                            tom="sucesso"
+                            significado="Ingressos conferidos na portaria."
+                        />
+                        <CartaoDeNumero
+                            rotulo="Ainda faltam"
+                            :valor="String(presenca.faltantes)"
+                            tom="informacao"
+                            significado="Inscrições confirmadas que ainda não passaram pelo portão."
+                        />
+                        <CartaoDeNumero
+                            rotulo="Esperados"
+                            :valor="String(presenca.confirmadas)"
+                            significado="Todo mundo com inscrição confirmada neste evento."
                         />
                     </div>
                 </section>
@@ -232,21 +278,23 @@ function haQuantoTempo(minutos: number | null): string {
         >
             <h2 id="titulo-avisos-do-provedor" class="text-lg font-semibold">Provedor de pagamento</h2>
 
-            <div class="rounded-lg border border-border p-4">
+            <div class="border-border rounded-lg border p-4">
                 <template v-if="ultimoAviso">
-                    <p class="text-sm text-muted-foreground">Último aviso recebido</p>
+                    <p class="text-muted-foreground text-sm">Último aviso recebido</p>
                     <p class="text-2xl font-semibold tracking-tight" data-testid="painel-ultimo-aviso">
                         {{ haQuantoTempo(ultimoAviso.minutos_atras) }}
                     </p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        {{ ultimoAviso.recebido_em ?? 'sem data' }} · {{ ultimoAviso.gateway }} · {{ ultimoAviso.situacao_rotulo }}
-                    </p>
+                    <!-- Um `div`, e não um `p`: a etiqueta é um bloco, e bloco dentro de parágrafo o navegador desmonta sozinho. -->
+                    <div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
+                        <span>{{ ultimoAviso.recebido_em ?? 'sem data' }} · {{ ultimoAviso.gateway }}</span>
+                        <EtiquetaDeSituacao dominio="webhook" :situacao="ultimoAviso.situacao" :rotulo="ultimoAviso.situacao_rotulo" />
+                    </div>
                 </template>
 
                 <!-- Sem nenhum aviso não se calcula intervalo nenhum: um "há — dias" assustaria à toa em sistema recém-publicado ou com o provedor simulado. -->
                 <template v-else>
                     <p class="text-base font-semibold" data-testid="painel-sem-aviso">Nenhum aviso ainda</p>
-                    <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
+                    <p class="text-muted-foreground mt-1 max-w-2xl text-sm">
                         O provedor de pagamento nunca chamou este sistema. Com a cobrança simulada isso é o esperado; com a cobrança real ligada,
                         costuma significar que o endereço de aviso não foi registrado no painel da Efí.
                     </p>
@@ -254,7 +302,7 @@ function haQuantoTempo(minutos: number | null): string {
 
                 <Link
                     :href="route('admin.pagamentos.avisos')"
-                    class="mt-3 inline-flex h-11 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    class="border-border focus-visible:ring-ring mt-3 inline-flex h-11 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                 >
                     Ver os avisos do provedor
                 </Link>

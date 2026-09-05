@@ -1,11 +1,24 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
 import CampoDeDataHora from '@/components/admin/CampoDeDataHora.vue';
 import CampoDeMarcar from '@/components/admin/CampoDeMarcar.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import { DateField } from '@/components/ui/date-field';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { AtividadeDaEstrutura, ConflitoDaEstrutura, DiaDaEstrutura, EventoDaEstrutura, GrupoDaEstrutura, OpcaoDeAtividade } from '@/types/admin';
+import { formatarValor } from '@/lib/formato';
+import type {
+    AtividadeDaEstrutura,
+    ConflitoDaEstrutura,
+    DiaDaEstrutura,
+    EventoDaEstrutura,
+    GrupoDaEstrutura,
+    LoteDaEstrutura,
+    OpcaoDeAtividade,
+    ResumoDosLotes,
+} from '@/types/admin';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /**
@@ -24,6 +37,8 @@ const props = defineProps<{
     dias: DiaDaEstrutura[];
     conflitos: ConflitoDaEstrutura[];
     atividades: OpcaoDeAtividade[];
+    lotes: LoteDaEstrutura[];
+    lotes_resumo: ResumoDosLotes;
     sucesso: string | null;
 }>();
 
@@ -47,6 +62,23 @@ const grupos = computed<GrupoDaEstrutura[]>(() => props.dias.flatMap((dia) => di
  * cima. O que esta cadastrado e o que se ve; o que se digita interrompe a tela
  * de proposito, e sai dela quando termina.
  */
+/**
+ * A SEÇÃO DE DIAS COMEÇA RECOLHIDA QUANDO O EVENTO TEM UM DIA SÓ.
+ *
+ * Todo evento novo já nasce com o "Dia 1" pronto, e a maioria deles tem
+ * mesmo um dia só. Deixar a tabela de dias aberta no topo da tela faz a
+ * primeira coisa que se lê ser justamente a que não precisa de trabalho, e
+ * empurra as atividades — o motivo de ter entrado aqui — para baixo da dobra.
+ *
+ * Recolhida não é escondida: o botão diz quantos dias existem e abre a tabela
+ * com um toque. Com dois dias ou mais, a seção começa aberta, como sempre foi:
+ * aí a programação de fato tem estrutura para conferir.
+ */
+const diasExpandidos = ref<boolean>(props.evento.dias_total !== 1);
+
+/** "Dia 1 · 17/10/2026" — o que a seção recolhida mostra no lugar da tabela. */
+const resumoDosDias = computed<string>(() => props.dias.map((dia) => `${dia.nome} · ${dataEmPortugues(dia.data)}`).join(', '));
+
 const modalDiaAberto = ref(false);
 
 const diaEmEdicao = ref<DiaDaEstrutura | null>(null);
@@ -229,8 +261,10 @@ function editarAtividade(atividade: AtividadeDaEstrutura): void {
     formularioAtividade.grupo_atividade_id = atividade.grupo_atividade_id;
     formularioAtividade.nome = atividade.nome;
     formularioAtividade.descricao = atividade.descricao ?? '';
-    formularioAtividade.comeca_em = atividade.comeca_em;
-    formularioAtividade.termina_em = atividade.termina_em;
+    // O horário é opcional: quando não existe, o campo abre vazio — e vazio é
+    // o que o servidor recebe de volta se ninguém preencher.
+    formularioAtividade.comeca_em = atividade.comeca_em ?? '';
+    formularioAtividade.termina_em = atividade.termina_em ?? '';
     formularioAtividade.capacidade = atividade.capacidade;
     formularioAtividade.idade_minima = atividade.idade_minima;
     formularioAtividade.idade_maxima = atividade.idade_maxima;
@@ -315,6 +349,155 @@ function gravarConflito(): void {
     });
 }
 
+/* ------------------------------------------------------------- lotes --- */
+
+/**
+ * OS LOTES SÃO OS DEGRAUS DE PREÇO DO EVENTO.
+ *
+ * Cada um vale até uma data, até acabarem as vagas dele, ou até o que vier
+ * primeiro — e pelo menos um dos dois limites é obrigatório: lote que não
+ * encerra é o valor do próprio evento com outro nome.
+ *
+ * A situação de cada lote (encerrado, atual, em breve) vem DECIDIDA do servidor:
+ * ela é derivada da data e do contador a cada leitura, e não existe coluna
+ * guardando-a. Refazer essa conta aqui criaria um segundo lugar onde a regra
+ * mora — e o relógio deste computador não é o que vende a vaga.
+ */
+const modalLoteAberto = ref(false);
+
+const loteEmEdicao = ref<LoteDaEstrutura | null>(null);
+
+const formularioLote = useForm({
+    nome: '',
+    posicao: props.lotes.length + 1,
+    valor_centavos: props.lotes_resumo.valor_do_evento,
+    disponivel_ate: '',
+    quantidade: null as number | null,
+}).transform((dados) => ({
+    ...dados,
+    // Campo vazio é "sem prazo", e não string vazia: é assim que o servidor
+    // reconhece um lote que só encerra por vagas.
+    disponivel_ate: dados.disponivel_ate === '' ? null : dados.disponivel_ate,
+}));
+
+function editarLote(lote: LoteDaEstrutura): void {
+    modalLoteAberto.value = true;
+    loteEmEdicao.value = lote;
+    formularioLote.clearErrors();
+    formularioLote.nome = lote.nome;
+    formularioLote.posicao = lote.posicao;
+    formularioLote.valor_centavos = lote.valor_centavos;
+    formularioLote.disponivel_ate = lote.disponivel_ate ?? '';
+    formularioLote.quantidade = lote.quantidade;
+}
+
+function abrirCadastroLote(): void {
+    loteEmEdicao.value = null;
+    formularioLote.clearErrors();
+    formularioLote.reset();
+    // A próxima posição livre, para que o caso comum não peça digitação.
+    formularioLote.posicao = props.lotes.length + 1;
+    modalLoteAberto.value = true;
+}
+
+/**
+ * Fechar DESFAZ a edicao em curso: quem fechou desistiu. Sem isto, o proximo
+ * "Novo" abriria com os dados de um registro que a pessoa achou que tinha
+ * abandonado.
+ */
+function aoTrocarAberturaLote(aberto: boolean): void {
+    modalLoteAberto.value = aberto;
+
+    if (!aberto) {
+        loteEmEdicao.value = null;
+        formularioLote.clearErrors();
+        formularioLote.reset();
+    }
+}
+
+function cancelarLote(): void {
+    loteEmEdicao.value = null;
+    modalLoteAberto.value = false;
+    formularioLote.clearErrors();
+    formularioLote.reset();
+}
+
+function gravarLote(): void {
+    if (loteEmEdicao.value === null) {
+        formularioLote.post(route('admin.eventos.lotes.store', { evento: props.evento.id }), {
+            preserveScroll: true,
+            onSuccess: () => {
+                formularioLote.reset();
+                modalLoteAberto.value = false;
+            },
+        });
+
+        return;
+    }
+
+    formularioLote.put(route('admin.eventos.lotes.update', { evento: props.evento.id, lote: loteEmEdicao.value.id }), {
+        preserveScroll: true,
+        onSuccess: () => cancelarLote(),
+    });
+}
+
+function excluirLote(lote: LoteDaEstrutura): void {
+    excluir(route('admin.eventos.lotes.destroy', { evento: props.evento.id, lote: lote.id }));
+}
+
+/** "Lote atual", "Em breve", "Encerrado" — a situação sempre escrita. */
+function situacaoDoLote(lote: LoteDaEstrutura): string {
+    if (lote.situacao === 'vigente') {
+        return 'Lote atual';
+    }
+
+    return lote.situacao === 'futuro' ? 'Em breve' : 'Encerrado';
+}
+
+/** "Até 10/10/2026 às 23:59 · 40 vagas", ou o que houver dos dois. */
+function limiteDoLote(lote: LoteDaEstrutura): string {
+    const partes: string[] = [];
+
+    if (lote.disponivel_ate !== null) {
+        partes.push(`Até ${horario(lote.disponivel_ate)}`);
+    }
+
+    if (lote.quantidade !== null) {
+        partes.push(`${lote.quantidade} vaga(s)`);
+    }
+
+    return partes.join(' · ');
+}
+
+/**
+ * A soma das quantidades ao lado da capacidade — INFORMAÇÃO, nunca bloqueio.
+ *
+ * Os dois tetos são independentes: a soma pode ficar abaixo da capacidade (e aí
+ * sobra vaga sem lote, e a inscrição fecha quando o último lote acabar) ou acima
+ * dela (e aí o evento lota antes do último lote). Nenhum dos dois é erro; os
+ * dois são decisões — e quem cadastra precisa enxergar qual delas tomou.
+ */
+const comparacaoComACapacidade = computed<string | null>(() => {
+    const { capacidade, soma_quantidades: soma } = props.lotes_resumo;
+
+    if (soma === null) {
+        return null;
+    }
+
+    if (capacidade === null) {
+        return `Os lotes somam ${soma} vaga(s). O evento não tem capacidade máxima definida.`;
+    }
+
+    if (soma === capacidade) {
+        return `Os lotes somam ${soma} vaga(s), exatamente a capacidade do evento.`;
+    }
+
+    return soma < capacidade
+        ? `Os lotes somam ${soma} vaga(s) e a capacidade do evento é ${capacidade}. ` +
+              `Sobram ${capacidade - soma} vaga(s) sem lote: quando o último lote acabar, as inscrições fecham mesmo com vaga livre.`
+        : `Os lotes somam ${soma} vaga(s) e a capacidade do evento é ${capacidade}. ` + 'O evento lota antes do último lote acabar.';
+});
+
 /* ---------------------------------------------------------- exclusões --- */
 
 const excluindo = ref(false);
@@ -366,6 +549,22 @@ function horario(iso: string): string {
     return `${dataEmPortugues(data ?? '')} às ${(hora ?? '').slice(0, 5)}`;
 }
 
+/**
+ * "17/10/2026 às 08:00 — 10:00", ou "—" quando a atividade não tem hora marcada.
+ *
+ * O travessão sozinho vale AQUI, e só aqui: nesta tela a ausência de horário é
+ * informação de trabalho — quem organiza precisa ver, batendo o olho na
+ * listagem, quais atividades ocupam o dia inteiro. Nas telas de quem se
+ * inscreve, a linha do horário simplesmente não existe.
+ */
+function horarioDaAtividade(atividade: AtividadeDaEstrutura): string {
+    if (atividade.comeca_em === null || atividade.termina_em === null) {
+        return '—';
+    }
+
+    return `${horario(atividade.comeca_em)} — ${horario(atividade.termina_em).slice(-5)}`;
+}
+
 function escolhas(grupo: GrupoDaEstrutura): string {
     const maximo = grupo.max_selecoes === null ? 'sem limite' : String(grupo.max_selecoes);
 
@@ -405,12 +604,25 @@ function escolhas(grupo: GrupoDaEstrutura): string {
 
                 <button
                     type="button"
+                    :aria-expanded="diasExpandidos"
+                    aria-controls="lista-de-dias"
+                    data-testid="alternar-dias"
+                    class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    @click="diasExpandidos = !diasExpandidos"
+                >
+                    {{ diasExpandidos ? 'Ocultar os dias' : `Mostrar os dias (${props.dias.length})` }}
+                </button>
+
+                <button
+                    type="button"
                     class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
                     @click="abrirCadastroDia"
                 >
                     Novo dia
                 </button>
             </div>
+
+            <p v-if="!diasExpandidos" class="text-muted-foreground text-sm">{{ resumoDosDias }}</p>
 
             <Dialog :open="modalDiaAberto" @update:open="aoTrocarAberturaDia">
                 <DialogContent class="sm:max-w-2xl">
@@ -491,50 +703,43 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                 </DialogContent>
             </Dialog>
 
-            <table v-if="props.dias.length > 0" class="w-full text-sm">
-                <caption class="sr-only">
-                    Dias da programação, com a data, a posição na leitura e quantos grupos cada um tem.
-                </caption>
-                <thead>
-                    <tr class="border-border border-b text-left">
-                        <th scope="col" class="px-2 py-2 font-medium">Dia</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Data</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Posição</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Situação</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Grupos</th>
-                        <th scope="col" class="px-2 py-2 font-medium">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="dia in props.dias" :key="dia.id" class="border-border border-b last:border-0">
-                        <th scope="row" class="px-2 py-2 text-left font-normal">{{ dia.nome }}</th>
-                        <td class="px-2 py-2">{{ dataEmPortugues(dia.data) }}</td>
-                        <td class="px-2 py-2">{{ dia.posicao }}</td>
-                        <td class="px-2 py-2">{{ dia.ativo ? 'Ativo' : 'Desativado' }}</td>
-                        <td class="px-2 py-2">{{ dia.grupos.length }}</td>
-                        <td class="px-2 py-2">
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="editarDia(dia)"
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    type="button"
-                                    :disabled="excluindo"
-                                    class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                    @click="excluirDia(dia)"
-                                >
-                                    Excluir
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <p v-else class="text-muted-foreground text-sm">Nenhum dia cadastrado. Comece por aqui: sem dia não há programação.</p>
+            <div id="lista-de-dias" v-show="diasExpandidos">
+                <table v-if="props.dias.length > 0" class="w-full text-sm">
+                    <caption class="sr-only">
+                        Dias da programação, com a data, a posição na leitura e quantos grupos cada um tem.
+                    </caption>
+                    <thead>
+                        <tr class="border-border border-b text-left">
+                            <th scope="col" class="px-2 py-2 font-medium">Dia</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Data</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Posição</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Situação</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Grupos</th>
+                            <th scope="col" class="px-2 py-2 font-medium">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="dia in props.dias" :key="dia.id" class="border-border border-b last:border-0">
+                            <th scope="row" class="px-2 py-2 text-left font-normal">{{ dia.nome }}</th>
+                            <td class="px-2 py-2">{{ dataEmPortugues(dia.data) }}</td>
+                            <td class="px-2 py-2">{{ dia.posicao }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="dia.ativo" :rotulo="dia.ativo ? 'Ativo' : 'Desativado'" />
+                            </td>
+                            <td class="px-2 py-2">{{ dia.grupos.length }}</td>
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarDia(dia)">Editar</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirDia(dia)">
+                                        Excluir
+                                    </BotaoDeAcao>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p v-else class="text-muted-foreground text-sm">Nenhum dia cadastrado. Comece por aqui: sem dia não há programação.</p>
+            </div>
         </section>
 
         <!-- Grupos -->
@@ -561,7 +766,36 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     </DialogHeader>
 
                     <form class="grid gap-4" @submit.prevent="gravarGrupo">
+                        <!--
+                            O NOME VEM PRIMEIRO, E OCUPA A LINHA INTEIRA. Ele e o
+                            campo principal do que se esta criando; "Dia" e
+                            acessorio, e vinha antes so por acidente de escrita.
+                            Assim a ordem de tabulacao tambem melhora: quem abre o
+                            dialogo digita o nome antes de escolher onde encaixar.
+
+                            O `col-span` esta na MESMA faixa da grade
+                            (`sm:grid-cols-2` pede `sm:col-span-2`). Antes era
+                            `md:col-span-2` dentro de grade `sm:`, e essa
+                            discordancia de faixa e que abria dois buracos no
+                            desktop: o Nome so esticava a partir de 768px, e de
+                            640 a 767 sobrava celula vazia ao lado.
+                        -->
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="grupo-nome" class="text-sm font-medium">Nome do grupo</label>
+                                <input
+                                    id="grupo-nome"
+                                    v-model="formularioGrupo.nome"
+                                    type="text"
+                                    required
+                                    maxlength="120"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioGrupo.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioGrupo.errors.nome }}
+                                </p>
+                            </div>
+
                             <div class="flex flex-col gap-1">
                                 <label for="grupo-dia" class="text-sm font-medium">Dia</label>
                                 <select
@@ -574,21 +808,6 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 </select>
                                 <p v-if="formularioGrupo.errors.dia_evento_id" role="alert" class="text-destructive text-sm">
                                     {{ formularioGrupo.errors.dia_evento_id }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label for="grupo-nome" class="text-sm font-medium">Nome do grupo</label>
-                                <input
-                                    id="grupo-nome"
-                                    v-model="formularioGrupo.nome"
-                                    type="text"
-                                    required
-                                    maxlength="120"
-                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                                />
-                                <p v-if="formularioGrupo.errors.nome" role="alert" class="text-destructive text-sm">
-                                    {{ formularioGrupo.errors.nome }}
                                 </p>
                             </div>
 
@@ -693,25 +912,16 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <tr v-for="grupo in dia.grupos" :key="grupo.id" class="border-border border-b last:border-0">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ grupo.nome }}</th>
                             <td class="px-2 py-2">{{ escolhas(grupo) }}</td>
-                            <td class="px-2 py-2">{{ grupo.ativo ? 'Ativo' : 'Desativado' }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="grupo.ativo" :rotulo="grupo.ativo ? 'Ativo' : 'Desativado'" />
+                            </td>
                             <td class="px-2 py-2">{{ grupo.atividades.length }}</td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="editarGrupo(grupo)"
-                                    >
-                                        Editar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                        @click="excluirGrupo(grupo)"
-                                    >
+                                    <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarGrupo(grupo)">Editar</BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirGrupo(grupo)">
                                         Excluir
-                                    </button>
+                                    </BotaoDeAcao>
                                 </div>
                             </td>
                         </tr>
@@ -745,7 +955,29 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     </DialogHeader>
 
                     <form class="grid gap-4" @submit.prevent="gravarAtividade">
+                        <!--
+                            Mesma correcao do dialogo do grupo, e pela mesma
+                            razao: o Nome e o campo principal e abre a grade
+                            ocupando a linha inteira, com `sm:col-span-2` casando
+                            com a faixa da grade (`sm:grid-cols-2`). Grupo e
+                            Posicao dividem a linha seguinte, sem celula vazia.
+                        -->
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="atividade-nome" class="text-sm font-medium">Nome da atividade</label>
+                                <input
+                                    id="atividade-nome"
+                                    v-model="formularioAtividade.nome"
+                                    type="text"
+                                    required
+                                    maxlength="120"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioAtividade.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioAtividade.errors.nome }}
+                                </p>
+                            </div>
+
                             <div class="flex flex-col gap-1">
                                 <label for="atividade-grupo" class="text-sm font-medium">Grupo</label>
                                 <select
@@ -758,21 +990,6 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 </select>
                                 <p v-if="formularioAtividade.errors.grupo_atividade_id" role="alert" class="text-destructive text-sm">
                                     {{ formularioAtividade.errors.grupo_atividade_id }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label for="atividade-nome" class="text-sm font-medium">Nome da atividade</label>
-                                <input
-                                    id="atividade-nome"
-                                    v-model="formularioAtividade.nome"
-                                    type="text"
-                                    required
-                                    maxlength="120"
-                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-                                />
-                                <p v-if="formularioAtividade.errors.nome" role="alert" class="text-destructive text-sm">
-                                    {{ formularioAtividade.errors.nome }}
                                 </p>
                             </div>
 
@@ -790,19 +1007,38 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <!-- O HORÁRIO É OPCIONAL, E EM PAR. Nem toda
+                                 programação tem hora marcada: um mutirão, uma
+                                 caminhada, um retiro acontecem "no sábado", e
+                                 obrigar quem cadastra a inventar 08:00 às 17:00
+                                 é pedir um dado que ninguém tem. Deixar os dois
+                                 campos em branco faz a atividade ocupar o dia
+                                 inteiro; preencher só um é recusado, porque
+                                 metade de um horário não descreve nada. -->
+                            <p id="ajuda-atividade-horario" class="text-muted-foreground text-sm sm:col-span-2">
+                                O horário é opcional. Sem hora de início e de término, a atividade ocupa o dia inteiro do dia a que pertence — e não
+                                pode ser escolhida junto com nenhuma outra desse mesmo dia.
+                            </p>
+
                             <div class="flex flex-col gap-1">
-                                <label for="atividade-comeca" class="text-sm font-medium">Começa em</label>
-                                <CampoDeDataHora id="atividade-comeca" v-model="formularioAtividade.comeca_em" />
+                                <label for="atividade-comeca" class="text-sm font-medium">Começa em (opcional)</label>
+                                <CampoDeDataHora
+                                    id="atividade-comeca"
+                                    v-model="formularioAtividade.comeca_em"
+                                    aria-describedby="ajuda-atividade-horario"
+                                    :aria-invalid="formularioAtividade.errors.comeca_em ? true : undefined"
+                                />
                                 <p v-if="formularioAtividade.errors.comeca_em" role="alert" class="text-destructive text-sm">
                                     {{ formularioAtividade.errors.comeca_em }}
                                 </p>
                             </div>
 
                             <div class="flex flex-col gap-1">
-                                <label for="atividade-termina" class="text-sm font-medium">Termina em</label>
+                                <label for="atividade-termina" class="text-sm font-medium">Termina em (opcional)</label>
                                 <CampoDeDataHora
                                     id="atividade-termina"
                                     v-model="formularioAtividade.termina_em"
+                                    aria-describedby="ajuda-atividade-horario"
                                     :aria-invalid="formularioAtividade.errors.termina_em ? true : undefined"
                                 />
                                 <p v-if="formularioAtividade.errors.termina_em" role="alert" class="text-destructive text-sm">
@@ -907,9 +1143,7 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                     <tbody>
                         <tr v-for="atividade in grupo.atividades" :key="atividade.id" class="border-border border-b last:border-0">
                             <th scope="row" class="px-2 py-2 text-left font-normal">{{ atividade.nome }}</th>
-                            <td class="px-2 py-2 whitespace-nowrap">
-                                {{ horario(atividade.comeca_em) }} — {{ horario(atividade.termina_em).slice(-5) }}
-                            </td>
+                            <td class="px-2 py-2 whitespace-nowrap">{{ horarioDaAtividade(atividade) }}</td>
                             <td class="px-2 py-2">
                                 {{
                                     atividade.capacidade === null
@@ -918,28 +1152,27 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                                 }}
                             </td>
                             <td class="px-2 py-2">{{ atividade.escolhida_por }}</td>
-                            <td class="px-2 py-2">{{ atividade.ativo ? 'Ativa' : 'Desativada' }}</td>
+                            <td class="px-2 py-2">
+                                <EtiquetaDeSituacao dominio="ativo" :situacao="atividade.ativo" :rotulo="atividade.ativo ? 'Ativa' : 'Desativada'" />
+                            </td>
                             <td class="px-2 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="editarAtividade(atividade)"
+                                    <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarAtividade(atividade)"
+                                        >Editar</BotaoDeAcao
                                     >
-                                        Editar
-                                    </button>
                                     <span v-if="atividade.escolhida_por > 0" class="text-muted-foreground">
                                         Já escolhida: desative em vez de excluir.
                                     </span>
-                                    <button
+                                    <BotaoDeAcao
                                         v-else
-                                        type="button"
+                                        tamanho="xs"
+                                        intencao="excluir"
+                                        :icone="Trash2"
                                         :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
                                         @click="excluirAtividade(atividade)"
                                     >
                                         Excluir
-                                    </button>
+                                    </BotaoDeAcao>
                                 </div>
                             </td>
                         </tr>
@@ -1062,19 +1295,212 @@ function escolhas(grupo: GrupoDaEstrutura): string {
                         <td class="px-2 py-2">{{ conflito.atividade_b }}</td>
                         <td class="px-2 py-2">{{ conflito.motivo ?? '—' }}</td>
                         <td class="px-2 py-2">
-                            <button
-                                type="button"
-                                :disabled="excluindo"
-                                class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                @click="excluirConflito(conflito)"
-                            >
+                            <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirConflito(conflito)">
                                 Remover
-                            </button>
+                            </BotaoDeAcao>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <p v-else class="text-muted-foreground text-sm">Nenhum conflito cadastrado.</p>
+        </section>
+
+        <!-- Lotes de inscrição -->
+        <section aria-labelledby="titulo-lotes" class="border-border grid gap-4 rounded-lg border p-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 id="titulo-lotes" class="mr-auto text-lg font-semibold">Lotes de inscrição</h2>
+
+                <button
+                    type="button"
+                    class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden"
+                    @click="abrirCadastroLote"
+                >
+                    Novo lote
+                </button>
+            </div>
+
+            <p class="text-muted-foreground max-w-3xl text-sm">
+                Cada lote é um degrau de preço: ele vale até uma data, até acabarem as vagas dele, ou até o que vier primeiro — e precisa de pelo
+                menos um desses dois limites. Quem se inscreve entra sempre pelo lote em vigor, e o valor daquele lote fica gravado na inscrição:
+                mudar o preço depois não altera o que ninguém já deve. Sem nenhum lote cadastrado, vale o valor do próprio evento.
+            </p>
+
+            <p v-if="comparacaoComACapacidade" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
+                {{ comparacaoComACapacidade }}
+            </p>
+
+            <Dialog :open="modalLoteAberto" @update:open="aoTrocarAberturaLote">
+                <DialogContent class="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{{ loteEmEdicao === null ? 'Novo lote' : `Editando ${loteEmEdicao.nome}` }}</DialogTitle>
+                        <DialogDescription>
+                            A posição decide a ordem da sucessão: vale sempre o primeiro lote da fila que ainda não encerrou.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form class="grid gap-4" @submit.prevent="gravarLote">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="flex flex-col gap-1 sm:col-span-2">
+                                <label for="lote-nome" class="text-sm font-medium">Nome do lote</label>
+                                <input
+                                    id="lote-nome"
+                                    v-model="formularioLote.nome"
+                                    type="text"
+                                    required
+                                    maxlength="80"
+                                    :aria-invalid="formularioLote.errors.nome ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.nome" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.nome }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-posicao" class="text-sm font-medium">Posição</label>
+                                <input
+                                    id="lote-posicao"
+                                    v-model.number="formularioLote.posicao"
+                                    type="number"
+                                    min="1"
+                                    required
+                                    :aria-invalid="formularioLote.errors.posicao ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.posicao" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.posicao }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-valor" class="text-sm font-medium">Valor em centavos</label>
+                                <input
+                                    id="lote-valor"
+                                    v-model.number="formularioLote.valor_centavos"
+                                    type="number"
+                                    min="0"
+                                    required
+                                    aria-describedby="ajuda-lote-valor"
+                                    :aria-invalid="formularioLote.errors.valor_centavos ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p id="ajuda-lote-valor" class="text-muted-foreground text-sm">R$ 120,00 se escreve 12000.</p>
+                                <p v-if="formularioLote.errors.valor_centavos" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.valor_centavos }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <p id="ajuda-lote-limite" class="text-muted-foreground text-sm sm:col-span-2">
+                                Preencha pelo menos um dos dois. Com os dois, o lote encerra no que vier primeiro.
+                            </p>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-disponivel-ate" class="text-sm font-medium">Disponível até (opcional)</label>
+                                <CampoDeDataHora
+                                    id="lote-disponivel-ate"
+                                    v-model="formularioLote.disponivel_ate"
+                                    aria-describedby="ajuda-lote-limite"
+                                    :aria-invalid="formularioLote.errors.disponivel_ate ? true : undefined"
+                                />
+                                <p v-if="formularioLote.errors.disponivel_ate" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.disponivel_ate }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-1">
+                                <label for="lote-quantidade" class="text-sm font-medium">Quantidade de vagas (opcional)</label>
+                                <input
+                                    id="lote-quantidade"
+                                    v-model.number="formularioLote.quantidade"
+                                    type="number"
+                                    min="1"
+                                    aria-describedby="ajuda-lote-limite"
+                                    :aria-invalid="formularioLote.errors.quantidade ? true : undefined"
+                                    class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                />
+                                <p v-if="formularioLote.errors.quantidade" role="alert" class="text-destructive text-sm">
+                                    {{ formularioLote.errors.quantidade }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <button
+                                type="button"
+                                class="border-border focus-visible:ring-ring h-11 rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                                @click="cancelarLote"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                :disabled="formularioLote.processing"
+                                class="bg-acao text-acao-foreground focus-visible:ring-ring h-11 rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
+                            >
+                                {{ loteEmEdicao === null ? 'Acrescentar' : 'Salvar' }}
+                            </button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <table v-if="props.lotes.length > 0" class="w-full text-sm" data-testid="tabela-de-lotes">
+                <caption class="sr-only">
+                    Lotes de inscrição, com o valor, o limite de cada um, quantas vagas já saíram e a situação.
+                </caption>
+                <thead>
+                    <tr class="border-border border-b text-left">
+                        <th scope="col" class="px-2 py-2 font-medium">Lote</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Valor</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Limite</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Vagas do lote</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Inscrições</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Situação</th>
+                        <th scope="col" class="px-2 py-2 font-medium">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="lote in props.lotes" :key="lote.id" class="border-border border-b last:border-0">
+                        <th scope="row" class="px-2 py-2 text-left font-normal">{{ lote.posicao }}. {{ lote.nome }}</th>
+                        <td class="px-2 py-2 tabular-nums">{{ formatarValor(lote.valor_centavos) }}</td>
+                        <td class="px-2 py-2">{{ limiteDoLote(lote) }}</td>
+                        <td class="px-2 py-2">
+                            {{ lote.quantidade === null ? `${lote.vagas_ocupadas} (sem limite)` : `${lote.vagas_ocupadas} de ${lote.quantidade}` }}
+                        </td>
+                        <td class="px-2 py-2">{{ lote.inscricoes }}</td>
+                        <!-- A palavra fica sempre escrita: a situação não pode
+                             depender só da cor (WCAG 1.4.1). -->
+                        <td class="px-2 py-2" :class="lote.situacao === 'vigente' ? 'font-medium' : 'text-muted-foreground'">
+                            {{ situacaoDoLote(lote) }}
+                        </td>
+                        <td class="px-2 py-2">
+                            <div class="flex flex-wrap gap-2">
+                                <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editarLote(lote)">Editar</BotaoDeAcao>
+                                <!--
+                                    Sem botão de excluir quando alguém já entrou
+                                    por este lote: apagá-lo apagaria de onde
+                                    aquelas pessoas vieram e por qual valor. O
+                                    caminho certo é encerrar o lote pela data ou
+                                    pela quantidade, e a frase diz isso no lugar
+                                    do botão que não existe.
+                                -->
+                                <span v-if="lote.inscricoes > 0" class="text-muted-foreground">
+                                    Já tem inscrição: encerre pela data ou pela quantidade em vez de excluir.
+                                </span>
+                                <BotaoDeAcao v-else tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluirLote(lote)">
+                                    Excluir
+                                </BotaoDeAcao>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p v-else class="text-muted-foreground text-sm">
+                Nenhum lote cadastrado. Sem lotes, a inscrição custa o valor do evento — {{ formatarValor(props.lotes_resumo.valor_do_evento) }} — do
+                começo ao fim.
+            </p>
         </section>
     </AdminLayout>
 </template>

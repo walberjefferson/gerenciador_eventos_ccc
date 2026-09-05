@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import BotaoDeAcao from '@/components/admin/BotaoDeAcao.vue';
+import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import PainelDeFiltros from '@/components/admin/PainelDeFiltros.vue';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { CidadeDoCatalogo } from '@/types/admin';
+import type { CidadeDoCatalogo, ResponsavelDisponivel } from '@/types/admin';
 import { router, useForm, usePage } from '@inertiajs/vue3';
+import { CircleAlert, Pencil, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, ref } from 'vue';
 
 /**
@@ -23,6 +26,7 @@ import { computed, nextTick, ref } from 'vue';
 const props = defineProps<{
     cidades: CidadeDoCatalogo[];
     ufs: string[];
+    responsaveis: ResponsavelDisponivel[];
     sucesso: string | null;
 }>();
 
@@ -49,7 +53,23 @@ const formulario = useForm({
     // porque a coluna é obrigatória e entra na chave única (nome, uf).
     uf: 'AL',
     ativo: true as boolean,
+    // Quem atende o setor (RN-R2). Vazio por padrão, e o setor continua valendo
+    // assim: só o evento que recebe pela chave Pix do setor exige ao menos um
+    // responsável apto aqui (RN-S4 com a redação da RN-R3).
+    responsaveis: [] as number[],
 });
+
+/**
+ * Existe alguém apto no cadastro para ser vinculado?
+ *
+ * Quando não existe, o modal avisa e aponta o caminho em vez de oferecer uma
+ * lista vazia sem explicação: sem responsável apto o setor nunca vai receber, e
+ * a pessoa precisa saber que o cadastro que falta é o de outra tela.
+ */
+const existeResponsavelApto = computed<boolean>(() => props.responsaveis.some((pessoa) => pessoa.apto));
+
+/** Este setor ficaria pronto para receber com o que está marcado agora? */
+const selecaoTemAlguemApto = computed<boolean>(() => props.responsaveis.some((pessoa) => pessoa.apto && formulario.responsaveis.includes(pessoa.id)));
 
 /**
  * O erro de exclusão não vem de um formulário: ele volta do servidor como erro
@@ -122,6 +142,7 @@ function editar(cidade: CidadeDoCatalogo): void {
     formulario.nome = cidade.nome;
     formulario.uf = cidade.uf;
     formulario.ativo = cidade.ativo;
+    formulario.responsaveis = cidade.responsaveis.map((pessoa) => pessoa.id);
 
     void nextTick(() => campoNome.value?.focus());
 }
@@ -251,6 +272,64 @@ function excluir(cidade: CidadeDoCatalogo): void {
                         <label for="setor-ativo" class="text-sm font-medium">Ativo</label>
                     </div>
 
+                    <!--
+                        Quem atende o setor.
+
+                        A chave Pix, o titular e o telefone saíram daqui: eles
+                        descrevem uma pessoa, e a pessoa tem cadastro próprio.
+                        O que este bloco decide é o vínculo — e é ele que
+                        responde se o setor consegue receber (RN-R3).
+                    -->
+                    <fieldset class="border-border grid gap-3 rounded-md border p-3" data-testid="recebimento-do-setor">
+                        <legend class="px-1 text-sm font-medium">Quem recebe por este setor</legend>
+
+                        <p class="text-muted-foreground text-sm">
+                            Marque quem pode receber o Pix de quem se inscreve por aqui. A cada cobrança emitida o sistema sorteia um deles, entre os
+                            que estiverem com menos inscrições no evento — e qualquer um dos marcados confere os comprovantes do setor.
+                        </p>
+
+                        <!-- Nenhum responsável apto no cadastro inteiro: o aviso
+                             aponta a tela onde o cadastro é feito, em vez de
+                             mostrar uma lista vazia que ninguém sabe por quê. -->
+                        <p
+                            v-if="!existeResponsavelApto"
+                            role="status"
+                            class="border-atencao/40 bg-atencao/10 rounded-md border px-3 py-2 text-sm"
+                            data-testid="sem-responsavel-apto"
+                        >
+                            Nenhum responsável ativo e com chave Pix está cadastrado ainda. Cadastre em
+                            <a :href="route('admin.catalogo.responsaveis')" class="text-acao-texto font-medium">Catálogo → Responsáveis</a>
+                            e volte aqui para vincular.
+                        </p>
+
+                        <div v-else class="grid gap-2" data-testid="campo-responsaveis">
+                            <label
+                                v-for="pessoa in props.responsaveis"
+                                :key="pessoa.id"
+                                class="flex items-center gap-2 text-sm"
+                                :data-testid="`responsavel-opcao-${pessoa.id}`"
+                            >
+                                <input v-model="formulario.responsaveis" type="checkbox" :value="pessoa.id" class="border-input size-4 rounded" />
+                                <span>{{ pessoa.nome }}</span>
+                                <!-- Quem não está apto continua aparecendo: ele
+                                     pode já estar vinculado, e sumir da lista
+                                     faria o vínculo desaparecer sem aviso. -->
+                                <span v-if="!pessoa.apto" class="text-muted-foreground text-xs">
+                                    {{ pessoa.ativo ? 'sem chave Pix' : 'desativado' }} — não entra no sorteio
+                                </span>
+                            </label>
+                        </div>
+
+                        <p v-if="existeResponsavelApto && !selecaoTemAlguemApto" class="text-muted-foreground text-sm">
+                            Sem ninguém apto marcado, este setor não consegue receber — e nenhum evento pode ser salvo no modo setor enquanto ele
+                            estiver ativo assim.
+                        </p>
+
+                        <p v-if="formulario.errors.responsaveis" role="alert" class="text-destructive text-sm">
+                            {{ formulario.errors.responsaveis }}
+                        </p>
+                    </fieldset>
+
                     <DialogFooter>
                         <button
                             type="button"
@@ -323,13 +402,16 @@ function excluir(cidade: CidadeDoCatalogo): void {
 
             <table v-else class="w-full text-sm">
                 <caption class="sr-only">
-                    Setores do catálogo, com o estado, a situação e quantos grupos de participantes dependem de cada um.
+                    Setores do catálogo, com o estado, a situação, quem atende o setor, se ele consegue receber pagamento e quantos grupos de
+                    participantes dependem de cada um.
                 </caption>
                 <thead>
                     <tr class="border-border border-b text-left">
                         <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                         <th scope="col" class="px-4 py-2 font-medium">Estado</th>
                         <th scope="col" class="px-4 py-2 font-medium">Situação</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Responsáveis</th>
+                        <th scope="col" class="px-4 py-2 font-medium">Recebe Pix</th>
                         <th scope="col" class="px-4 py-2 font-medium">Grupos</th>
                         <th scope="col" class="px-4 py-2 font-medium">Ações</th>
                     </tr>
@@ -338,44 +420,43 @@ function excluir(cidade: CidadeDoCatalogo): void {
                     <tr v-for="cidade in cidadesFiltradas" :key="cidade.id" class="border-border border-b last:border-0">
                         <th scope="row" class="px-4 py-2 text-left font-normal">{{ cidade.nome }}</th>
                         <td class="px-4 py-2">{{ cidade.uf }}</td>
-                        <td class="px-4 py-2">{{ cidade.ativo ? 'Ativo' : 'Desativado' }}</td>
+                        <td class="px-4 py-2">
+                            <EtiquetaDeSituacao dominio="ativo" :situacao="cidade.ativo" :rotulo="cidade.ativo ? 'Ativo' : 'Desativado'" />
+                        </td>
+                        <td class="px-4 py-2">
+                            <span v-if="cidade.responsaveis.length > 0" :data-testid="`responsaveis-${cidade.id}`">
+                                {{ cidade.responsaveis.map((pessoa) => pessoa.nome).join(', ') }}
+                            </span>
+                            <span v-else class="text-muted-foreground" :data-testid="`responsaveis-${cidade.id}`">—</span>
+                        </td>
+                        <td class="px-4 py-2">
+                            <!-- O que a coluna responde é "este setor consegue
+                                 receber?", e não "ele tem responsável": um
+                                 vínculo com quem está sem chave ou desativado
+                                 não faz o setor receber nada (RN-R3). -->
+                            <span v-if="cidade.preparado_para_receber" class="text-sucesso-texto font-medium" :data-testid="`recebe-${cidade.id}`">
+                                Sim
+                            </span>
+                            <span v-else class="text-muted-foreground inline-flex items-center gap-1" :data-testid="`recebe-${cidade.id}`">
+                                <CircleAlert class="size-4" aria-hidden="true" />
+                                Falta cadastro
+                            </span>
+                        </td>
                         <td class="px-4 py-2">{{ cidade.grupos }}</td>
                         <td class="px-4 py-2">
                             <div class="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="editar(cidade)"
-                                >
-                                    Editar
-                                </button>
+                                <BotaoDeAcao tamanho="xs" intencao="editar" :icone="Pencil" @click="editar(cidade)">Editar</BotaoDeAcao>
 
                                 <template v-if="confirmandoExclusao === cidade.id">
                                     <span class="text-muted-foreground">Excluir mesmo?</span>
-                                    <button
-                                        type="button"
-                                        :disabled="excluindo"
-                                        class="border-destructive text-destructive focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
-                                        @click="excluir(cidade)"
-                                    >
+                                    <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(cidade)">
                                         Sim, excluir
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                        @click="confirmandoExclusao = null"
-                                    >
-                                        Não
-                                    </button>
+                                    </BotaoDeAcao>
+                                    <BotaoDeAcao tamanho="xs" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                 </template>
-                                <button
-                                    v-else
-                                    type="button"
-                                    class="border-border focus-visible:ring-ring rounded-md border px-3 py-1 focus-visible:ring-2 focus-visible:outline-hidden"
-                                    @click="confirmandoExclusao = cidade.id"
+                                <BotaoDeAcao v-else tamanho="xs" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = cidade.id"
+                                    >Excluir</BotaoDeAcao
                                 >
-                                    Excluir
-                                </button>
                             </div>
                         </td>
                     </tr>

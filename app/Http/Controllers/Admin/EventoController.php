@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Inscricoes\ResolverLoteVigente;
+use App\Enums\FormaRecebimento;
 use App\Enums\SituacaoEvento;
 use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EventoRequest;
 use App\Http\Resources\Admin\EstruturaDoEventoResource;
+use App\Models\Cidade;
+use App\Models\DiaEvento;
 use App\Models\Evento;
+use App\Models\GrupoAtividade;
+use App\Models\Lote;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 
 /**
@@ -64,19 +71,63 @@ class EventoController extends Controller
         return inertia('Admin/Eventos/Formulario', [
             'evento' => null,
             'situacoes' => $this->situacoes(),
+            'formas_recebimento' => $this->formasDeRecebimento(),
+            'setores_despreparados' => Cidade::ativasDespreparadasParaReceber(),
         ]);
     }
 
+    /**
+     * O evento nasce com o primeiro dia e um grupo de atividades prontos.
+     *
+     * Antes, quem cadastrava um evento caía numa tela de programação vazia e
+     * precisava criar um dia e um grupo antes de conseguir cadastrar a
+     * primeira atividade — três formulários para dizer uma coisa só. Para a
+     * maioria dos eventos, o primeiro dia é a data de início e o único grupo é
+     * "as atividades": o sistema já sabe disso e não deveria perguntar.
+     *
+     * Só o PRIMEIRO dia é criado, mesmo em evento de vários dias. Adivinhar os
+     * demais seria inventar programação; acrescentá-los é um gesto do
+     * organizador, que sabe o que acontece em cada um.
+     *
+     * Tudo numa transação: um evento sem o dia (ou com o dia sem o grupo) seria
+     * pior do que um evento não cadastrado, porque ninguém perceberia a falta.
+     */
     public function store(EventoRequest $request): RedirectResponse
     {
         $this->authorize('create', Evento::class);
 
-        $evento = Evento::create($request->dadosDoEvento());
+        $evento = DB::transaction(function () use ($request): Evento {
+            $evento = Evento::create($request->dadosDoEvento());
+
+            $dia = DiaEvento::create([
+                'evento_id' => $evento->id,
+                'nome' => 'Dia 1',
+                'data' => $evento->data_inicio->toDateString(),
+                'posicao' => 1,
+                'ativo' => true,
+            ]);
+
+            GrupoAtividade::create([
+                'dia_evento_id' => $dia->id,
+                'nome' => 'Atividades',
+                // Opcional e sem teto: é o grupo mais permissivo possível, o
+                // que deixa a decisão de fato para quem organiza. Um grupo
+                // obrigatório criado por conta própria travaria as inscrições
+                // de um evento que talvez nem tenha atividades.
+                'obrigatorio' => false,
+                'min_selecoes' => 0,
+                'max_selecoes' => null,
+                'posicao' => 1,
+                'ativo' => true,
+            ]);
+
+            return $evento;
+        });
 
         $this->auditarCriacao($evento, 'evento');
 
         return to_route('admin.eventos.estrutura', $evento)
-            ->with('sucesso', "Evento {$evento->nome} cadastrado. Agora monte a programação.");
+            ->with('sucesso', "Evento {$evento->nome} cadastrado. A programação já começa com o Dia 1 e um grupo de atividades: acrescente as atividades ou ajuste o que precisar.");
     }
 
     public function edit(Evento $evento): Response
@@ -101,6 +152,7 @@ class EventoController extends Controller
                 'valor_centavos' => $evento->valor_centavos,
                 'moeda' => $evento->moeda,
                 'prazo_pagamento_minutos' => $evento->prazo_pagamento_minutos,
+                'forma_recebimento' => $evento->forma_recebimento->value,
                 'situacao' => $evento->situacao->value,
                 'regulamento' => $evento->regulamento,
                 'versao_termos' => $evento->versao_termos,
@@ -110,6 +162,12 @@ class EventoController extends Controller
                 'inscricoes_ativas' => $evento->inscricoes()->ativas()->count(),
             ],
             'situacoes' => $this->situacoes(),
+            'formas_recebimento' => $this->formasDeRecebimento(),
+            // Os setores que ainda nao conseguem receber. A tela avisa ANTES de
+            // a pessoa tentar salvar no modo setor e levar a recusa da RN-S4 —
+            // que continua existindo no servidor, porque este aviso e cortesia
+            // e nao trava.
+            'setores_despreparados' => Cidade::ativasDespreparadasParaReceber(),
         ]);
     }
 
@@ -135,7 +193,53 @@ class EventoController extends Controller
         $this->authorize('view', $evento);
 
         return inertia('Admin/Eventos/Estrutura', (new EstruturaDoEventoResource($evento))->paraTela()
-            + ['sucesso' => session('sucesso')]);
+            + ['sucesso' => session('sucesso')]
+            + $this->lotesDoEvento($evento));
+    }
+
+    /**
+     * Os lotes de inscricao, no formato que a tela de programacao le.
+     *
+     * Cada linha leva quantas vagas ja sairam e quantas inscricoes vieram
+     * daquele lote: e por esses dois numeros que a tela decide se pode oferecer
+     * o botao de excluir (RN-L12). Sem eles, ela ofereceria um botao que o
+     * servidor recusaria.
+     *
+     * A soma das quantidades viaja ao lado da capacidade do evento como
+     * INFORMACAO, nunca como bloqueio (RN-L10): os dois tetos sao independentes,
+     * e quem cadastra e que precisa enxergar a diferenca entre eles.
+     *
+     * @return array<string, mixed>
+     */
+    private function lotesDoEvento(Evento $evento): array
+    {
+        $lotes = $evento->lotes()->withCount('inscricoes')->get();
+        $vigente = app(ResolverLoteVigente::class)->daColecao($lotes);
+        $comQuantidade = $lotes->whereNotNull('quantidade');
+
+        return [
+            'lotes' => $lotes
+                ->map(fn (Lote $lote): array => [
+                    'id' => $lote->id,
+                    'nome' => $lote->nome,
+                    'posicao' => $lote->posicao,
+                    'valor_centavos' => $lote->valor_centavos,
+                    // O formato que o campo de data e hora do painel troca.
+                    'disponivel_ate' => $lote->disponivel_ate?->format('Y-m-d\TH:i'),
+                    'quantidade' => $lote->quantidade,
+                    'vagas_ocupadas' => $lote->vagas_ocupadas,
+                    'situacao' => $lote->situacaoEm(null, $vigente?->id),
+                    'inscricoes' => (int) $lote->inscricoes_count,
+                ])
+                ->all(),
+            'lotes_resumo' => [
+                'capacidade' => $evento->capacidade,
+                // Null quando NENHUM lote tem quantidade: aí não há soma a
+                // comparar com a capacidade, e um zero mentiria.
+                'soma_quantidades' => $comQuantidade->isEmpty() ? null : (int) $comQuantidade->sum('quantidade'),
+                'valor_do_evento' => $evento->valor_centavos,
+            ],
+        ];
     }
 
     public function destroy(Evento $evento): RedirectResponse
@@ -159,6 +263,27 @@ class EventoController extends Controller
         $this->auditarRemocao($evento, 'evento');
 
         return to_route('admin.eventos.index')->with('sucesso', "Evento {$nome} excluído.");
+    }
+
+    /**
+     * As formas de recebimento, com o rotulo, a explicacao e os dois numeros de
+     * prazo que a tela usa: o minimo que ela cobra e o que ela sugere ao trocar
+     * de forma (RN-S8).
+     *
+     * @return array<int, array{valor: string, rotulo: string, explicacao: string, prazo_minimo: int, prazo_sugerido: int}>
+     */
+    private function formasDeRecebimento(): array
+    {
+        return array_map(
+            fn (FormaRecebimento $forma): array => [
+                'valor' => $forma->value,
+                'rotulo' => $forma->rotulo(),
+                'explicacao' => $forma->explicacao(),
+                'prazo_minimo' => $forma->prazoMinimoEmMinutos(),
+                'prazo_sugerido' => $forma->prazoSugeridoEmMinutos(),
+            ],
+            FormaRecebimento::cases(),
+        );
     }
 
     /**

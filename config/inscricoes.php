@@ -59,7 +59,31 @@ return [
         // aqui pega quem tenta muitos e-mails diferentes do mesmo lugar.
         'login_por_minuto' => (int) env('ADMIN_LIMITE_LOGIN_MINUTO', 20),
 
+        // Conferencia de ingresso na portaria, por endereco de internet.
+        //
+        // O teto e alto de proposito, e pelo mesmo motivo do limite de criar
+        // inscricao: no dia do evento o portao inteiro sai por UM endereco — o
+        // wi-fi do salao, ou o celular de alguem repartindo internet — e sao
+        // varios voluntarios conferindo ao mesmo tempo, cada um com a fila na
+        // frente. Um teto justo transformaria a defesa em porta trancada
+        // justamente na hora em que a tela precisa funcionar.
+        //
+        // Ele existe mesmo assim porque rota de conferencia sem limite nenhum
+        // e convite a varredura. Com ~60 bits de entropia no codigo, 240
+        // tentativas por minuto levariam bilhoes de anos para acertar um
+        // ingresso — e ainda assim o limite corta o script que tentasse.
+        'validar_ingresso' => env('PORTARIA_LIMITE_VALIDAR_INGRESSO', '240,1'),
+
         'segunda_via' => env('INSCRICOES_LIMITE_SEGUNDA_VIA', '5,1'),
+
+        // Envio do comprovante de pagamento, na tela do participante.
+        //
+        // E a unica porta em que alguem de fora escreve ARQUIVO no servidor, e
+        // por isso o teto e baixo. Baixo, mas nao apertado: quem manda a foto
+        // errada, ve que ficou tremida e manda de novo precisa conseguir — e
+        // seis tentativas por minuto cobrem isso com folga. Um script que
+        // quisesse encher o disco, nao.
+        'comprovante' => env('INSCRICOES_LIMITE_COMPROVANTE', '6,1'),
         'acesso_por_minuto' => env('INSCRICOES_LIMITE_ACESSO_MINUTO', '5,1'),
         'acesso_por_hora' => env('INSCRICOES_LIMITE_ACESSO_HORA', '15,60'),
     ],
@@ -109,13 +133,29 @@ return [
         'espera_entre_tentativas' => [60, 300, 900],
 
         /*
-        | O lembrete de prazo. A janela e o quanto antes do vencimento a
-        | mensagem sai: com 24 horas, quem tem prazo vencendo dentro desse
-        | intervalo recebe o aviso. O lote e o tamanho da fatia lida por vez,
-        | para que uma varredura grande nao carregue tudo na memoria.
+        | O lembrete de prazo.
+        |
+        | A hora de avisar nao e um numero fixo de horas: e uma fracao do prazo
+        | que AQUELA inscricao recebeu. Com 0.5, o aviso sai quando resta
+        | metade ou menos do tempo — 12 horas para quem teve 24, 30 minutos
+        | para quem teve uma hora.
+        |
+        | Uma janela fixa nao serviria, porque o prazo e escolhido evento a
+        | evento (eventos.prazo_pagamento_minutos, de 5 minutos a 30 dias).
+        | Vinte e quatro horas de antecedencia em um evento com prazo de 24
+        | horas fariam o "lembrete" chegar junto com o e-mail de inscricao
+        | recebida: aviso que chega antes de a pessoa ter tido tempo de pagar
+        | nao lembra nada, so ensina a ignorar o proximo.
+        |
+        | O prazo concedido e medido na propria inscricao (do momento em que
+        | ela foi criada ate o prazo dela), e nao no evento: mudar o prazo do
+        | evento depois nao pode reescrever a conta de quem ja se inscreveu.
+        |
+        | O lote e o tamanho da fatia lida por vez, para que uma varredura
+        | grande nao carregue tudo na memoria.
         */
         'lembrete' => [
-            'janela_horas' => (int) env('INSCRICOES_LEMBRETE_JANELA_HORAS', 24),
+            'fracao_restante' => (float) env('INSCRICOES_LEMBRETE_FRACAO_RESTANTE', 0.5),
             'lote' => (int) env('INSCRICOES_LEMBRETE_LOTE', 100),
         ],
 

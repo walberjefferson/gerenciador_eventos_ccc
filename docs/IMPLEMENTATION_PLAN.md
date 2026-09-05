@@ -54,7 +54,7 @@
 | 1.1 | Repositório Git inicializado |
 | 1.2 | Projeto Laravel 12 com o kit inicial Vue (Inertia 2 + TypeScript + Tailwind 4) |
 | 1.3 | Ambiente em Docker (Laravel Sail) com PostgreSQL 18, Redis e Mailpit |
-| 1.4 | `.env` configurado: PostgreSQL, Redis, `APP_TIMEZONE=America/Sao_Paulo`, `PAYMENT_GATEWAY=fake` |
+| 1.4 | `.env` configurado: PostgreSQL, Redis, `APP_TIMEZONE=America/Maceio`, `PAYMENT_GATEWAY=fake` |
 | 1.5 | `config/payments.php` com o provedor padrão e as configurações do provedor simulado |
 | 1.6 | Pest e Pint configurados |
 | 1.7 | Migrações do kit inicial rodando e autenticação administrativa funcionando |
@@ -247,7 +247,7 @@ Todas as onze etapas foram entregues. Três ajustes de rumo, feitos durante a ex
 
 - ✅ Ouvintes dos quatro anúncios já disparados pelo domínio: `InscricaoCriada`, `InscricaoConfirmada`, `InscricaoExpirada` e `InscricaoCancelada`. A decisão **D-12** está **encerrada** — eles finalmente têm quem os escute.
 - ✅ Cinco e-mails (decisão **D-65**): inscrição recebida com o link de pagamento, lembrete antes do prazo, pagamento confirmado, prazo vencido e cancelamento. Todos em HTML **e** em texto puro, sempre com link assinado e **nunca** com CPF, telefone, impressão digital ou código Pix inteiro (**D-68**).
-- ✅ Lembrete de prazo pelo comando agendado `inscricoes:lembrar-prazo` (a cada 15 minutos, janela configurável, padrão de 24 horas — decisão DA-08 cumprida).
+- ✅ Lembrete de prazo pelo comando agendado `inscricoes:lembrar-prazo` (a cada 15 minutos; sai quando resta metade ou menos do prazo daquela inscrição, fração configurável — decisão DA-08 cumprida).
 - ✅ Tudo na fila `emails`, com 3 tentativas e espera de 1, 5 e 15 minutos; falha definitiva vai para `failed_jobs` sem afetar inscrição, vaga ou pagamento (**D-67**).
 - ✅ Tabela `comunicacoes_enviadas` com unicidade `(inscricao_id, tipo, canal)`: é o **banco** que impede a segunda cópia, não uma verificação em PHP (**D-66**).
 - ✅ Estrutura pronta para um segundo canal: só a coluna `canal` e o Enum `TipoComunicacao`, sem contrato nem adaptador de WhatsApp (**D-70**).

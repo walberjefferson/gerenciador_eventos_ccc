@@ -8,6 +8,7 @@ use App\Events\InscricaoCancelada;
 use App\Events\InscricaoConfirmada;
 use App\Events\InscricaoCriada;
 use App\Events\InscricaoExpirada;
+use App\Listeners\EmitirIngressoDaInscricao;
 use App\Listeners\EnviarEmailInscricaoCancelada;
 use App\Listeners\EnviarEmailInscricaoRecebida;
 use App\Listeners\EnviarEmailPagamentoConfirmado;
@@ -31,14 +32,23 @@ class AppServiceProvider extends ServiceProvider
      * nova em app/Listeners nao comeca a receber anuncios sem ninguem decidir.
      * (A descoberta esta desligada em bootstrap/app.php.)
      *
-     * Todos os ouvintes rodam na fila. O dominio anuncia e segue; se o e-mail
-     * falhar, nada acontece com a inscricao, a vaga ou o pagamento.
+     * Os ouvintes de e-mail rodam na fila. O dominio anuncia e segue; se o
+     * e-mail falhar, nada acontece com a inscricao, a vaga ou o pagamento.
+     *
+     * A ORDEM DENTRO DE CADA LISTA IMPORTA em um caso, e so nele: o ingresso
+     * e emitido ANTES de o e-mail de pagamento confirmado ser montado, porque
+     * o codigo do ingresso vai dentro da mensagem. EmitirIngressoDaInscricao
+     * nao vai para a fila justamente por isso — ele roda aqui, na hora, e o
+     * ouvinte seguinte ja encontra o ingresso gravado.
      *
      * @var array<class-string, list<class-string>>
      */
     private const OUVINTES = [
         InscricaoCriada::class => [EnviarEmailInscricaoRecebida::class],
-        InscricaoConfirmada::class => [EnviarEmailPagamentoConfirmado::class],
+        InscricaoConfirmada::class => [
+            EmitirIngressoDaInscricao::class,
+            EnviarEmailPagamentoConfirmado::class,
+        ],
         InscricaoExpirada::class => [EnviarEmailPrazoVencido::class],
         InscricaoCancelada::class => [EnviarEmailInscricaoCancelada::class],
     ];

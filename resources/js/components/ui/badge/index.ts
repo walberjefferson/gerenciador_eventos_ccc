@@ -24,6 +24,26 @@ export { default as Badge } from './Badge.vue';
  * O texto de `outline` no publico e o `muted-foreground` (#5B6C64) em vez do
  * cinza do prototipo (#8A968E): aquele rende 2.53:1 sobre o fundo da etiqueta e
  * reprova; este rende 4.58:1 (DA-42).
+ *
+ * CHEIA OU SUAVE — QUANDO USAR CADA UMA
+ *
+ * As sete variantes de cima sao de COR CHEIA: bloco de cor com texto claro por
+ * cima. Elas servem ao destaque ISOLADO — uma etiqueta so, no topo de uma ficha
+ * ou ao lado de um titulo, onde ela precisa ser a primeira coisa que se ve.
+ *
+ * As cinco de baixo (`sucessoSuave`, `informacaoSuave`, `atencaoSuave`,
+ * `erroSuave`, `neutra`) sao de SUPERFICIE SUAVE: fundo lavado com texto
+ * escuro. Elas servem a LISTA LONGA — a coluna "Situacao" de uma tabela com
+ * trinta linhas. Trinta blocos de cor cheia empilhados nao hierarquizam nada:
+ * viram um vitral, e a linha que realmente pede acao some no meio das outras.
+ * O tom lavado deixa a tabela legivel e continua dizendo o que cada linha e.
+ *
+ * Nenhuma delas leva prefixo `publico:`: os tokens `-suave` existem nos dois
+ * temas, com a razao de contraste calculada em cada um, entao a mesma variante
+ * se veste sozinha do lado certo.
+ *
+ * Quem decide QUAL variante cada situacao recebe nao e a tela: e o
+ * `resources/js/lib/situacoes.ts`, fonte unica do mapeamento.
  */
 export const badgeVariants = cva(
     'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 publico:rounded-full publico:px-3 publico:py-1',
@@ -37,6 +57,20 @@ export const badgeVariants = cva(
                 sucesso: 'border-transparent bg-sucesso text-sucesso-foreground publico:bg-sucesso-suave publico:text-sucesso-suave-foreground',
                 informacao: 'border-transparent bg-informacao text-informacao-foreground',
                 atencao: 'border-transparent bg-atencao text-atencao-foreground publico:bg-atencao-suave publico:text-atencao-suave-foreground',
+
+                // As de superficie suave. A razao de contraste de cada par
+                // esta calculada no `app.css`, na linha de cima do token:
+                // 7.41:1, 7.59:1, 6.36:1 e 7.04:1 no painel.
+                sucessoSuave: 'border-transparent bg-sucesso-suave text-sucesso-suave-foreground',
+                informacaoSuave: 'border-transparent bg-informacao-suave text-informacao-suave-foreground',
+                atencaoSuave: 'border-transparent bg-atencao-suave text-atencao-suave-foreground',
+                erroSuave: 'border-transparent bg-erro-suave text-erro-suave-foreground',
+
+                // O texto e `foreground`, e NAO `muted-foreground`: o cinza
+                // sobre o proprio `--muted` rende 4.39:1 e reprova — o
+                // comentario do `--muted-foreground` no `app.css` registra a
+                // medicao. Com `foreground` sao 18.10:1.
+                neutra: 'border-transparent bg-muted text-foreground',
             },
         },
         defaultVariants: {

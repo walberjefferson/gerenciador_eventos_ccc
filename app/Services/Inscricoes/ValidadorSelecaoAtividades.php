@@ -77,6 +77,10 @@ class ValidadorSelecaoAtividades
 
         return Atividade::query()
             ->whereIn('id', $atividadeIds)
+            // O dia da programacao entra junto porque atividade sem horario
+            // tira dele a data em que acontece (RN-06 e RN-08). Sem este
+            // carregamento, cada conferencia iria buscar o mesmo dia de novo.
+            ->with('grupoAtividade.diaEvento')
             ->ativos()
             ->whereHas(
                 'grupoAtividade',
@@ -144,6 +148,11 @@ class ValidadorSelecaoAtividades
      * RN-06 — duas atividades nao podem se sobrepor no tempo. Limites que
      * apenas se encostam sao permitidos.
      *
+     * Atividade sem horário ocupa o dia inteiro, e por isso ganha uma recusa
+     * com outras palavras: dizer "acontecem no mesmo horário" sobre algo que
+     * não tem horário deixaria o participante procurando na tela uma hora que
+     * ninguém escreveu.
+     *
      * @param  Collection<int, Atividade>  $atividades
      * @return array<int, string>
      */
@@ -154,13 +163,38 @@ class ValidadorSelecaoAtividades
 
         foreach ($lista as $indice => $atividade) {
             foreach ($lista->slice($indice + 1) as $outra) {
-                if ($atividade->sobrepoe($outra)) {
-                    $erros[] = "{$atividade->nome} e {$outra->nome} acontecem no mesmo horário. Escolha apenas uma das duas.";
+                if (! $atividade->sobrepoe($outra)) {
+                    continue;
                 }
+
+                $erros[] = $this->recusaDoChoque($atividade, $outra);
             }
         }
 
         return $erros;
+    }
+
+    /**
+     * A frase que explica por que as duas não cabem juntas.
+     */
+    private function recusaDoChoque(Atividade $atividade, Atividade $outra): string
+    {
+        // Quem ocupa o dia inteiro vem primeiro na frase: é a atividade que
+        // manda no bloqueio, e é dela que a pessoa precisa desistir para poder
+        // escolher a outra.
+        $diaInteiro = match (true) {
+            ! $atividade->temHorario() => $atividade,
+            ! $outra->temHorario() => $outra,
+            default => null,
+        };
+
+        if ($diaInteiro === null) {
+            return "{$atividade->nome} e {$outra->nome} acontecem no mesmo horário. Escolha apenas uma das duas.";
+        }
+
+        $acompanhante = $diaInteiro->is($atividade) ? $outra : $atividade;
+
+        return "{$diaInteiro->nome} ocupa o dia inteiro e não pode ser escolhida junto com {$acompanhante->nome}.";
     }
 
     /**

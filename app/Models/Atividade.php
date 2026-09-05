@@ -10,12 +10,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 /**
  * Atividade que o participante pode escolher dentro de um grupo de atividades.
  *
  * Assim como no evento, vagas_reservadas e vagas_confirmadas sao contadores
  * mantidos por comandos atomicos.
+ *
+ * O horário é opcional: quando ele falta, a atividade acontece no dia inteiro
+ * do dia de programação a que pertence — veja data() e sobrepoe().
  */
 class Atividade extends Model
 {
@@ -68,24 +72,74 @@ class Atividade extends Model
     }
 
     /**
+     * A atividade tem hora marcada?
+     *
+     * O horário é opcional EM PAR (ou os dois campos, ou nenhum): é assim que o
+     * banco o guarda, em atividades_horario_check, e é assim que o formulário o
+     * aceita. Por isso basta perguntar uma vez, e não campo a campo.
+     */
+    public function temHorario(): bool
+    {
+        return $this->comeca_em !== null && $this->termina_em !== null;
+    }
+
+    /**
+     * O dia em que a atividade acontece.
+     *
+     * Com hora marcada, é o dia de `comeca_em`. Sem hora marcada, é a data do
+     * dia da programação a que ela pertence — que é justamente o motivo de o
+     * horário poder faltar: quem cadastra já disse "é no sábado" ao escolher o
+     * grupo, e repetir isso em dois campos de data e hora não acrescenta nada.
+     *
+     * É esta data — e não `comeca_em` — que manda na idade (RN-08) e no choque
+     * de dia inteiro (RN-06).
+     */
+    public function data(): Carbon
+    {
+        if ($this->comeca_em !== null) {
+            return $this->comeca_em->copy()->startOfDay();
+        }
+
+        $this->loadMissing('grupoAtividade.diaEvento');
+
+        $data = $this->grupoAtividade?->diaEvento?->data;
+
+        if ($data === null) {
+            throw new RuntimeException(
+                "A atividade {$this->nome} não tem horário nem dia de programação: "
+                .'sem um dos dois é impossível saber quando ela acontece.'
+            );
+        }
+
+        return $data->copy()->startOfDay();
+    }
+
+    /**
      * Duas atividades se sobrepoem quando uma comeca antes de a outra terminar,
      * dos dois lados. Limites que apenas se encostam (uma termina exatamente
      * quando a outra comeca) NAO se sobrepoem.
+     *
+     * Atividade sem horário ocupa o DIA INTEIRO (RN-06): ninguém sabe a que
+     * horas ela começa, então supor que sobra tempo para outra coisa no mesmo
+     * dia seria adivinhar. Ela choca com qualquer atividade da mesma data — com
+     * ou sem horário — e com nenhuma de outra data.
      */
     public function sobrepoe(self $outra): bool
     {
+        if (! $this->temHorario() || ! $outra->temHorario()) {
+            return $this->data()->isSameDay($outra->data());
+        }
+
         return $this->comeca_em < $outra->termina_em
             && $this->termina_em > $outra->comeca_em;
     }
 
     /**
-     * Idade que a pessoa tera no dia em que a atividade comeca.
+     * Idade que a pessoa tera no dia em que a atividade acontece.
      */
     public function idadeNaData(Carbon $dataNascimento): int
     {
-        return (int) $dataNascimento->copy()->startOfDay()->diffInYears(
-            $this->comeca_em->copy()->startOfDay()
-        );
+        return (int) $dataNascimento->copy()->startOfDay()->diffInYears($this->data());
     }
 
     public function aceitaIdade(Carbon $dataNascimento): bool

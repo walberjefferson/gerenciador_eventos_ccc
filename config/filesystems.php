@@ -47,6 +47,26 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Os comprovantes de pagamento enviados pelos participantes.
+         *
+         * Disco proprio, e PRIVADO: um comprovante de Pix traz nome, valor,
+         * banco e conta de gente de verdade. Ele nao tem 'url' nem
+         * 'visibility' => 'public' de proposito — nao existe endereco publico
+         * para adivinhar. Quem entrega o arquivo e uma rota autenticada, que
+         * antes confere se quem pede e do setor daquela inscricao (RN-S11).
+         *
+         * Fica fora de storage/app/public tambem por isso: aquela pasta e
+         * espelhada em public/storage pelo `storage:link`.
+         */
+        'comprovantes' => [
+            'driver' => 'local',
+            'root' => storage_path('app/comprovantes'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

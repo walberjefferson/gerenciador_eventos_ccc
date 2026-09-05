@@ -84,6 +84,66 @@ describe('restricoes do evento', function () {
         expect(Evento::where('slug', 'copa-ccc-2026')->exists())->toBeTrue();
     });
 
+    it('o evento novo ja nasce com o Dia 1 e um grupo de atividades', function () {
+        $campos = camposDoEvento();
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/eventos', $campos)
+            ->assertSessionHasNoErrors();
+
+        $evento = Evento::query()->where('slug', 'copa-ccc-2026')->firstOrFail();
+        $dia = DiaEvento::query()->where('evento_id', $evento->id)->first();
+
+        // Só o PRIMEIRO dia: acrescentar os demais é decisão de quem organiza,
+        // e o sistema não inventa programação.
+        expect(DiaEvento::query()->where('evento_id', $evento->id)->count())->toBe(1)
+            ->and($dia->nome)->toBe('Dia 1')
+            ->and($dia->data->toDateString())->toBe($campos['data_inicio'])
+            ->and($dia->posicao)->toBe(1)
+            ->and($dia->ativo)->toBeTrue();
+
+        $grupo = GrupoAtividade::query()->where('dia_evento_id', $dia->id)->first();
+
+        // O grupo mais permissivo possível: opcional e sem teto. Um grupo
+        // obrigatório criado por conta própria travaria as inscrições de um
+        // evento que talvez nem tenha atividades.
+        expect($grupo)->not->toBeNull()
+            ->and($grupo->nome)->toBe('Atividades')
+            ->and($grupo->obrigatorio)->toBeFalse()
+            ->and($grupo->min_selecoes)->toBe(0)
+            ->and($grupo->max_selecoes)->toBeNull()
+            ->and($grupo->posicao)->toBe(1)
+            ->and($grupo->ativo)->toBeTrue();
+    });
+
+    it('nao deixa evento nem dia pela metade quando o cadastro e recusado', function () {
+        $inicio = Carbon::now()->addMonths(2)->startOfDay();
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/eventos', camposDoEvento([
+                'data_fim' => $inicio->copy()->subYear()->toDateString(),
+            ]))
+            ->assertSessionHasErrors('data_fim');
+
+        expect(Evento::count())->toBe(0)
+            ->and(DiaEvento::count())->toBe(0)
+            ->and(GrupoAtividade::count())->toBe(0);
+    });
+
+    it('editar um evento nao cria dia nem grupo novo', function () {
+        $evento = Evento::factory()->create(['slug' => 'evento-ja-existente']);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->put("/admin/eventos/{$evento->id}", camposDoEvento([
+                'slug' => 'evento-ja-existente',
+                'nome' => 'Nome novo do evento',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        expect(DiaEvento::query()->where('evento_id', $evento->id)->count())->toBe(0)
+            ->and($evento->fresh()->nome)->toBe('Nome novo do evento');
+    });
+
     it('recusa data final anterior a inicial', function () {
         $inicio = Carbon::now()->addMonths(2)->startOfDay();
 

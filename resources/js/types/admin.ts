@@ -15,6 +15,66 @@ export interface CidadeDoCatalogo {
     ativo: boolean;
     /** Quantos grupos de participantes dependem deste setor. */
     grupos: number;
+    /**
+     * Quem atende este setor (RN-R2). Chave Pix, titular e telefone não moram
+     * mais aqui: eles descrevem uma pessoa, e a pessoa tem cadastro próprio.
+     */
+    responsaveis: ResponsavelVinculado[];
+    /** Tem ao menos um responsável ativo e com chave (RN-R3). */
+    preparado_para_receber: boolean;
+}
+
+/** Um responsável já vinculado a um setor, do jeito que a lista o mostra. */
+export interface ResponsavelVinculado {
+    id: number;
+    nome: string;
+    /** Ativo e com chave: só assim ele entra no sorteio (RN-R4). */
+    apto: boolean;
+}
+
+/** Um responsável do cadastro, oferecido para o vínculo na tela do setor. */
+export interface ResponsavelDisponivel {
+    id: number;
+    nome: string;
+    ativo: boolean;
+    apto: boolean;
+}
+
+/** Uma conta do painel que pode ser ligada a um responsável. */
+export interface ContaDoPainel {
+    id: number;
+    nome: string;
+    email: string;
+}
+
+/** Um setor, do jeito que a tela de responsáveis o oferece para o vínculo. */
+export interface SetorParaVinculo {
+    id: number;
+    nome: string;
+    uf: string;
+    ativo: boolean;
+}
+
+/**
+ * Quem recebe o Pix de um ou mais setores.
+ *
+ * A chave aparece em claro (RN-S3): ela existe para ser mostrada a quem vai
+ * pagar. O que a protege é o escopo de quem a vê — aqui, quem já passou por
+ * "catalogo.gerenciar".
+ */
+export interface ResponsavelDoCatalogo {
+    id: number;
+    nome: string;
+    chave_pix: string;
+    telefone: string | null;
+    ativo: boolean;
+    /** A conta do painel, quando existe. Nula é "recebe, mas não confere" (RN-R1). */
+    user_id: number | null;
+    conta_nome: string | null;
+    setores: SetorParaVinculo[];
+    /** Quantas cobranças já apontaram para esta pessoa. Com uma que seja, ela não é excluída (RN-R9). */
+    cobrancas: number;
+    apto: boolean;
 }
 
 /** Um grupo de participantes do catálogo global. */
@@ -59,6 +119,18 @@ export interface EventoDaLista {
 }
 
 /** O evento aberto no formulário de cadastro. */
+/**
+ * Uma forma de recebimento, com os dois numeros de prazo que a tela usa: o
+ * minimo que o servidor cobra e o que ela sugere ao trocar de forma (RN-S8).
+ */
+export interface OpcaoDeFormaDeRecebimento {
+    valor: string;
+    rotulo: string;
+    explicacao: string;
+    prazo_minimo: number;
+    prazo_sugerido: number;
+}
+
 export interface EventoEmEdicao {
     id: number;
     nome: string;
@@ -78,6 +150,8 @@ export interface EventoEmEdicao {
     valor_centavos: number;
     moeda: string;
     prazo_pagamento_minutos: number;
+    /** Por onde o dinheiro deste evento entra: 'gateway' ou 'setor'. */
+    forma_recebimento: string;
     situacao: string;
     regulamento: string;
     versao_termos: string;
@@ -97,6 +171,8 @@ export interface EventoDaEstrutura {
     data_inicio: string;
     data_fim: string;
     inscricoes_ativas: number;
+    /** Quantos dias a programação tem — com um só, a seção de dias começa recolhida. */
+    dias_total: number;
 }
 
 /** Uma atividade dentro de um grupo. */
@@ -105,8 +181,9 @@ export interface AtividadeDaEstrutura {
     grupo_atividade_id: number;
     nome: string;
     descricao: string | null;
-    comeca_em: string;
-    termina_em: string;
+    /** Nulos quando a atividade não tem hora marcada: ela ocupa o dia inteiro. */
+    comeca_em: string | null;
+    termina_em: string | null;
     capacidade: number | null;
     idade_minima: number | null;
     idade_maxima: number | null;
@@ -140,6 +217,40 @@ export interface DiaDaEstrutura {
     posicao: number;
     ativo: boolean;
     grupos: GrupoDaEstrutura[];
+}
+
+/**
+ * Um lote de inscrição na tela de programação.
+ *
+ * `vagas_ocupadas` é o contador do lote — que só cresce (RN-L6) — e
+ * `inscricoes` é quanta gente veio dele. Os dois viajam porque é por eles que a
+ * tela decide se pode oferecer o botão de excluir.
+ */
+export interface LoteDaEstrutura {
+    id: number;
+    nome: string;
+    posicao: number;
+    valor_centavos: number;
+    /** "AAAA-MM-DDTHH:MM", o formato do campo de data e hora. Nulo = sem prazo. */
+    disponivel_ate: string | null;
+    quantidade: number | null;
+    vagas_ocupadas: number;
+    situacao: 'encerrado' | 'vigente' | 'futuro';
+    /** Quantas inscrições vieram deste lote, em qualquer situação. */
+    inscricoes: number;
+}
+
+/**
+ * A soma das quantidades ao lado da capacidade do evento.
+ *
+ * É informação, e nunca bloqueio: lote e capacidade são tetos independentes
+ * (RN-L10). A soma é nula quando nenhum lote tem quantidade — aí não há o que
+ * comparar, e um zero mentiria.
+ */
+export interface ResumoDosLotes {
+    capacidade: number | null;
+    soma_quantidades: number | null;
+    valor_do_evento: number;
 }
 
 /** Um par de atividades que ninguém pode escolher junto. */
@@ -223,8 +334,9 @@ export interface PaginaDeInscricoes {
 export interface AtividadeEscolhida {
     id: number;
     nome: string;
-    comeca_em: string;
-    termina_em: string;
+    /** Nulos quando a atividade não tem hora marcada. */
+    comeca_em: string | null;
+    termina_em: string | null;
 }
 
 /** A ficha da inscrição. Sem CPF: ele fica cifrado e não é mostrado. */
@@ -433,4 +545,52 @@ export interface PapelDaMatriz {
 export interface PermissaoDaMatriz {
     nome: string;
     explicacao: string;
+}
+
+/**
+ * Uma linha da fila de conferência de comprovantes.
+ *
+ * O `urgente` e o `horas_ate_o_prazo` vêm calculados do servidor de propósito:
+ * o relógio do navegador de quem confere pode estar em qualquer fuso, e o da
+ * aplicação é um só.
+ */
+export interface LinhaDaFilaDeComprovantes {
+    id: number;
+    nome_original: string;
+    mime: string;
+    tamanho_bytes: number;
+    enviado_em: string | null;
+    situacao: string;
+    situacao_rotulo: string;
+    /**
+     * Quem recebeu o Pix desta cobrança (RN-R7).
+     *
+     * Nulo no modo gateway, onde ninguém foi sorteado. Ele aparece na fila
+     * porque o sorteio se repete a cada cobrança (RN-R5): sem o nome e a chave
+     * daquela cobrança, alguém aceitaria o comprovante de um Pix que caiu na
+     * conta de outra pessoa sem perceber.
+     */
+    recebedor: { nome: string; chave_pix: string } | null;
+    inscricao: {
+        id: number;
+        codigo_publico: string | null;
+        nome_completo: string | null;
+        email: string | null;
+        evento: string | null;
+        setor: string | null;
+        grupo: string | null;
+        valor_centavos: number;
+        situacao: string | null;
+        situacao_rotulo: string | null;
+        prazo_pagamento: string | null;
+    };
+    horas_ate_o_prazo: number | null;
+    /** Vence em menos de 24 horas (ou já venceu): a fila pinta isso de vermelho. */
+    urgente: boolean;
+}
+
+/** O recorte de setor de quem está olhando a fila (RN-S9). */
+export interface EscopoDaFilaDeComprovantes {
+    recortado_por_setor: boolean;
+    setores: string[];
 }

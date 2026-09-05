@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CidadeRequest;
 use App\Models\Cidade;
+use App\Models\Responsavel;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Response;
 
@@ -37,6 +38,10 @@ class CidadeController extends Controller
         return inertia('Admin/Catalogo/Setores', [
             'cidades' => Cidade::query()
                 ->withCount('gruposParticipantes')
+                // Os responsaveis vem junto porque a tela mostra quem atende
+                // cada setor E porque `estaPreparadaParaReceber()` le a relacao
+                // carregada: sem isto seria uma consulta por linha da lista.
+                ->with('responsaveis:id,nome,chave_pix,ativo')
                 ->orderBy('uf')
                 ->orderBy('nome')
                 ->get()
@@ -46,6 +51,29 @@ class CidadeController extends Controller
                     'uf' => $cidade->uf,
                     'ativo' => $cidade->ativo,
                     'grupos' => $cidade->grupos_participantes_count,
+                    'responsaveis' => $cidade->responsaveis
+                        ->map(fn (Responsavel $responsavel): array => [
+                            'id' => (int) $responsavel->id,
+                            'nome' => $responsavel->nome,
+                            'apto' => $responsavel->estaApto(),
+                        ])
+                        ->all(),
+                    'preparado_para_receber' => $cidade->estaPreparadaParaReceber(),
+                ])
+                ->all(),
+            // Todo o cadastro de responsaveis, para a tela oferecer o vinculo.
+            // A chave e LIDA — e dela que sai a resposta de "esta apto?" —, mas
+            // nao viaja para a tela: aqui ela nao seria mostrada, e o que nao e
+            // mostrado nao precisa sair do servidor. Quem quer ver chave abre
+            // Catalogo -> Responsaveis.
+            'responsaveis' => Responsavel::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'ativo', 'chave_pix'])
+                ->map(fn (Responsavel $responsavel): array => [
+                    'id' => (int) $responsavel->id,
+                    'nome' => $responsavel->nome,
+                    'ativo' => $responsavel->ativo,
+                    'apto' => $responsavel->estaApto(),
                 ])
                 ->all(),
             'ufs' => CidadeRequest::UFS,
@@ -58,6 +86,7 @@ class CidadeController extends Controller
         $this->authorize('create', Cidade::class);
 
         $setor = Cidade::create($request->dadosDaCidade());
+        $setor->responsaveis()->sync($request->responsaveis());
 
         // A entidade da auditoria continua sendo 'cidade': ela e a chave do
         // rastro ja gravado, e renomea-la partiria o historico em dois.
@@ -73,6 +102,13 @@ class CidadeController extends Controller
         $antes = $setor->getRawOriginal();
 
         $setor->update($request->dadosDaCidade());
+
+        // O vinculo so e mexido quando a tela mandou a lista. Um formulario que
+        // nao fala de responsaveis nao pode esvaziar o setor por omissao —
+        // seria tirar o setor inteiro do ar sem ninguem pedir.
+        if ($request->has('responsaveis')) {
+            $setor->responsaveis()->sync($request->responsaveis());
+        }
 
         $this->auditarAlteracao($setor, $antes, 'cidade');
 

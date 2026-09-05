@@ -6,6 +6,11 @@ Guarde esta mensagem: ela é o seu comprovante.
 Valor pago: {{ $valor }}
 Pagamento reconhecido em: {{ $pagoEm }}
 Inscrição: {{ $codigo }}
+@if ($codigoIngressoFormatado)
+
+SEU INGRESSO: {{ $codigoIngressoFormatado }}
+Apresente este código na entrada. Ele vale para uma única entrada.
+@endif
 @if (count($atividades) > 0)
 
 Atividades escolhidas:

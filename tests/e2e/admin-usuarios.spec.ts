@@ -117,9 +117,16 @@ test.describe('em tela grande', () => {
         await expect(minhaLinha).toContainText(ADMINISTRADORA);
         await expect(minhaLinha).toContainText('você');
 
-        // Nem seletor de papel, nem botao de desativar.
+        // Nem seletor de papel, nem botao de desativar: ninguem muda o proprio
+        // papel nem se tranca para fora.
         await expect(minhaLinha.getByRole('combobox')).toHaveCount(0);
-        await expect(minhaLinha.getByRole('button')).toHaveCount(0);
+        await expect(minhaLinha.getByRole('button', { name: 'Desativar' })).toHaveCount(0);
+        await expect(minhaLinha.getByRole('button', { name: 'Enviar link de senha' })).toHaveCount(0);
+
+        // "Editar" continua: corrigir o proprio nome ou e-mail nao tranca
+        // ninguem, e e a unica acao que a propria linha oferece.
+        await expect(minhaLinha.getByRole('button')).toHaveCount(1);
+        await expect(minhaLinha.getByRole('button', { name: 'Editar' })).toBeVisible();
 
         // E o motivo fica escrito: acao ausente sem explicacao parece defeito.
         await expect(minhaLinha).toContainText('Esta é a sua conta');
@@ -160,7 +167,7 @@ test.describe('em tela grande', () => {
         await expect(page.getByRole('heading', { name: 'Papéis', level: 1 })).toBeVisible();
 
         // O texto em portugues do PapeisSeeder, e nao so o nome tecnico.
-        await expect(page.getByText('Cadastrar setores e grupos de participantes')).toBeVisible();
+        await expect(page.getByText('Cadastrar setores, grupos de participantes e responsaveis')).toBeVisible();
 
         // "Alcança"/"Não alcança" por extenso, nunca so a cor.
         await expect(page.getByTestId('organizador-usuarios.gerenciar')).toHaveText('Não alcança');

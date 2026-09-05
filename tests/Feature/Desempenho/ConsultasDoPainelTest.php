@@ -70,17 +70,22 @@ it('o volume da medicao entra no banco inteiro e coerente', function (): void {
     expect((int) $ocupadas->maximo)->toBeLessThanOrEqual((int) $ocupadas->capacidade);
 });
 
-it('o painel responde em tres consultas agregadas, quaisquer que sejam os inscritos', function (): void {
+it('o painel responde em quatro consultas agregadas, quaisquer que sejam os inscritos', function (): void {
     $medida = contandoConsultas(fn () => app(NumerosDoEvento::class)->paraEvento($this->evento));
 
-    // Uma por bloco: inscricoes por situacao, vagas por atividade, dinheiro.
+    // Uma por bloco: inscricoes por situacao, vagas por atividade, dinheiro e
+    // presenca no portao. Foram tres ate o controle de presenca entrar; a
+    // quarta conta presentes e faltantes na MESMA varredura, e nao em duas.
     // Se este numero subir, alguem passou a contar linha por linha no PHP.
-    expect($medida['consultas'])->toBe(3);
+    expect($medida['consultas'])->toBe(4);
 
     $numeros = $medida['resultado'];
 
     expect($numeros['inscricoes']['total'])->toBe(VolumeSeeder::TOTAL)
-        ->and($numeros['dinheiro']['pagamentos_pagos'])->toBeGreaterThan(0);
+        ->and($numeros['dinheiro']['pagamentos_pagos'])->toBeGreaterThan(0)
+        // Os dois numeros do portao fecham mesmo com milhares de inscritos.
+        ->and($numeros['presenca']['presentes'] + $numeros['presenca']['faltantes'])
+        ->toBe($numeros['presenca']['confirmadas']);
 
     expect($medida['ms'])->toBeLessThan(2_000.0);
 });

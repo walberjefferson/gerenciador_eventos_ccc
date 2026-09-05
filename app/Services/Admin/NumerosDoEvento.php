@@ -25,16 +25,24 @@ use Illuminate\Support\Facades\DB;
  *    linha da atividade, que e a fonte da verdade do dominio. Recontar as
  *    escolhas de atividade criaria uma segunda versao do mesmo numero, e as
  *    duas iriam divergir no primeiro caso de borda.
+ *
+ * A presenca no portao mora em servico proprio (NumerosDePresenca) e e apenas
+ * COMPOSTA aqui. O motivo e concreto: a tela da portaria precisa dos mesmos
+ * dois numeros sem carregar vaga por atividade nem dinheiro, e um evento com
+ * mil inscritos nao pode pagar por consultas que ninguem vai olhar no portao.
  */
 class NumerosDoEvento
 {
+    public function __construct(private readonly NumerosDePresenca $presenca) {}
+
     /**
-     * Junta os tres blocos do painel para um evento.
+     * Junta os quatro blocos do painel para um evento.
      *
      * @return array{
      *     inscricoes: array{total: int, por_situacao: array<int, array{situacao: string, rotulo: string, total: int}>},
      *     vagas: array<int, array{atividade_id: int, atividade: string, grupo: string, dia: string, capacidade: int|null, reservadas: int, confirmadas: int, ocupadas: int, restantes: int|null}>,
-     *     dinheiro: array{recebido_centavos: int, pendente_centavos: int, estornado_centavos: int, pagamentos_pagos: int, pagamentos_pendentes: int}
+     *     dinheiro: array{recebido_centavos: int, pendente_centavos: int, estornado_centavos: int, pagamentos_pagos: int, pagamentos_pendentes: int},
+     *     presenca: array{presentes: int, faltantes: int, confirmadas: int}
      * }
      */
     public function paraEvento(Evento $evento): array
@@ -43,6 +51,7 @@ class NumerosDoEvento
             'inscricoes' => $this->inscricoesPorSituacao($evento),
             'vagas' => $this->vagasPorAtividade($evento),
             'dinheiro' => $this->dinheiro($evento),
+            'presenca' => $this->presenca->paraEvento($evento),
         ];
     }
 

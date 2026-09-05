@@ -51,6 +51,16 @@ class CidadeRequest extends FormRequest
             ],
             'uf' => ['required', 'string', 'size:2', Rule::in(self::UFS)],
             'ativo' => ['sometimes', 'boolean'],
+            // Quem atende este setor (RN-R2). O setor nao guarda mais chave,
+            // titular nem telefone: esses campos descrevem uma PESSOA, e agora
+            // moram no cadastro dela. O que sobra aqui e o vinculo.
+            //
+            // Lista vazia e permitida: cadastrar o setor antes de saber quem
+            // vai atende-lo e o gesto normal de quem esta montando o catalogo.
+            // Quem cobra a presenca de um responsavel apto e o formulario do
+            // evento no modo setor (RN-S4), e la a recusa nomeia quem falta.
+            'responsaveis' => ['sometimes', 'array'],
+            'responsaveis.*' => ['integer', Rule::exists('responsaveis', 'id')],
         ];
     }
 
@@ -62,6 +72,7 @@ class CidadeRequest extends FormRequest
         return [
             'nome' => 'nome do setor',
             'uf' => 'estado',
+            'responsaveis' => 'responsáveis do setor',
         ];
     }
 
@@ -76,6 +87,7 @@ class CidadeRequest extends FormRequest
             'uf.required' => 'Escolha o estado.',
             'uf.in' => 'Escolha um estado válido, com as duas letras da sigla.',
             'nome.unique' => 'Já existe um setor com esse nome neste estado.',
+            'responsaveis.*.exists' => 'Escolha um responsável que exista no cadastro.',
         ];
     }
 
@@ -97,6 +109,22 @@ class CidadeRequest extends FormRequest
             'uf' => $this->uf(),
             'ativo' => $this->boolean('ativo', true),
         ];
+    }
+
+    /**
+     * Os responsaveis escolhidos, prontos para o sync do vinculo.
+     *
+     * @return array<int, int>
+     */
+    public function responsaveis(): array
+    {
+        /** @var array<int, mixed> $escolhidos */
+        $escolhidos = $this->input('responsaveis', []);
+
+        return array_values(array_unique(array_map(
+            fn (mixed $id): int => (int) $id,
+            is_array($escolhidos) ? $escolhidos : [],
+        )));
     }
 
     private function uf(): string

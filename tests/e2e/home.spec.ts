@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { EVENTO_DEMO } from './ambiente';
-import { artisan } from './apoio';
+import { artisan, contraste } from './apoio';
 import { expect, test } from './base';
 
 /**
@@ -20,55 +20,6 @@ function definirSituacaoDoEvento(slug: string, situacao: string): void {
 /** A largura util da pagina nao pode passar da largura da janela. */
 async function rolagemHorizontal(page: Page): Promise<number> {
     return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-}
-
-/**
- * A razao de contraste entre o texto de um elemento e o fundo atras dele,
- * pela formula da WCAG. Abaixo de 4,5 o texto comum reprova.
- */
-async function contraste(page: Page, seletor: string): Promise<number> {
-    return page.evaluate((alvo) => {
-        const elemento = document.querySelector<HTMLElement>(alvo);
-
-        if (elemento === null) {
-            return 0;
-        }
-
-        const canais = (cor: string): number[] => (cor.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
-
-        const luminancia = (cor: string): number => {
-            const [r, g, b] = canais(cor).map((canal) => {
-                const parte = canal / 255;
-
-                return parte <= 0.03928 ? parte / 12.92 : ((parte + 0.055) / 1.055) ** 2.4;
-            });
-
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        };
-
-        /** O fundo pintado mais proximo: cor transparente herda de quem esta atras. */
-        const fundo = (de: HTMLElement): string => {
-            let atual: HTMLElement | null = de;
-
-            while (atual !== null) {
-                const cor = getComputedStyle(atual).backgroundColor;
-                const alfa = canais(cor).length === 3 ? (cor.match(/[\d.]+/g) ?? [])[3] : undefined;
-
-                if (cor !== 'rgba(0, 0, 0, 0)' && alfa !== '0') {
-                    return cor;
-                }
-
-                atual = atual.parentElement;
-            }
-
-            return 'rgb(255, 255, 255)';
-        };
-
-        const claro = Math.max(luminancia(getComputedStyle(elemento).color), luminancia(fundo(elemento)));
-        const escuro = Math.min(luminancia(getComputedStyle(elemento).color), luminancia(fundo(elemento)));
-
-        return (claro + 0.05) / (escuro + 0.05);
-    }, seletor);
 }
 
 test('a home apresenta o evento aberto e o botao leva a vitrine', async ({ page }) => {

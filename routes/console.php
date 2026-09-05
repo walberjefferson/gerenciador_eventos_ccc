@@ -36,9 +36,12 @@ Artisan::command('inspire', function () {
 |    entao o volume de consultas e pequeno.
 |
 | 3) Lembrete de prazo — a cada quinze minutos. Avisa quem esta aguardando
-|    pagamento com prazo vencendo dentro da janela configurada (padrao: as
-|    proximas 24 horas). Quinze minutos e precisao de sobra para um aviso de
-|    24 horas, e o volume e baixo: so entra quem ainda nao recebeu o lembrete.
+|    pagamento e ja gastou metade do prazo que recebeu. A hora do aviso e
+|    proporcional, e nao um numero fixo de horas: quem teve 24 horas e avisado
+|    faltando 12, quem teve uma hora e avisado faltando 30 minutos. Quinze
+|    minutos e precisao suficiente ate para os prazos mais curtos que o
+|    formulario aceita, e o volume e baixo: so entra quem ainda nao recebeu o
+|    lembrete.
 |
 | As tres sao seguras para rodar duas vezes: as duas primeiras porque cada
 | mudanca exige a situacao anterior, e o lembrete porque a unicidade de

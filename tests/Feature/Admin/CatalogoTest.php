@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Cidade;
 use App\Models\GrupoParticipante;
+use App\Models\Responsavel;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Feature\Admin\Cenario;
 use Tests\Feature\Inscricoes\Cenario as CenarioInscricao;
@@ -73,6 +74,59 @@ describe('setores', function () {
             ->assertSessionHasNoErrors();
 
         expect($setor->fresh()->nome)->toBe('Setor Santana do Ipanema');
+    });
+
+    /*
+    | Chave Pix, titular, telefone e conta do responsavel NAO moram mais no
+    | setor: eles descreviam uma pessoa, e a pessoa tem cadastro proprio
+    | (RN-R1). O que o setor guarda agora e o vinculo, e os testes abaixo
+    | guardam as tres coisas que ele precisa fazer certo.
+    */
+    it('vincula os responsaveis escolhidos ao setor', function () {
+        $ana = Responsavel::factory()->semConta()->create(['nome' => 'Ana Tesoureira']);
+        $bruno = Responsavel::factory()->semConta()->create(['nome' => 'Bruno Caixa']);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/catalogo/setores', [
+                'nome' => 'Setor Batalha',
+                'uf' => 'AL',
+                'responsaveis' => [$ana->getKey(), $bruno->getKey()],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $setor = Cidade::where('nome', 'Setor Batalha')->firstOrFail();
+
+        expect($setor->responsaveis()->pluck('responsaveis.id')->all())
+            ->toEqualCanonicalizing([$ana->getKey(), $bruno->getKey()])
+            ->and($setor->estaPreparadaParaReceber())->toBeTrue();
+    });
+
+    // Um formulario que nao fala de responsaveis nao pode esvaziar o setor por
+    // omissao: seria tirar o setor inteiro do ar sem ninguem pedir.
+    it('nao desfaz o vinculo quando o formulario nao fala de responsaveis', function () {
+        $setor = Cidade::factory()->create(['nome' => 'Setor Delmiro', 'uf' => 'AL']);
+        $ana = Responsavel::factory()->semConta()->create();
+        $setor->responsaveis()->sync([$ana->getKey()]);
+
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->put(route('admin.catalogo.setores.update', ['setor' => $setor->id]), [
+                'nome' => 'Setor Delmiro',
+                'uf' => 'AL',
+                'ativo' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        expect($setor->responsaveis()->count())->toBe(1);
+    });
+
+    it('recusa vincular responsavel que nao existe no cadastro', function () {
+        $this->actingAs(Cenario::usuarioCom('organizador'))
+            ->post('/admin/catalogo/setores', [
+                'nome' => 'Setor Olho',
+                'uf' => 'AL',
+                'responsaveis' => [987654],
+            ])
+            ->assertSessionHasErrors('responsaveis.0');
     });
 
     it('recusa nome repetido no mesmo estado antes de o banco reclamar', function () {

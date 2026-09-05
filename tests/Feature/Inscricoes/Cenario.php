@@ -13,6 +13,7 @@ use App\Models\Evento;
 use App\Models\GrupoAtividade;
 use App\Models\GrupoParticipante;
 use App\Models\Inscricao;
+use App\Models\Lote;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -56,6 +57,14 @@ final class Cenario
     public Carbon $dataDoDia;
 
     /**
+     * Os lotes do evento, na ordem em que foram criados. Vazio por padrao: a
+     * maioria dos cenarios nao trabalha com lotes, e continua nao trabalhando.
+     *
+     * @var array<int, Lote>
+     */
+    public array $lotes = [];
+
+    /**
      * @param  array<string, mixed>  $atributosDoEvento
      */
     public static function montar(array $atributosDoEvento = []): self
@@ -95,6 +104,37 @@ final class Cenario
             ->create(['nome' => 'Grupo Central']);
 
         return $cenario;
+    }
+
+    /**
+     * Acrescenta lotes ao evento, na ordem em que vierem.
+     *
+     * A posicao e dada pela ordem da lista — quem chama so diz preco e limite.
+     * Nenhuma chamada existente muda: cenario sem esta chamada continua sendo um
+     * evento sem lote nenhum (RN-L8).
+     *
+     * @param  array<int, array<string, mixed>>  $definicoes
+     */
+    public function comLotes(array $definicoes): self
+    {
+        foreach (array_values($definicoes) as $indice => $definicao) {
+            $fabrica = Lote::factory()->for($this->evento);
+
+            // "esgotado" nao e coluna: e um state da fabrica, que move o
+            // contador por SQL como a Action faria.
+            if (($definicao['esgotado'] ?? false) === true) {
+                $fabrica = $fabrica->esgotado();
+            }
+
+            unset($definicao['esgotado']);
+
+            $this->lotes[] = $fabrica->create($definicao + [
+                'nome' => ($indice + 1).'º lote',
+                'posicao' => $indice + 1,
+            ]);
+        }
+
+        return $this;
     }
 
     /**

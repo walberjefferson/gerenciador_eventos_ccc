@@ -46,6 +46,21 @@ class AtividadeFactory extends Factory
         ]);
     }
 
+    /**
+     * Atividade sem hora marcada: ela ocupa o dia inteiro do dia de
+     * programação a que pertence.
+     *
+     * O horário é opcional em par — ou os dois campos, ou nenhum —, e é assim
+     * que o CHECK do banco o cobra.
+     */
+    public function semHorario(): static
+    {
+        return $this->state(fn (array $atributos): array => [
+            'comeca_em' => null,
+            'termina_em' => null,
+        ]);
+    }
+
     public function comCapacidade(int $capacidade): static
     {
         return $this->state(fn (array $atributos): array => [

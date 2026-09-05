@@ -273,6 +273,320 @@ Inscrições e pagamentos nunca são removidos do banco. Toda mudança é de sit
 
 ---
 
+## Regras de lote de inscrição
+
+O **lote** é um degrau de preço entre o evento e a inscrição: ele vale até uma data, até acabarem as vagas dele, ou até o que vier primeiro. Um evento pode ter uma sequência deles — e pode não ter nenhum, que é o caso mais comum e continua funcionando exatamente como antes.
+
+### RN-L1 — Todo lote encerra
+
+Pelo menos um dos dois limites (`disponivel_ate` ou `quantidade`) precisa estar preenchido. Um lote sem limite nenhum nunca encerraria, e um lote que não encerra não é um lote: é o preço do evento com outro nome.
+**Onde é aplicada:** `app/Http/Requests/Admin/LoteRequest.php` (avisa antes) e o CHECK `lotes_tem_limite_check` (recusa depois).
+**Mensagem:** "Todo lote precisa de um limite: uma data, uma quantidade de vagas, ou os dois. Sem limite, ele nunca encerraria — e aí é o valor do próprio evento."
+**Teste:** `tests/Feature/Admin/LotesAdminTest.php`
+
+### RN-L2 — A ordem é a `posicao`
+
+A posição decide qual lote sucede qual e não se repete dentro do evento, no mesmo molde de `dias_evento`. Cobrada pelo índice único `lotes_evento_id_posicao_unique`.
+**Mensagem:** "Já existe um lote nesta posição. Cada lote ocupa uma posição diferente na sequência."
+
+### RN-L3 — O lote vigente é calculado, nunca gravado
+
+O lote vigente é o primeiro da ordem que ainda está disponível: dentro do prazo e com vaga. **Não existe coluna "ativo".** Situação derivada de data e contador é sempre verdadeira; situação gravada envelhece no primeiro minuto em que ninguém roda a rotina que a atualizaria.
+**Onde é aplicada:** `app/Actions/Inscricoes/ResolverLoteVigente.php` — o único lugar onde a regra mora. A Action de inscrição, o Resource público e os testes perguntam todos ali.
+
+### RN-L4 — Todos aparecem, só o vigente é selecionável
+
+A página do evento e o formulário listam os lotes na ordem, cada um com nome, valor e situação (`encerrado`, `vigente`, `futuro`). Os não vigentes chegam à tela já marcados como não selecionáveis — e o servidor decide de novo no envio.
+**Onde é aplicada:** `app/Http/Resources/LotePublicoResource.php`, `resources/js/components/eventos/ListaDeLotes.vue`.
+
+### RN-L5 — O lote virou enquanto a pessoa preenchia
+
+O formulário envia o `lote_id` que a pessoa viu. Se, no instante do envio, esse não for mais o vigente, a inscrição é **recusada** com 422 e uma mensagem que diz o que mudou e qual é o novo valor; a tela recarrega os lotes. Aceitar em silêncio pelo lote novo cobraria um preço que a pessoa não viu; aceitar pelo lote velho venderia abaixo do combinado.
+**Onde é aplicada:** `app/Actions/Inscricoes/CriarInscricao.php`, `app/Exceptions/Inscricoes/LoteIndisponivelException.php`.
+**Mensagem:** "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}. Confira o novo valor e envie a inscrição novamente."
+**Teste:** `tests/Feature/Inscricoes/LotesTest.php`, `tests/e2e/inscricao-por-lote.spec.ts`
+
+### RN-L6 — O contador do lote nunca volta
+
+A vaga é presa no lote no mesmo instante em que é presa no evento, com o mesmo UPDATE condicional. Quando a inscrição expira ou é cancelada, a vaga volta para o evento e para as atividades, **mas não para o lote**: `lotes.vagas_ocupadas` só cresce, e lote esgotado não reabre.
+
+**Decisão do dono do produto, com o efeito colateral à vista:** quem reserva e não paga queima a vaga do lote barato, e ela será vendida pelo preço do lote seguinte. Num evento popular, o 1º lote pode esgotar em minutos e, no dia seguinte, ver metade daquelas inscrições expiradas. Duas mitigações existem e estão fora deste escopo: prazo de pagamento mais curto nos eventos com lote, ou devolver a vaga ao lote de origem enquanto ele ainda estiver na data.
+**Onde é aplicada:** `app/Actions/Inscricoes/LiberarVagas.php` (que documenta a ausência).
+
+### RN-L7 — O valor é fotografado, e a fotografia não se refaz
+
+Na criação da inscrição, `valor_centavos` recebe o valor do lote vigente e `lote_id` guarda de qual lote ela veio. Alterar o valor de um lote depois **não muda inscrição nenhuma**, nem cobrança já emitida, nem segunda via de Pix — que continua lendo `inscricoes.valor_centavos`. O `lote_id` serve a relatório e conferência, nunca a cálculo de cobrança.
+
+### RN-L8 — Evento sem lote continua como hoje
+
+Nenhum lote cadastrado → `lote_id` nulo e `valor_centavos` copiado de `eventos.valor_centavos`. Nenhuma tela muda de comportamento.
+
+### RN-L9 — Lotes esgotados fecham a inscrição
+
+Evento **com** lotes e **sem** lote vigente tem as inscrições fechadas, com motivo em palavras, pelo mesmo caminho que já explica capacidade cheia e janela fechada. Evento **sem** lotes nunca cai nesta regra.
+**Mensagem:** "Os lotes de inscrição se esgotaram."
+**Onde é aplicada:** `Evento::aceitaInscricaoPorLote()`, combinada com `inscricoesEstaoAbertas()` e `temVagaDisponivel()` nos três pontos de decisão (Resource público, formulário público e `CriarInscricao`).
+
+### RN-L10 — Lote e capacidade são tetos independentes
+
+`eventos.capacidade` continua sendo o teto físico e manda em último caso; os lotes são degraus de preço dentro dela. A soma das quantidades pode ser menor que a capacidade (sobra vaga sem lote — e aí a inscrição fecha por RN-L9) ou maior (o evento lota antes do último lote). **Não há validação cruzada entre os dois**; a tela administrativa apenas informa a soma ao lado da capacidade.
+
+### RN-L11 — Ordem canônica das travas
+
+`evento → lote → atividades (id crescente)`. O lote entra logo depois do evento, antes das atividades. Cada inscrição toca um único lote, então não há ordem a arbitrar entre lotes.
+
+### RN-L12 — Lote com inscrição não some nem encolhe
+
+Excluir lote que já tem inscrição é recusado (`restrictOnDelete`, com a explicação do caminho certo). Reduzir `quantidade` abaixo de `vagas_ocupadas` é recusado no `FormRequest` e no CHECK `lotes_quantidade_check`.
+
+---
+
+## Regras do recebimento pela chave Pix do setor
+
+Um evento escolhe **por onde o dinheiro entra**: pelo provedor de pagamento,
+como sempre, ou pela chave Pix do responsável do setor de cada participante.
+No segundo caminho nenhuma chamada sai para o provedor, o participante envia o
+comprovante pela própria tela, e uma pessoa — o responsável do setor — confere
+e confirma.
+
+### RN-S1 — A forma de recebimento é do evento, e é uma só
+
+`eventos.forma_recebimento` vale `gateway` (o padrão) ou `setor`, e vale para
+todas as inscrições daquele evento. Ela é lida **num lugar só** —
+`CriarPagamentoDaInscricao`, na hora de emitir a cobrança — e em nenhum outro
+decide nada.
+
+### RN-S2 — No modo `setor`, nenhuma chamada sai para o provedor
+
+A bifurcação acontece **antes** de qualquer toque no `PaymentGateway`: cria-se
+um `Pagamento` com `gateway = 'setor'`, `id_externo = null`, `metodo = Pix`,
+`expira_em` igual ao prazo da inscrição e `pix_copia_e_cola` com um BR Code
+estático montado a partir da chave do setor. Nenhuma credencial é lida, nenhum
+certificado é materializado, nenhum pacote sai pela rede.
+
+O `id_externo` nulo é o que já mantém essa cobrança fora da reconciliação
+(`whereNotNull('id_externo')`) e fora do aviso de cancelamento ao provedor.
+
+### RN-S3 — A chave Pix do responsável não é cifrada, e isso é decisão
+
+`CredencialPagamento.chave_pix` é cifrada porque é segredo de instituição
+financeira e nunca precisa voltar para tela nenhuma. A chave do responsável é o
+oposto: ela **existe para ser mostrada** a todo participante daquele setor.
+Cifrar o que a própria tela publica na página seguinte é teatro. O que protege
+esta chave é o escopo de quem a vê — só aparece dentro de uma inscrição daquele
+setor, nunca numa listagem pública.
+
+A chave mora em `responsaveis.chave_pix` desde a RN-R2. Antes ela morava em
+`cidades.chave_pix`, e a decisão de não cifrar é a mesma: mudou o dono da
+coluna, não a razão.
+
+### RN-S4 — O setor precisa estar pronto antes de o evento ser salvo
+
+Salvar um evento com `forma_recebimento = setor` é recusado enquanto existir
+setor **ativo** sem **nenhum responsável apto** — ativo e com chave (a redação
+da RN-R3). A mensagem nomeia os setores que faltam. Um evento que cobra por
+chave que não existe é uma inscrição que ninguém consegue pagar.
+
+### RN-S5 — O comprovante é do participante, pela tela dele
+
+Imagem (`jpeg`, `png`, `webp`) ou `pdf`, no máximo 5 MB, validado pelo
+**conteúdo** (`mimetypes`) e nunca pela extensão. Guardado em disco privado,
+sob `comprovantes/{ano}/{codigo_publico}/`, com nome gerado pelo servidor — o
+nome original vai para a coluna, nunca para o caminho. A rota de envio é
+assinada e tem limite de tentativas.
+
+### RN-S6 — Um comprovante em aberto por inscrição
+
+Enviar outro enquanto o anterior ainda está `enviado` **substitui** o anterior:
+a linha é sobrescrita e o arquivo antigo sai do disco. Depois de `recusado`, um
+envio novo cria linha nova — o histórico da recusa, e o motivo escrito nela, não
+se apaga. Quem garante isso no banco é o índice único parcial
+`comprovantes_um_em_aberto_por_inscricao`.
+
+### RN-S7 — Enviar comprovante não confirma nada
+
+A situação da inscrição continua `aguardando_pagamento` até uma pessoa
+conferir. O que a tela do participante mostra ("comprovante enviado, em
+conferência") vem do **comprovante**, não da situação da inscrição: é informação
+de tela, e não estado de domínio.
+
+> **Risco conhecido e aceito.** Não existe situação "em conferência", e o prazo
+> da inscrição corre enquanto o comprovante espera. A pessoa pode pagar no sexto
+> dia de um prazo de sete, o responsável abrir o painel no oitavo, e a rotina de
+> expiração já ter devolvido a vaga — com o dinheiro na conta dele. Duas
+> mitigações reduzem a chance sem mudar a máquina de estados: a fila de
+> conferência ordena pelo prazo mais próximo e destaca em vermelho o que vence
+> em menos de 24 horas, e a tela do participante diz, depois do envio, até
+> quando a conferência precisa acontecer.
+
+### RN-S8 — Evento no modo `setor` tem prazo mínimo maior
+
+`prazo_pagamento_minutos` passa a ser validado conforme a forma: mínimo de **5
+minutos** no modo `gateway` (como sempre) e de **2880** (2 dias) no modo
+`setor`, com **10080** (7 dias) sugerido pelo formulário. Uma transferência
+conferida por uma pessoa não cabe em 24 horas.
+
+### RN-S9 — Quem confere é responsável daquele setor, e só enxerga os setores dele
+
+Papel `responsavel-setor`, com duas permissões: `inscricoes.ver` (que já
+existia) e `pagamentos.conferir-comprovante` (nova). Em toda consulta que ele
+alcança, o setor é **escopo obrigatório aplicado no servidor** — nunca um filtro
+que ele possa mudar. Trocar `cidade_id` na URL só estreita; nunca amplia. A
+regra mora inteira em `ComprovantePagamentoPolicy`, e `FiltroDeInscricoes`,
+`InscricaoPolicy` e o controller da fila perguntam a ela. Administrador continua
+vendo tudo e também confere.
+
+O caminho do escopo mudou com a RN-R6: era `cidades.responsavel_id`, e hoje é a
+cadeia `users → responsaveis → responsaveis_setores → cidades`. O que não mudou
+é que ele é lido no servidor a cada pedido.
+
+### RN-S10 — Aceitar o comprovante é confirmar o pagamento pelo caminho que já existe
+
+Aceitar delega a `ConfirmarPagamentoManual` com `metodo = Transferencia` e a
+observação escrita por quem conferiu. Nenhuma regra de dinheiro nova: a vaga
+presa vira vaga paga, o anúncio é `InscricaoConfirmada`, a auditoria é a mesma.
+Recusar exige motivo, marca o comprovante como `recusado` e **não mexe** na
+inscrição — ela segue aguardando pagamento até o prazo.
+
+### RN-S11 — O arquivo nunca é servido direto
+
+O disco `comprovantes` é privado, fora de `storage/app/public` e sem URL. O
+download passa por rota autenticada, com a mesma checagem de escopo da RN-S9, e
+responde `Storage::download()`.
+
+### RN-S12 — Evento no modo `gateway` não muda em nada
+
+Nenhuma tela, nenhum teste e nenhum caminho de cobrança se comporta diferente do
+que se comportava antes. O padrão da coluna é `gateway`, o formulário que não
+manda o campo continua no `gateway`, e o recorte de setor só alcança quem tem
+`pagamentos.conferir-comprovante` **e** não tem `pagamentos.confirmar-manual`.
+
+### RN-S13 — O código da inscrição viaja no BR Code, em dois campos
+
+| Campo EMV | Conteúdo | Limite | Por quê |
+|---|---|---|---|
+| `26-02` | `INSCRICAO <codigo_publico>` — o ULID inteiro | 72 | é o que os aplicativos de banco mostram como descrição, e é onde o código cabe sem mutilação |
+| `62-05` | os últimos 25 caracteres do código | 25 | é o identificador de transação; o ULID tem 26 caracteres e não cabe inteiro |
+
+A palavra sai em caixa alta porque o saneamento EMV é o mesmo do resto do
+payload — e é essa mesmice que garante a igualdade byte a byte com o código
+anterior à extração do `MontadorDeBrCodePix`.
+
+**Nem um nem outro é conciliação.** Nem todo aplicativo preserva esses campos a
+quem recebe, e nada impede a pessoa de copiar a chave e pagar pela mão. Eles
+ajudam quem confere a achar a inscrição; nenhuma decisão de dinheiro pode
+depender deles — inclusive o valor do campo `54`, que num BR Code estático é
+sugestão e não trava.
+
+---
+
+## Responsáveis do setor e sorteio de quem recebe (RN-R\*)
+
+Até aqui o setor tinha **um** responsável, e ele morava em quatro colunas de
+`cidades`: `responsavel_id`, `chave_pix`, `titular_chave_pix` e
+`telefone_responsavel`. Esses campos descreviam uma pessoa, não um lugar — e
+com mais de uma pessoa por setor deixaram de caber. As regras abaixo substituem
+esse arranjo; as RN-S\* continuam valendo com a redação ajustada.
+
+### RN-R1 — Responsável é cadastro próprio, e pode existir sem conta no painel
+
+`responsaveis` guarda `nome`, `chave_pix`, `telefone` e um `user_id` **opcional**.
+`user_id` nulo quer dizer "recebe, mas não confere": é o caso real do tesoureiro
+que não usa o sistema. Quem confere continua sendo quem tem conta **e** o papel
+— ou o administrador, que alcança tudo. Um índice único parcial garante que uma
+conta do painel corresponde a **um** cadastro de responsável: duas fichas para o
+mesmo login fariam o escopo de conferência responder duas coisas diferentes para
+a mesma pessoa.
+
+### RN-R2 — Um setor tem N responsáveis; um responsável atende N setores
+
+O vínculo mora em `responsaveis_setores` (chave primária composta, sem `id` e
+sem timestamps). **A chave Pix é da pessoa, não do vínculo**: o mesmo
+responsável usa a mesma chave em todos os setores que atende. Chave por vínculo
+foi considerada e recusada — ela cobriria a tesouraria que separa contas por
+setor ao preço de duplicar cadastro no caso comum. Se um dia for preciso, a
+coluna nasce na tabela de vínculo sem desfazer nada disto.
+
+### RN-R3 — Setor preparado é setor com pelo menos um responsável ativo e com chave
+
+Substitui a regra antiga (`responsavel_id` + `chave_pix` no próprio setor).
+`Cidade::estaPreparadaParaReceber()` responde sim quando existe ao menos um
+responsável **apto** vinculado. Um vínculo sozinho não basta: desativado ou sem
+chave, a pessoa não recebe nada.
+
+### RN-R4 — O sorteio acontece ao emitir a cobrança, e escolhe entre os menos carregados
+
+Candidatos: responsáveis **ativos**, **com chave**, vinculados ao setor da
+inscrição. Carga: quantas inscrições **ativas** (aguardando pagamento ou
+confirmadas) daquele **evento** já apontam para cada candidato, via
+`pagamentos.responsavel_id`. Toma-se o menor valor de carga e sorteia-se **entre
+os empatados** nele — assim ninguém recebe o dobro do outro por azar, e a
+escolha continua imprevisível. A regra inteira mora em
+`App\Actions\Pagamentos\SortearResponsavel`.
+
+A carga conta **o evento**, e não a história inteira: equilibrar entre eventos
+faria um responsável novo herdar a carga de outro e receber tudo do evento
+seguinte.
+
+### RN-R5 — Cada cobrança sorteia de novo
+
+`CriarPagamentoDaInscricao` continua idempotente: havendo cobrança pendente, ela
+é devolvida como está, **sem sortear**. O sorteio só acontece quando uma
+cobrança nova precisa nascer — primeira emissão, ou reemissão depois de a
+anterior vencer. Por isso a coluna do responsável mora em **`pagamentos`**, e
+não em `inscricoes`: o escolhido pertence àquela cobrança, e uma cobrança
+vencida guarda para sempre quem era o responsável dela.
+
+O risco que isso traz está escrito no `PROGRESS.md`, com as três mitigações.
+
+### RN-R6 — Qualquer responsável do setor confere, não só o sorteado
+
+O escopo da RN-S9 passa a ser "os setores que esta conta atende", pela cadeia
+`users → responsaveis → responsaveis_setores → cidades`. Responsável ausente não
+trava a fila do setor, e quem de fato recebeu o Pix consegue aceitar o
+comprovante do próprio dinheiro. Conta sem ficha de responsável não alcança
+nada: ter login não é atender setor.
+
+### RN-R7 — Quem confere precisa ver para quem o dinheiro foi
+
+A fila de conferência mostra, em cada linha, o nome e a chave do responsável
+**daquela cobrança**. Sem isso, com a RN-R5, alguém aceitaria um comprovante de
+um Pix que caiu na conta de outra pessoa sem perceber. É a peça que torna a
+RN-R5 segura.
+
+### RN-R8 — A carga é balanceamento, nunca capacidade
+
+Duas inscrições simultâneas podem sortear o mesmo responsável, e isso é
+aceitável: nada estoura, nada é vendido duas vezes. Por isso o sorteio **não**
+usa trava nem `SELECT ... FOR UPDATE` — serializar a emissão de cobrança do
+setor inteiro para corrigir um desequilíbrio de uma unidade é custo que não se
+paga.
+
+### RN-R9 — Responsável que já recebeu não se apaga, e sem chave não entra no sorteio
+
+`pagamentos.responsavel_id` é `restrictOnDelete`: excluir responsável com
+cobrança é recusado, com a mensagem indicando o caminho — desativar. Desativado
+ou sem chave, ele sai do sorteio na hora, sem tocar em cobrança nenhuma já
+emitida.
+
+### RN-R10 — Setor sem responsável apto recusa a inscrição com a mensagem de sempre
+
+Reaproveita `SetorSemChavePixException`, com o texto no plural: agora são várias
+pessoas que poderiam ter chave, e a mensagem manda cadastrar e vincular em vez
+de apontar um campo que não existe mais no setor.
+
+### A migração dos quatro campos
+
+`2026_09_03_120004_mover_responsavel_do_setor_para_responsaveis` faz **backfill
+antes do drop**: cada setor que tinha chave vira um registro em `responsaveis`
+(com `titular_chave_pix` virando `nome`, ou o nome do setor quando o titular
+estava vazio) e ganha o vínculo correspondente. Dois setores atendidos pela
+mesma pessoa viram uma ficha só; a mesma conta do painel com chaves diferentes
+preserva as duas chaves, e a segunda nasce sem conta — perder chave de
+recebimento no meio de uma migração é o pior desfecho possível.
+
+---
+
 ## Mapeamento com os testes obrigatórios do briefing
 
 O briefing exige oito testes com nomes em inglês. Como o domínio deste projeto é escrito em português, eles receberam nomes equivalentes. A correspondência é esta:
@@ -296,6 +610,15 @@ Testes adicionais criados além dos exigidos:
 | `tests/Feature/Inscricoes/InscricaoDuplicadaTest.php` | RN-11, incluindo a liberação depois da expiração |
 | `tests/Feature/Inscricoes/ConcorrenciaTest.php` | RN-09 e RN-10 sob concorrência real, com processos paralelos |
 | `tests/Feature/Pagamentos/ReconciliacaoTest.php` | RN-P05 |
+| `tests/Feature/Inscricoes/LotesTest.php` | RN-L1 a RN-L11: vigência, fotografia do preço, corrida pela última vaga do lote e a vaga que não volta |
+| `tests/Feature/Admin/LotesAdminTest.php` | RN-L1, RN-L2 e RN-L12 no cadastro, com auditoria |
+| `tests/Feature/Pagamentos/RecebimentoPeloSetorTest.php` | RN-S1 a RN-S4, RN-S8, RN-S12 e RN-S13, com um provedor que explode se for chamado |
+| `tests/Feature/Comprovantes/EnvioDeComprovanteTest.php` | RN-S5, RN-S6, RN-S7 e RN-S11 |
+| `tests/Feature/Comprovantes/ConferenciaTest.php` | RN-S9, RN-S10, RN-R6 e RN-R7, incluindo o 403 pela URL direta |
+| `tests/Feature/Pagamentos/SorteioDeResponsavelTest.php` | RN-R4, RN-R5, RN-R8 e RN-R9: o equilíbrio, a imprevisibilidade no empate, quem nunca é sorteado e o histórico que não se reescreve |
+| `tests/Feature/Pagamentos/MigracaoDoResponsavelDoSetorTest.php` | o backfill dos quatro campos de `cidades`, campo a campo, antes do drop |
+| `tests/Feature/Admin/ResponsaveisTest.php` | o CRUD, o vínculo N:N e a RN-R9 pelos dois lados |
+| `tests/e2e/pagamento-pelo-setor.spec.ts` | os quatro caminhos na tela: pagar com dois responsáveis no setor, conferir pelo outro deles, recusar e o isolamento entre setores |
 
 ---
 
@@ -316,3 +639,14 @@ Testes adicionais criados além dos exigidos:
 | RN-11 | "Já existe uma inscrição ativa com este e-mail neste evento." / "Já existe uma inscrição ativa com este CPF neste evento." |
 | RN-12 | (sem mensagem — devolve a inscrição já criada) |
 | RN-13 | "Você precisa aceitar o regulamento do evento para continuar." |
+| RN-L1 | "Todo lote precisa de um limite: uma data, uma quantidade de vagas, ou os dois." |
+| RN-L2 | "Já existe um lote nesta posição. Cada lote ocupa uma posição diferente na sequência." |
+| RN-L5 | "O lote de inscrição mudou enquanto você preenchia o formulário. Agora vale o {lote}, por {valor}." / "As vagas do {lote} acabaram neste instante." |
+| RN-L9 | "Os lotes de inscrição se esgotaram." |
+| RN-L12 | "Não é possível excluir este lote: {n} inscrição(ões) vieram dele." / "Este lote já ocupou {n} vaga(s). A quantidade não pode ser menor do que isso." |
+| RN-S4 | "Para receber pela chave Pix do setor, todo setor ativo precisa ter ao menos um responsável ativo e com chave Pix. Faltam: {setores}." |
+| RN-S5 | "O comprovante precisa ser uma imagem (JPG, PNG ou WebP) ou um PDF. Trocar a extensão do arquivo não funciona: o servidor confere o conteúdo." / "O arquivo passou de 5 MB." |
+| RN-S8 | "Quando o evento recebe pela chave Pix do setor, o prazo precisa ter ao menos 2880 minutos (2 dias)." |
+| RN-S10 | "Descreva o que você conferiu no comprovante." / "Escreva por que o comprovante não foi aceito: é o que o participante vai ler para corrigir." |
+| RN-R9 | "Este responsável não pode ser excluído porque {n} cobrança(s) já apontam para ele. Desative o responsável para que ele saia do sorteio, sem apagar o registro de quem recebeu cada Pix." |
+| RN-R10 | "O setor desta inscrição não tem nenhum responsável com chave Pix cadastrada. Sem chave não há para onde o pagamento ir: cadastre os responsáveis do setor e vincule ao menos um deles, ativo e com chave." |

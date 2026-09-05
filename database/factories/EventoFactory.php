@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\FormaRecebimento;
 use App\Enums\SituacaoEvento;
 use App\Models\Evento;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -38,6 +39,8 @@ class EventoFactory extends Factory
             'valor_centavos' => 15000,
             'moeda' => 'BRL',
             'prazo_pagamento_minutos' => 1440,
+            // O padrao e o de sempre: a cobranca sai pelo provedor (RN-S12).
+            'forma_recebimento' => FormaRecebimento::Gateway,
             'situacao' => SituacaoEvento::InscricoesAbertas,
             'regulamento' => 'Regulamento de teste.',
             'versao_termos' => '2026.1',
@@ -45,6 +48,20 @@ class EventoFactory extends Factory
             'contato_telefone' => '(11) 90000-0000',
             'configuracoes' => [],
         ];
+    }
+
+    /**
+     * Evento que recebe pela chave Pix do responsavel do setor.
+     *
+     * O prazo acompanha a forma: o minimo desta forma e de dois dias, e uma
+     * semana e o que o formulario sugere (RN-S8).
+     */
+    public function recebendoPeloSetor(): static
+    {
+        return $this->state(fn (array $atributos): array => [
+            'forma_recebimento' => FormaRecebimento::Setor,
+            'prazo_pagamento_minutos' => 10080,
+        ]);
     }
 
     public function rascunho(): static

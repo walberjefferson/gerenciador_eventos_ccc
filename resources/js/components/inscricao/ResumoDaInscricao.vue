@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatarValor } from '@/lib/formato';
-import type { EventoPublico } from '@/types/evento';
+import type { EventoPublico, LotePublico } from '@/types/evento';
 import { computed } from 'vue';
 
 /**
@@ -20,15 +20,25 @@ import { computed } from 'vue';
  * vitrine. Dizer duas vezes na mesma tela nao ajuda ninguem — so empurra o
  * total para baixo.
  */
-const props = defineProps<{
-    evento: EventoPublico;
-    atividadesPorDia: Array<{
-        id: number;
-        nome: string;
-        data_rotulo: string;
-        atividades: Array<{ id: number; nome: string; horario_rotulo: string }>;
-    }>;
-}>();
+const props = withDefaults(
+    defineProps<{
+        evento: EventoPublico;
+        /**
+         * O lote que vale agora, quando o evento trabalha com lotes. O total
+         * continua sendo `evento.valor_centavos` — que o servidor já resolveu como
+         * o valor do vigente —; o lote só empresta o nome à linha.
+         */
+        loteVigente?: LotePublico | null;
+        atividadesPorDia: Array<{
+            id: number;
+            nome: string;
+            data_rotulo: string;
+            /** `horario_rotulo` é nulo quando a atividade não tem hora marcada. */
+            atividades: Array<{ id: number; nome: string; horario_rotulo: string | null }>;
+        }>;
+    }>(),
+    { loteVigente: null },
+);
 
 const emit = defineEmits<{
     (e: 'editar'): void;
@@ -78,11 +88,15 @@ const linhas = computed<Array<{ id: number; rotulo: string; valor: string }>>(()
         <!-- .summary__tot — o total em Bricolage Grotesque de 24px, como todo
              preco desta identidade -->
         <div class="border-border mt-4 flex items-baseline border-t pt-4">
-            <span class="text-muted-foreground text-sm">Total</span>
+            <span class="text-muted-foreground text-sm">{{ props.loteVigente ? props.loteVigente.nome : 'Total' }}</span>
             <strong class="font-titulo ml-auto text-2xl font-semibold tracking-[-0.02em] tabular-nums">
                 {{ formatarValor(evento.valor_centavos, evento.moeda) }}
             </strong>
         </div>
+
+        <!-- Ate quando esse total vale. Some em evento sem lotes: ali o preco
+             nao tem prazo, e a linha nao teria o que dizer. -->
+        <p v-if="props.loteVigente?.limite_rotulo" class="text-muted-foreground mt-1 text-[13px]">{{ props.loteVigente.limite_rotulo }}</p>
 
         <!-- .buy__n — a frase que tira o susto: ninguem paga por engano no meio
              do formulario -->

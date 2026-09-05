@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { formatarDataHora, formatarValor } from '@/lib/formato';
+import { varianteDoPagamento } from '@/lib/situacoes';
 import type { PagamentoDoHistorico } from '@/types/participante';
 
 /**
@@ -15,25 +16,23 @@ defineProps<{
     moeda: string;
 }>();
 
-function variante(situacao: string): 'sucesso' | 'informacao' | 'secondary' {
-    if (situacao === 'pago') {
-        return 'sucesso';
-    }
-
-    return situacao === 'pendente' ? 'informacao' : 'secondary';
-}
+/*
+ * A cor de cada cobrança vem do mapeamento central (`lib/situacoes.ts`), a
+ * mesma fonte que a ficha do painel consulta. Antes eram dois mapas separados,
+ * e uma cobrança estornada aparecia cinza aqui e sem cor nenhuma lá.
+ */
 </script>
 
 <template>
     <div>
-        <p v-if="pagamentos.length === 0" class="text-sm text-muted-foreground" data-testid="historico-vazio">
+        <p v-if="pagamentos.length === 0" class="text-muted-foreground text-sm" data-testid="historico-vazio">
             Ainda não emitimos nenhuma cobrança para esta inscrição.
         </p>
 
         <ul v-else class="space-y-3" data-testid="historico-da-cobranca">
-            <li v-for="pagamento in pagamentos" :key="pagamento.codigo_publico" class="rounded-lg border border-border p-4">
+            <li v-for="pagamento in pagamentos" :key="pagamento.codigo_publico" class="border-border rounded-lg border p-4">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <Badge :variant="variante(pagamento.situacao)">{{ pagamento.situacao_rotulo }}</Badge>
+                    <Badge :variant="varianteDoPagamento(pagamento.situacao)">{{ pagamento.situacao_rotulo }}</Badge>
                     <span class="text-base font-semibold">{{ formatarValor(pagamento.valor_centavos, moeda) }}</span>
                 </div>
 

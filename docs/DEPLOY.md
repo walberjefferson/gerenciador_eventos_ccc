@@ -143,7 +143,7 @@ está em `.planning/feat/features/deploy-docker-portainer/prova-da-stack.md`.
    | `APP_NAME` | `Gestão de Eventos` | você escolhe |
    | `APP_KEY` | `base64:...` | `php artisan key:generate --show` ou `echo "base64:$(openssl rand -base64 32)"` |
    | `APP_DOMAIN` | `inscricoes.cccista.com.br` | o domínio já apontado no DNS |
-   | `APP_TIMEZONE` | `America/Sao_Paulo` | não mude |
+   | `APP_TIMEZONE` | `America/Maceio` | não mude |
    | `TRAEFIK_NETWORK` | `proxy` | a rede do Traefik (passo 2) |
    | `TRAEFIK_CERTRESOLVER` | `le` | o resolvedor do Traefik (passo 2) |
    | `EFI_IP_PERMITIDO` | `34.193.116.226/32` | o IP de onde a Efí notifica |

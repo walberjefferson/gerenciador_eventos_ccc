@@ -164,6 +164,16 @@
         --cor-informacao-contraste: #ffffff;
         --cor-informacao-texto: #0069a8;
 
+        /*
+         * A mesma ideia como SUPERFICIE SUAVE, irma da `--cor-sucesso-suave`.
+         * Serve a etiqueta que diz "esta na lista de espera" ou "foi
+         * estornado" no meio de uma tabela longa: informa sem gritar. O azul
+         * cheio, num lugar desses, competiria com o botao de acao ao lado.
+         * Texto #00506F sobre #E2F0F8: 7.59:1.
+         */
+        --cor-informacao-suave: #e2f0f8;
+        --cor-informacao-suave-contraste: #00506f;
+
         /* Atencao e contagem de tempo - ambar #FE9A00. Preto por cima: 9.32:1.
          * Como texto o ambar puro reprova (2.13:1 sobre branco), por isso o
          * papel de texto usa o ambar escuro #973C00, que rende 7.09:1. */
@@ -176,6 +186,21 @@
          * cima. Texto #973C00 sobre #FFF1D9: 6.36:1. */
         --cor-atencao-suave: #fff1d9;
         --cor-atencao-suave-contraste: #973c00;
+
+        /*
+         * Erro como SUPERFICIE SUAVE.
+         *
+         * O nome e `erro`, e nao `destructive`, de proposito: a camada
+         * semantica deste projeto fala portugues (DA-41) e `destructive` e
+         * vocabulario do shadcn. Nao existe `--cor-erro` cheia porque nao
+         * precisa: quando o erro e um bloco de cor, quem responde e o
+         * `--destructive` do studio. O que faltava era o tom lavado da
+         * etiqueta "expirada", "falhou" — a linha da tabela que pede leitura,
+         * nao susto.
+         * Texto #9B1C1C sobre #FDEAEA: 7.04:1.
+         */
+        --cor-erro-suave: #fdeaea;
+        --cor-erro-suave-contraste: #9b1c1c;
 
         /* --- Barra lateral, tokens do studio --- */
         --sidebar-background: #fafafa; /* #FAFAFA */
@@ -324,6 +349,11 @@
         --cor-informacao: #0c5a75;
         --cor-informacao-contraste: #ffffff;
         --cor-informacao-texto: #0c5a75;
+        /* A superficie suave da informacao, derivada como a do sucesso: o tom
+         * lavado sobre o papel, com a versao escura do proprio azul-petroleo
+         * por cima. #0A4A60 sobre #E2ECF0: 8.09:1. */
+        --cor-informacao-suave: #e2ecf0;
+        --cor-informacao-suave-contraste: #0a4a60;
 
         /*
          * Atencao - o `--sol` do prototipo (#E9922B) como SUPERFICIE, com a
@@ -342,6 +372,14 @@
          * #8A5310 sobre #FBEDDA: 5.48:1. */
         --cor-atencao-suave: #fbedda;
         --cor-atencao-suave-contraste: #8a5310;
+
+        /* A superficie suave do erro, pelo mesmo metodo: o vermelho do
+         * prototipo (#A93425) lavado no papel, com a sua versao escura por
+         * cima. #8C2A1E sobre #F7E6E3: 7.05:1. Existe aqui por paridade — sem
+         * o par, a etiqueta "expirada" de uma tela publica sairia com o
+         * vermelho do painel no meio da identidade verde. */
+        --cor-erro-suave: #f7e6e3;
+        --cor-erro-suave-contraste: #8c2a1e;
 
         /*
          * Barra lateral: nenhuma tela publica tem uma. Os tokens existem
@@ -442,6 +480,8 @@
     --color-informacao: var(--cor-informacao);
     --color-informacao-foreground: var(--cor-informacao-contraste);
     --color-informacao-texto: var(--cor-informacao-texto);
+    --color-informacao-suave: var(--cor-informacao-suave);
+    --color-informacao-suave-foreground: var(--cor-informacao-suave-contraste);
 
     --color-atencao: var(--cor-atencao);
     --color-atencao-forte: var(--cor-atencao-forte);
@@ -449,6 +489,11 @@
     --color-atencao-texto: var(--cor-atencao-texto);
     --color-atencao-suave: var(--cor-atencao-suave);
     --color-atencao-suave-foreground: var(--cor-atencao-suave-contraste);
+
+    /* Nao ha `--color-erro` cheia: o bloco de cor do erro continua sendo o
+     * `--destructive` do studio. Aqui so nasce a superficie suave. */
+    --color-erro-suave: var(--cor-erro-suave);
+    --color-erro-suave-foreground: var(--cor-erro-suave-contraste);
 
     --color-sidebar: var(--sidebar-background);
     --color-sidebar-foreground: var(--sidebar-foreground);

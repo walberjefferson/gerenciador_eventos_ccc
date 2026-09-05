@@ -52,6 +52,16 @@ export const ambienteDeTeste: Record<string, string> = {
     INSCRICOES_LIMITE_CRIAR_MINUTO: '1000',
     INSCRICOES_LIMITE_CRIAR_HORA: '5000',
 
+    // Pelo mesmo motivo, o teto do login do painel. Ele e por IP (vinte por
+    // minuto em producao) e a suite inteira entra pelo mesmo 127.0.0.1: cada
+    // cenario administrativo faz o seu proprio login, e uma dezena deles cabe
+    // no mesmo minuto. O que acontecia era pior do que uma falha honesta — o
+    // cenario que passava sozinho reprovava dentro da suite, e sempre um
+    // diferente, porque o vigesimo primeiro login depende de quanto tempo os
+    // anteriores levaram. Quem prova o limite de verdade, com o numero de
+    // producao, e o Pest (tests/Feature/Seguranca/LimitesTest.php).
+    ADMIN_LIMITE_LOGIN_MINUTO: '1000',
+
     // O servidor embutido do PHP atende uma requisicao por vez. A tela da
     // cobranca consulta a situacao enquanto a pessoa navega: sem estes
     // trabalhadores extras, uma consulta seguraria a proxima pagina.

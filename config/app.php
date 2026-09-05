@@ -59,13 +59,24 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | O fuso da aplicacao. Ele decide o que "agora" quer dizer em todo o
+    | dominio: o prazo de pagamento, a janela de inscricao, o horario que
+    | aparece no e-mail e a hora gravada quando um pagamento e reconhecido.
+    |
+    | O padrao e "America/Maceio", a sede da organizacao, e nao "UTC": errar
+    | para o lado do fuso de Londres desloca tudo em tres horas, e vaga perdida
+    | por prazo mal contado nao volta. Quem opera em outro lugar troca pela
+    | variavel de ambiente APP_TIMEZONE, mas ninguem precisa lembrar de
+    | definir uma para o sistema ficar certo aqui.
+    |
+    | As colunas de data e hora do dominio sao "timestamptz": o PostgreSQL
+    | guarda sempre o instante absoluto, entao mudar este valor nao reescreve
+    | nem desloca o que ja esta gravado — muda apenas como se le e como se
+    | escreve daqui para a frente.
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    'timezone' => env('APP_TIMEZONE', 'America/Maceio'),
 
     /*
     |--------------------------------------------------------------------------
