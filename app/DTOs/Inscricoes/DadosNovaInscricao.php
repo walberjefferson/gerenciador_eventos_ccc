@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Inscricoes;
 
+use App\Enums\Sexo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,6 +28,12 @@ final readonly class DadosNovaInscricao
         public string $telefone,
         public string $documento,
         public Carbon $dataNascimento,
+        /**
+         * Obrigatorio aqui, ainda que a coluna aceite nulo: a coluna acomoda o
+         * passado, este objeto descreve uma inscricao que esta nascendo agora
+         * (RN-X1).
+         */
+        public Sexo $sexo,
         public array $atividadeIds,
         public bool $aceitouTermos,
         public string $chaveIdempotencia,
@@ -58,6 +65,7 @@ final readonly class DadosNovaInscricao
             telefone: trim((string) $dados['telefone']),
             documento: (string) preg_replace('/\D/', '', (string) $dados['documento']),
             dataNascimento: Carbon::parse((string) $dados['data_nascimento'])->startOfDay(),
+            sexo: Sexo::from((string) $dados['sexo']),
             atividadeIds: array_values(array_unique(array_map(
                 fn (mixed $id): int => (int) $id,
                 $atividades,

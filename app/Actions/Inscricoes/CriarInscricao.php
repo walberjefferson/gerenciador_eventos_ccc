@@ -123,6 +123,9 @@ class CriarInscricao
             'documento' => $dados->documento,
             'documento_hash' => Inscricao::hashDocumento($dados->documento),
             'data_nascimento' => $dados->dataNascimento->toDateString(),
+            // Dado de cadastro, e nada alem disso: nenhuma linha acima ou
+            // abaixo o consulta para decidir preco, vaga ou atividade (RN-X4).
+            'sexo' => $dados->sexo,
             'situacao' => SituacaoInscricao::AguardandoPagamento,
             // De qual degrau de preco esta pessoa veio. Serve a conferencia; o
             // que ela deve pagar e a linha de baixo, e so ela.

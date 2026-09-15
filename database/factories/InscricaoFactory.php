@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use App\Models\Evento;
 use App\Models\GrupoParticipante;
@@ -37,6 +38,7 @@ class InscricaoFactory extends Factory
             'documento' => $documento,
             'documento_hash' => Inscricao::hashDocumento($documento),
             'data_nascimento' => $agora->copy()->subYears(30)->toDateString(),
+            'sexo' => fake()->randomElement(Sexo::cases()),
             'situacao' => SituacaoInscricao::AguardandoPagamento,
             'valor_centavos' => 15000,
             'versao_termos' => '2026.1',

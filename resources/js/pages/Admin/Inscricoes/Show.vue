@@ -134,6 +134,11 @@ function confirmarPagamento(): void {
                     <dd class="text-sm font-medium">{{ props.inscricao.grupo || '—' }}</dd>
                 </div>
                 <div>
+                    <dt class="text-muted-foreground text-sm">Sexo</dt>
+                    <!-- Nulo na inscrição anterior ao campo, e isso não é defeito: ninguém chegou a perguntar. -->
+                    <dd class="text-sm font-medium">{{ props.inscricao.sexo_rotulo ?? '—' }}</dd>
+                </div>
+                <div>
                     <dt class="text-muted-foreground text-sm">Valor</dt>
                     <dd class="text-sm font-medium">{{ moeda(props.inscricao.valor_centavos) }}</dd>
                 </div>

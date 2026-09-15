@@ -24,6 +24,18 @@ export interface GrupoParticipantePublico {
 }
 
 /**
+ * Uma opção de sexo, como o servidor a manda.
+ *
+ * O rótulo vem do enum `App\Enums\Sexo`: o formulário nunca escreve
+ * "Masculino" por conta própria, senão a tela passaria a ter uma opinião
+ * própria sobre o que o servidor aceita.
+ */
+export interface OpcaoDeSexo {
+    valor: string;
+    rotulo: string;
+}
+
+/**
  * Par de atividades que nao podem ser escolhidas juntas, mesmo sem choque de
  * horario. Vem normalizado do banco (o menor id primeiro), por isso o
  * composable precisa conferir os dois sentidos.
@@ -58,6 +70,8 @@ export interface FormularioInscricao {
     telefone: string;
     documento: string;
     data_nascimento: string;
+    /** "masculino" ou "feminino". Vazio enquanto a pessoa não escolheu. */
+    sexo: string;
     atividades: number[];
     aceite_termos: boolean;
     chave_idempotencia: string;

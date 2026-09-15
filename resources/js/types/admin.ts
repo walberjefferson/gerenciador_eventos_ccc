@@ -279,6 +279,9 @@ export interface InscricaoDaLista {
     evento: string;
     cidade: string;
     grupo: string;
+    /** Nulos na inscrição gravada antes de o campo existir: a tela desenha "—". */
+    sexo: string | null;
+    sexo_rotulo: string | null;
     situacao: string;
     situacao_rotulo: string;
     valor_centavos: number;
@@ -292,6 +295,7 @@ export interface InscricaoDaLista {
 export interface FiltrosAplicados {
     evento_id: string | null;
     situacao: string | null;
+    sexo: string | null;
     cidade_id: string | null;
     grupo_participante_id: string | null;
     atividade_id: string | null;
@@ -314,6 +318,8 @@ export interface OpcoesDeFiltro {
     grupos: OpcaoComId[];
     atividades: OpcaoComId[];
     situacoes: OpcaoDeSituacao[];
+    /** As duas opções de sexo, vindas do enum do servidor (RN-X3). */
+    sexos: OpcaoDeSituacao[];
     situacoes_pagamento: OpcaoDeSituacao[];
 }
 
@@ -349,6 +355,9 @@ export interface FichaDaInscricao {
     evento: string;
     cidade: string;
     grupo: string;
+    /** Nulos na inscrição gravada antes de o campo existir: a ficha desenha "—". */
+    sexo: string | null;
+    sexo_rotulo: string | null;
     situacao: string;
     situacao_rotulo: string;
     valor_centavos: number;

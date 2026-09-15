@@ -188,7 +188,8 @@ async function corDeFundo(page: Page, seletor: string): Promise<string> {
  * O seletor da etiqueta de uma coluna, numa linha.
  *
  * `nth-child` conta o cabecalho de linha (`th`) junto, entao na lista de
- * inscricoes a quinta celula e a Situacao e a sexta e a Cobranca. A etiqueta e
+ * inscricoes a SEXTA celula e a Situacao e a setima e a Cobranca — a quinta
+ * passou a ser o Sexo, que entrou entre o Grupo e a Situacao. A etiqueta e
  * o `div` que a `Badge` desenha dentro da celula; quando nao ha cobranca, a
  * celula traz um `span` com o travessao e nao casa com este seletor — que e
  * exatamente o que se quer.
@@ -242,7 +243,7 @@ test('a situacao e a cobranca chegam como etiqueta, com a palavra escrita', asyn
     await expect(page.getByRole('cell', { name: 'Confirmada', exact: true })).toBeVisible();
 
     // Nenhuma etiqueta virou so bolinha: as duas linhas trazem texto.
-    const situacoes = await page.locator(`${TABELA} tbody tr td:nth-child(5) > div`).allInnerTexts();
+    const situacoes = await page.locator(`${TABELA} tbody tr td:nth-child(6) > div`).allInnerTexts();
 
     expect(situacoes).toHaveLength(2);
     expect(situacoes.map((texto) => texto.trim()).sort()).toEqual(['Aguardando pagamento', 'Confirmada']);
@@ -250,7 +251,7 @@ test('a situacao e a cobranca chegam como etiqueta, com a palavra escrita', asyn
     // A cobranca da inscricao que passou pelo formulario existe e tambem e
     // etiqueta; a que nasceu confirmada no banco nao tem cobranca, e a celula
     // dela mostra o travessao em vez de inventar um estado.
-    const cobrancas = await page.locator(`${TABELA} tbody tr td:nth-child(6)`).allInnerTexts();
+    const cobrancas = await page.locator(`${TABELA} tbody tr td:nth-child(7)`).allInnerTexts();
 
     expect(cobrancas.map((texto) => texto.trim()).sort()).toEqual(['Aguardando pagamento', '—']);
 });
@@ -259,8 +260,8 @@ test('duas situacoes diferentes rendem etiquetas de cores diferentes', async ({ 
     await entrar(page, ADMINISTRADOR);
     await abrirListaDasDuas(page);
 
-    const primeira = await corDeFundo(page, etiquetaNaLinha(1, 5));
-    const segunda = await corDeFundo(page, etiquetaNaLinha(2, 5));
+    const primeira = await corDeFundo(page, etiquetaNaLinha(1, 6));
+    const segunda = await corDeFundo(page, etiquetaNaLinha(2, 6));
 
     expect(primeira, 'a etiqueta da primeira linha precisa ter fundo pintado').not.toBe('');
     expect(primeira).not.toBe('rgba(0, 0, 0, 0)');
@@ -275,7 +276,7 @@ test('toda etiqueta da lista de inscricoes passa em 4.5:1, medida no navegador',
     await abrirListaDasDuas(page);
 
     for (const linha of [1, 2]) {
-        for (const coluna of [5, 6]) {
+        for (const coluna of [6, 7]) {
             const seletor = etiquetaNaLinha(linha, coluna);
 
             // A celula da cobranca vazia nao tem etiqueta: nao ha o que medir.
@@ -295,7 +296,7 @@ test('o botao de acao da linha tem contraste e alvo de dedo na lista de inscrico
     await abrirListaDasDuas(page);
 
     for (const linha of [1, 2]) {
-        const seletor = `${TABELA} tbody tr:nth-child(${linha}) td:nth-child(9) a`;
+        const seletor = `${TABELA} tbody tr:nth-child(${linha}) td:nth-child(10) a`;
 
         await expect(page.locator(seletor)).toBeVisible();
 

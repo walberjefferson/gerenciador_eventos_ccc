@@ -62,6 +62,26 @@ it('abre o formulario com evento, cidades, grupos e conflitos', function (): voi
         );
 });
 
+it('entrega as duas opcoes de sexo, com o rotulo vindo do enum', function (): void {
+    eventoComFormulario();
+
+    $sabara = Cidade::factory()->create(['nome' => 'Sabará', 'uf' => 'MG']);
+    GrupoParticipante::factory()->for($sabara)->create(['nome' => 'Grupo Sagrada Família']);
+
+    // A tela nunca escreve "Masculino": se o par valor/rotulo nao chegar do
+    // servidor, o seletor fica vazio e ninguem consegue se inscrever.
+    $this->get('/eventos/caminhada-2026/inscricao')
+        ->assertOk()
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->has('sexos', 2)
+            ->where('sexos.0.valor', 'masculino')
+            ->where('sexos.0.rotulo', 'Masculino')
+            ->where('sexos.1.valor', 'feminino')
+            ->where('sexos.1.rotulo', 'Feminino')
+            ->etc()
+        );
+});
+
 it('nao lista cidade nem grupo desativado', function (): void {
     eventoComFormulario();
 

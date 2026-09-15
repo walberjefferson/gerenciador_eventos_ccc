@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoEvento;
 use App\Enums\SituacaoInscricao;
 use App\Events\InscricaoCriada;
@@ -9,6 +10,7 @@ use App\Exceptions\Inscricoes\InscricaoIndisponivelException;
 use App\Models\Cidade;
 use App\Models\GrupoParticipante;
 use App\Models\Inscricao;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -45,6 +47,29 @@ describe('criacao da inscricao', function () {
             ->and($cenario->volei->fresh()->vagas_reservadas)->toBe(0);
 
         Event::assertDispatched(InscricaoCriada::class);
+    });
+
+    it('grava o sexo escolhido, e ele nao muda mais nada na inscricao', function () {
+        $cenario = Cenario::montar();
+
+        $inscricao = $cenario->inscrever(['sexo' => Sexo::Feminino->value]);
+
+        expect($inscricao->sexo)->toBe(Sexo::Feminino)
+            ->and(DB::table('inscricoes')->where('id', $inscricao->id)->value('sexo'))->toBe('feminino')
+            // RN-X4 — o sexo nao decide preco nem vaga: os numeros sao os
+            // mesmos que a inscricao teria sem o campo.
+            ->and($inscricao->valor_centavos)->toBe($cenario->evento->valor_centavos)
+            ->and($cenario->evento->fresh()->vagas_reservadas)->toBe(1);
+    });
+
+    it('recusa no banco um sexo fora das duas opcoes, mesmo por fora do enum', function () {
+        $cenario = Cenario::montar();
+        $inscricao = $cenario->inscrever();
+
+        // O CHECK existe para o que nao passa pelo model: tinker, seeder,
+        // correcao manual em producao.
+        expect(fn () => DB::table('inscricoes')->where('id', $inscricao->id)->update(['sexo' => 'outro']))
+            ->toThrow(QueryException::class, 'inscricoes_sexo_check');
     });
 
     it('congela o prazo de pagamento a partir da configuracao do evento', function () {
@@ -219,7 +244,7 @@ describe('conferencia de formato do formulario', function () {
             ->assertStatus(422)
             ->assertJsonValidationErrors([
                 'evento_id', 'cidade_id', 'grupo_participante_id', 'nome_completo',
-                'email', 'telefone', 'documento', 'data_nascimento', 'chave_idempotencia',
+                'email', 'telefone', 'documento', 'data_nascimento', 'sexo', 'chave_idempotencia',
             ]);
     });
 
@@ -245,6 +270,30 @@ describe('conferencia de formato do formulario', function () {
         $this->postJson('/inscricoes', $cenario->payload([
             'atividades' => [$cenario->futebol->id, $cenario->futebol->id],
         ]))->assertStatus(422)->assertJsonValidationErrors(['atividades.1']);
+    });
+
+    it('recusa envio sem o sexo escolhido', function () {
+        $cenario = Cenario::montar();
+        $payload = $cenario->payload();
+        unset($payload['sexo']);
+
+        $this->postJson('/inscricoes', $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.sexo.0', 'Escolha o seu sexo.');
+
+        expect(Inscricao::count())->toBe(0);
+    });
+
+    it('recusa um sexo que nao existe no enum', function () {
+        $cenario = Cenario::montar();
+
+        // O enum do PHP protege o caminho normal; esta e a prova de que um
+        // terceiro valor nao entra nem por quem fala direto com a rota.
+        $this->postJson('/inscricoes', $cenario->payload(['sexo' => 'outro']))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.sexo.0', 'Escolha uma das opções de sexo oferecidas.');
+
+        expect(Inscricao::count())->toBe(0);
     });
 
     it('recusa evento inexistente', function () {

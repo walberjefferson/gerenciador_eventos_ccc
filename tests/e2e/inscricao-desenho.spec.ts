@@ -67,7 +67,7 @@ test.describe('em tela de computador', () => {
         await expect(painel.getByText('Usamos só para organizar o encontro e enviar sua confirmação.')).toBeVisible();
     });
 
-    test('os sete campos alinham nas mesmas duas colunas', async ({ page }) => {
+    test('os oito campos alinham nas mesmas duas colunas', async ({ page }) => {
         await abrirOFormulario(page);
 
         const nome = await largura(page.locator('#nome_completo'));
@@ -75,6 +75,7 @@ test.describe('em tela de computador', () => {
         const telefone = await largura(page.locator('#telefone'));
         const cpf = await largura(page.locator('#documento'));
         const nascimento = await largura(page.locator('#data_nascimento'));
+        const sexo = await largura(page.locator('#sexo'));
         // O campo continua se chamando `cidade_id`; o rotulo dele e "Setor".
         const setor = await largura(page.locator('#cidade_id'));
         const grupo = await largura(page.locator('#grupo_participante_id'));
@@ -86,6 +87,7 @@ test.describe('em tela de computador', () => {
             ['telefone', telefone],
             ['CPF', cpf],
             ['nascimento', nascimento],
+            ['sexo', sexo],
             ['setor', setor],
             ['grupo', grupo],
         ] as const) {

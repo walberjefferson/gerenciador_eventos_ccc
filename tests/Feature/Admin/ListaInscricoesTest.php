@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use App\Models\Inscricao;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Feature\Admin\Cenario;
 use Tests\Feature\Inscricoes\Cenario as CenarioInscricao;
@@ -180,6 +182,65 @@ describe('filtros', function () {
             ->assertInertia(fn (Assert $pagina) => $pagina
                 ->has('inscricoes.dados', 1)
                 ->where('inscricoes.dados.0.situacao', 'confirmada'));
+    });
+
+    it('filtra por sexo, com as duas opcoes e nada alem delas', function () {
+        $cenario = CenarioInscricao::montar();
+
+        $cenario->inscrever($cenario->outraPessoa(1, [
+            'nome_completo' => 'Joana Feminina',
+            'sexo' => Sexo::Feminino->value,
+        ]));
+        $cenario->inscrever($cenario->outraPessoa(2, [
+            'nome_completo' => 'Carlos Masculino',
+            'sexo' => Sexo::Masculino->value,
+        ]));
+
+        $usuario = Cenario::usuarioCom('organizador');
+
+        $this->actingAs($usuario)
+            ->get('/admin/inscricoes?sexo=feminino')
+            ->assertInertia(fn (Assert $pagina) => $pagina
+                ->has('inscricoes.dados', 1)
+                ->where('inscricoes.dados.0.nome_completo', 'Joana Feminina')
+                ->where('inscricoes.dados.0.sexo', 'feminino')
+                ->where('inscricoes.dados.0.sexo_rotulo', 'Feminino')
+                ->where('filtros.sexo', 'feminino')
+                // As opcoes do seletor vem do enum: duas, sempre (RN-X3).
+                ->has('opcoes.sexos', 2)
+                ->where('opcoes.sexos.0.rotulo', 'Masculino'));
+
+        // Valor que nao existe no enum nao filtra nada — e tambem nao esvazia
+        // a lista: o filtro simplesmente nao se aplica.
+        $this->actingAs($usuario)
+            ->get('/admin/inscricoes?sexo=outro')
+            ->assertInertia(fn (Assert $pagina) => $pagina->has('inscricoes.dados', 2));
+    });
+
+    it('nao esconde do "Todos" a inscricao gravada antes de o campo existir', function () {
+        $cenario = CenarioInscricao::montar();
+
+        $antiga = $cenario->inscrever($cenario->outraPessoa(1, ['nome_completo' => 'Rita Sem Sexo']));
+
+        // O jeito de uma inscricao ficar sem sexo e este: ela e anterior a
+        // migracao. Nenhum caminho do sistema grava nulo de propria vontade.
+        DB::table('inscricoes')->where('id', $antiga->id)->update(['sexo' => null]);
+
+        $usuario = Cenario::usuarioCom('organizador');
+
+        $this->actingAs($usuario)
+            ->get('/admin/inscricoes')
+            ->assertInertia(fn (Assert $pagina) => $pagina
+                ->has('inscricoes.dados', 1)
+                ->where('inscricoes.dados.0.nome_completo', 'Rita Sem Sexo')
+                ->where('inscricoes.dados.0.sexo', null)
+                ->where('inscricoes.dados.0.sexo_rotulo', null));
+
+        // E com o filtro escolhido ela some, que e a consequencia aceita de
+        // nao existir opcao "Não informado" (RN-X3).
+        $this->actingAs($usuario)
+            ->get('/admin/inscricoes?sexo=masculino')
+            ->assertInertia(fn (Assert $pagina) => $pagina->has('inscricoes.dados', 0));
     });
 
     it('filtra por atividade escolhida', function () {

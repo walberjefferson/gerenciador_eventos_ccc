@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 use App\Actions\Inscricoes\CriarInscricao;
 use App\DTOs\Inscricoes\DadosNovaInscricao;
+use App\Enums\Sexo;
 use App\Exceptions\Inscricoes\VagasEsgotadasException;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
@@ -60,6 +61,7 @@ $dados = new DadosNovaInscricao(
     telefone: '(16) 98888-0000',
     documento: cpfDeTeste((int) $indice),
     dataNascimento: Carbon::now()->subYears(30)->startOfDay(),
+    sexo: Sexo::Masculino,
     atividadeIds: $atividadeIds,
     aceitouTermos: true,
     chaveIdempotencia: (string) Str::uuid(),

@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Events\InscricaoCancelada;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Feature\Admin\Cenario;
@@ -40,6 +42,33 @@ it('abre a ficha com o historico da cobranca e sem CPF', function () {
             ->etc());
 
     expect($resposta->getContent())->not->toContain('52998224725');
+});
+
+it('mostra o sexo na ficha, e nao inventa um quando ele nao existe', function () {
+    $cenario = CenarioInscricao::montar();
+
+    $comSexo = $cenario->inscrever($cenario->outraPessoa(1, ['sexo' => Sexo::Feminino->value]));
+    $semSexo = $cenario->inscrever($cenario->outraPessoa(2));
+
+    // Inscricao anterior a migracao: o unico jeito de a coluna ficar nula.
+    DB::table('inscricoes')->where('id', $semSexo->id)->update(['sexo' => null]);
+
+    $organizador = Cenario::usuarioCom('organizador');
+
+    $this->actingAs($organizador)
+        ->get("/admin/inscricoes/{$comSexo->id}")
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('inscricao.sexo', 'feminino')
+            ->where('inscricao.sexo_rotulo', 'Feminino')
+            ->etc());
+
+    $this->actingAs($organizador)
+        ->get("/admin/inscricoes/{$semSexo->id}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $pagina) => $pagina
+            ->where('inscricao.sexo', null)
+            ->where('inscricao.sexo_rotulo', null)
+            ->etc());
 });
 
 it('leva o identificador da cobranca no provedor ate a ficha', function () {

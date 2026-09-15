@@ -6,6 +6,7 @@ namespace Tests\Feature\Inscricoes;
 
 use App\Actions\Inscricoes\CriarInscricao;
 use App\DTOs\Inscricoes\DadosNovaInscricao;
+use App\Enums\Sexo;
 use App\Models\Atividade;
 use App\Models\Cidade;
 use App\Models\DiaEvento;
@@ -169,6 +170,10 @@ final class Cenario
             'telefone' => '(16) 98888-7777',
             'documento' => '529.982.247-25',
             'data_nascimento' => Carbon::now()->subYears(30)->toDateString(),
+            // O campo e obrigatorio no envio (RN-X1): sem ele, todo cenario
+            // pararia na conferencia de formato antes de chegar a regra que
+            // pretende exercitar.
+            'sexo' => Sexo::Masculino->value,
             'atividades' => [$this->futebol->id],
             'aceite_termos' => true,
             'chave_idempotencia' => (string) Str::uuid(),

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\DTOs\Inscricoes\DadosNovaInscricao;
+use App\Enums\Sexo;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Confere o formato dos dados do formulario de inscricao.
@@ -44,6 +46,10 @@ class StoreInscricaoRequest extends FormRequest
             'telefone' => ['required', 'string', 'min:8', 'max:40'],
             'documento' => ['required', 'string', 'max:20', $this->cpfValido()],
             'data_nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
+            // Obrigatorio para quem se inscreve agora (RN-X1). A coluna aceita
+            // nulo por causa das inscricoes antigas, e nao por causa desta
+            // regra: aqui nao ha inscricao antiga nenhuma.
+            'sexo' => ['required', Rule::enum(Sexo::class)],
             'atividades' => ['present', 'array'],
             'atividades.*' => ['integer', 'distinct'],
             'aceite_termos' => ['accepted'],
@@ -75,6 +81,8 @@ class StoreInscricaoRequest extends FormRequest
             'data_nascimento.required' => 'Informe a sua data de nascimento.',
             'data_nascimento.date' => 'Esta data de nascimento não existe. Confira o dia, o mês e o ano.',
             'data_nascimento.before' => 'A data de nascimento precisa ser anterior a hoje.',
+            'sexo.required' => 'Escolha o seu sexo.',
+            'sexo.enum' => 'Escolha uma das opções de sexo oferecidas.',
             'atividades.present' => 'Envie as atividades escolhidas, mesmo que seja uma lista vazia.',
             'atividades.array' => 'Envie as atividades escolhidas, mesmo que seja uma lista vazia.',
             'atividades.*.distinct' => 'Você escolheu a mesma atividade duas vezes.',

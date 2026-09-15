@@ -95,6 +95,21 @@ function limpar(): void {
                 </div>
 
                 <div class="flex flex-col gap-1">
+                    <label for="filtro-sexo" class="text-sm font-medium">Sexo</label>
+                    <select
+                        id="filtro-sexo"
+                        v-model="campos.sexo"
+                        class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        <!-- Só as duas opções do enum. Quem procura inscrição
+                             anterior ao campo a encontra com o filtro em
+                             "Todos" — foi a decisão tomada (RN-X3). -->
+                        <option :value="null">Todos</option>
+                        <option v-for="sexo in props.opcoes.sexos" :key="sexo.valor" :value="sexo.valor">{{ sexo.rotulo }}</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-1">
                     <label for="filtro-setor" class="text-sm font-medium">Setor</label>
                     <select
                         id="filtro-setor"

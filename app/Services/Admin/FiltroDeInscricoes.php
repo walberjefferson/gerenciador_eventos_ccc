@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Admin;
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Models\Inscricao;
@@ -56,6 +57,7 @@ final class FiltroDeInscricoes
         return new self([
             'evento_id' => $texto($pedido->input('evento_id')),
             'situacao' => $texto($pedido->input('situacao')),
+            'sexo' => $texto($pedido->input('sexo')),
             'cidade_id' => $texto($pedido->input('cidade_id')),
             'grupo_participante_id' => $texto($pedido->input('grupo_participante_id')),
             'atividade_id' => $texto($pedido->input('atividade_id')),
@@ -137,6 +139,7 @@ final class FiltroDeInscricoes
         $this->aplicarEscopoDeSetor($consulta);
         $this->porEvento($consulta);
         $this->porSituacao($consulta);
+        $this->porSexo($consulta);
         $this->porCidade($consulta);
         $this->porGrupoParticipante($consulta);
         $this->porAtividade($consulta);
@@ -187,6 +190,25 @@ final class FiltroDeInscricoes
 
         if ($situacao instanceof SituacaoInscricao) {
             $consulta->where('inscricoes.situacao', $situacao->value);
+        }
+    }
+
+    /**
+     * O sexo, com as duas opcoes do enum e nada mais (RN-X3).
+     *
+     * Nao ha valor para "nao informado", por decisao do dono do produto. A
+     * consequencia e conhecida e aceita: as inscricoes gravadas antes de o campo
+     * existir so aparecem com o filtro em "Todos". Acrescentar a opcao um dia e
+     * um `whereNull` a mais aqui.
+     *
+     * @param  Builder<Inscricao>  $consulta
+     */
+    private function porSexo(Builder $consulta): void
+    {
+        $sexo = Sexo::tryFrom((string) $this->valores['sexo']);
+
+        if ($sexo instanceof Sexo) {
+            $consulta->where('inscricoes.sexo', $sexo->value);
         }
     }
 

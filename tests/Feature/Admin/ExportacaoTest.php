@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -101,6 +102,42 @@ it('traz os dados da inscricao que o organizador ve na tela', function () {
         ->and($conteudo)->toContain('Grupo Central')
         // As atividades escolhidas vao junto, numa coluna so.
         ->and($conteudo)->toContain('Futebol');
+});
+
+it('traz o sexo em coluna propria, e celula vazia quando nao ha o dado', function () {
+    $cenario = CenarioInscricao::montar();
+
+    $cenario->inscrever($cenario->outraPessoa(1, [
+        'nome_completo' => 'Joana Pereira',
+        'sexo' => Sexo::Feminino->value,
+    ]));
+    $semSexo = $cenario->inscrever($cenario->outraPessoa(2, ['nome_completo' => 'Rita Antiga']));
+
+    DB::table('inscricoes')->where('id', $semSexo->id)->update(['sexo' => null]);
+
+    $conteudo = conteudoDoCsv(
+        $this->actingAs(Cenario::usuarioCom('organizador'))->get('/admin/inscricoes/exportar')
+    );
+
+    $linhas = array_values(array_filter(explode("\n", str_replace("\r", '', $conteudo))));
+    $cabecalho = explode(';', substr($linhas[0], 3));
+    $posicao = array_search('Sexo', $cabecalho, true);
+
+    expect($posicao)->not->toBeFalse()
+        // Fecha o bloco de dados pessoais, logo depois do telefone.
+        ->and($cabecalho[$posicao - 1])->toBe('Telefone');
+
+    $porNome = [];
+
+    foreach (array_slice($linhas, 1) as $linha) {
+        $celulas = str_getcsv($linha, ';', '"', '');
+        $porNome[$celulas[1]] = $celulas[$posicao];
+    }
+
+    // O rotulo vem do enum, e a ausencia do dado vira celula vazia — nunca a
+    // palavra "null", que numa planilha viraria um valor a ser contado.
+    expect($porNome['Joana Pereira'])->toBe('Feminino')
+        ->and($porNome['Rita Antiga'])->toBe('');
 });
 
 describe('os filtros da tela valem no arquivo', function () {
