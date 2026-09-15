@@ -11,7 +11,14 @@ import { useSelecaoAtividades } from '@/composables/useSelecaoAtividades';
 import PublicoLayout from '@/layouts/PublicoLayout.vue';
 import { formatarValor } from '@/lib/formato';
 import type { DiaEventoPublico, EventoPublico, LotePublico } from '@/types/evento';
-import type { CidadePublica, ConflitoDeAtividades, FormularioInscricao, GrupoParticipantePublico, PassoDaInscricao } from '@/types/inscricao';
+import type {
+    CidadePublica,
+    ConflitoDeAtividades,
+    FormularioInscricao,
+    GrupoParticipantePublico,
+    OpcaoDeSexo,
+    PassoDaInscricao,
+} from '@/types/inscricao';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
 
@@ -24,12 +31,14 @@ const props = defineProps<{
     evento?: EventoPublico | null;
     evento_id?: number;
     cidades?: CidadePublica[];
+    sexos?: OpcaoDeSexo[];
     grupos_participantes?: GrupoParticipantePublico[];
     conflitos?: ConflitoDeAtividades[];
 }>();
 
 const evento = computed<EventoPublico | null>(() => props.evento ?? null);
 const cidades = computed<CidadePublica[]>(() => props.cidades ?? []);
+const sexos = computed<OpcaoDeSexo[]>(() => props.sexos ?? []);
 const gruposParticipantes = computed<GrupoParticipantePublico[]>(() => props.grupos_participantes ?? []);
 const conflitos = computed<ConflitoDeAtividades[]>(() => props.conflitos ?? []);
 const dias = computed<DiaEventoPublico[]>(() => evento.value?.dias ?? []);
@@ -77,6 +86,7 @@ const formulario = ref<FormularioInscricao>({
     telefone: '',
     documento: '',
     data_nascimento: '',
+    sexo: '',
     atividades: [],
     aceite_termos: false,
     chave_idempotencia: novaChave(),
@@ -188,6 +198,9 @@ const conferidores: Record<string, (dados: FormularioInscricao) => string | null
         // quem digita: ninguem nasceu depois de hoje.
         return dados.data_nascimento > hojeEmIso ? 'A data de nascimento não pode estar no futuro.' : null;
     },
+    // A mesma frase do servidor: quem le o aviso da tela e quem leria o do 422
+    // nao podem receber duas redacoes da mesma exigencia.
+    sexo: (dados) => (dados.sexo === '' ? 'Escolha o seu sexo.' : null),
     cidade_id: (dados) => (dados.cidade_id === null ? 'Escolha o seu setor.' : null),
     grupo_participante_id: (dados) => (dados.grupo_participante_id === null ? 'Escolha o seu grupo.' : null),
 };
@@ -288,6 +301,7 @@ const passoDoCampo: Record<string, PassoDaInscricao> = {
     telefone: 'dados',
     documento: 'dados',
     data_nascimento: 'dados',
+    sexo: 'dados',
     cidade_id: 'dados',
     grupo_participante_id: 'dados',
     atividades: 'participacao',
@@ -311,6 +325,7 @@ function formatarDataCurta(iso: string): string {
 const resumoPessoal = computed<Array<{ rotulo: string; valor: string }>>(() => {
     const dados = formulario.value;
     const cidade = cidades.value.find((candidata) => candidata.id === dados.cidade_id);
+    const sexo = sexos.value.find((candidato) => candidato.valor === dados.sexo);
     const grupo = gruposParticipantes.value.find((candidato) => candidato.id === dados.grupo_participante_id);
 
     return [
@@ -319,6 +334,7 @@ const resumoPessoal = computed<Array<{ rotulo: string; valor: string }>>(() => {
         { rotulo: 'Telefone', valor: dados.telefone },
         { rotulo: 'CPF', valor: dados.documento },
         { rotulo: 'Data de nascimento', valor: formatarDataCurta(dados.data_nascimento) },
+        { rotulo: 'Sexo', valor: sexo?.rotulo ?? '—' },
         { rotulo: 'Setor', valor: cidade?.rotulo ?? '—' },
         { rotulo: 'Grupo', valor: grupo?.nome ?? '—' },
     ];
@@ -497,6 +513,7 @@ async function voltar(): Promise<void> {
                     <PassoDadosPessoais
                         v-show="passo === 'dados'"
                         v-model="formulario"
+                        :sexos="sexos"
                         :cidades="cidades"
                         :grupos-da-cidade="gruposDaCidade"
                         :aviso-sem-grupos="avisoSemGrupos"

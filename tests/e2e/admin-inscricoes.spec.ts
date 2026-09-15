@@ -32,6 +32,7 @@ const DESISTENTE: PessoaDeTeste = {
     telefone: '(11) 97777-3311',
     cpf: '10120130068',
     nascimento: '1988-09-02',
+    sexo: 'Feminino',
 };
 
 /** A outra pessoa: existe so para provar que o filtro realmente filtra. */
@@ -41,6 +42,7 @@ const VIZINHA: PessoaDeTeste = {
     telefone: '(11) 97777-3322',
     cpf: '20220230056',
     nascimento: '1990-03-19',
+    sexo: 'Masculino',
 };
 
 /** A atividade escolhida pelas duas: e nela que a vaga precisa voltar. */
@@ -213,6 +215,54 @@ test('o organizador acha a pessoa pelo filtro, cancela com motivo e a vaga volta
     expect(depois).toBe(antes + 1);
 });
 
+test('a lista mostra a coluna de sexo e o filtro por ela estreita o resultado', async ({ page }) => {
+    const dela: PessoaDeTeste = {
+        nome: 'Sandra Coluna Prado',
+        email: 'sandra.coluna@example.com',
+        telefone: '(11) 97777-3355',
+        cpf: '81820830012',
+        nascimento: '1992-01-24',
+        sexo: 'Feminino',
+    };
+
+    const dele: PessoaDeTeste = {
+        nome: 'Otavio Coluna Prado',
+        email: 'otavio.coluna@example.com',
+        telefone: '(11) 97777-3366',
+        cpf: '91920930000',
+        nascimento: '1991-07-05',
+        sexo: 'Masculino',
+    };
+
+    await inscreverPessoa(page, dela, ATIVIDADE);
+    await inscreverPessoa(page, dele, ATIVIDADE);
+
+    await entrar(page, ORGANIZADOR);
+
+    // 1. A coluna existe e traz o rotulo que o enum do servidor escreve.
+    await page.goto('/admin/inscricoes');
+    await page.getByTestId('abrir-filtros').click();
+    await page.getByLabel('Buscar').fill('Coluna Prado');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page.getByRole('columnheader', { name: 'Sexo' })).toBeVisible();
+
+    const linhaDela = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: dela.nome }) });
+    const linhaDele = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: dele.nome }) });
+
+    await expect(linhaDela).toContainText('Feminino');
+    await expect(linhaDele).toContainText('Masculino');
+
+    // 2. O filtro por sexo estreita a lista, combinado com a busca que ja esta
+    // valendo. O painel continua aberto: com filtro ativo ele nao se recolhe,
+    // e clicar no cabecalho de novo fecharia o que precisamos usar.
+    await page.getByLabel('Sexo').selectOption('feminino');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page.getByRole('rowheader', { name: dela.nome })).toHaveCount(1);
+    await expect(page.getByRole('rowheader', { name: dele.nome })).toHaveCount(0);
+});
+
 test('cancelar sem escrever o motivo e barrado na tela', async ({ page }) => {
     const teimosa: PessoaDeTeste = {
         nome: 'Carla Teimosa Dias',
@@ -220,6 +270,7 @@ test('cancelar sem escrever o motivo e barrado na tela', async ({ page }) => {
         telefone: '(11) 97777-3333',
         cpf: '30320330044',
         nascimento: '1985-11-30',
+        sexo: 'Feminino',
     };
 
     await inscreverPessoa(page, teimosa, ATIVIDADE);

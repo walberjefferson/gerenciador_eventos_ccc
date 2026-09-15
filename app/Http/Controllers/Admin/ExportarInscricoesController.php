@@ -51,6 +51,10 @@ class ExportarInscricoesController extends Controller
         'Nome',
         'E-mail',
         'Telefone',
+        // Fecha o bloco de dados pessoais, e nao ao lado de Grupo como na
+        // tabela da tela: planilha e lida por blocos de coluna, tela e lida por
+        // varredura horizontal.
+        'Sexo',
         'Evento',
         // A coluna sempre trouxe o nome do setor da pessoa; so o cabecalho
         // mudou. As subconsultas continuam lendo a tabela `cidades`.
@@ -156,6 +160,9 @@ class ExportarInscricoesController extends Controller
             $inscricao->nome_completo,
             $inscricao->email,
             $inscricao->telefone,
+            // Celula vazia na inscricao anterior ao campo — nunca a palavra
+            // "null", que numa planilha viraria um valor a ser contado.
+            $inscricao->sexo?->rotulo() ?? '',
             $this->texto($inscricao->getAttribute('evento_nome')),
             $cidade === '' ? '' : "{$cidade}/{$uf}",
             $this->texto($inscricao->getAttribute('grupo_nome')),

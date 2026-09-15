@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\MetodoPagamento;
+use App\Enums\Sexo;
 use App\Enums\SituacaoEvento;
 use App\Enums\SituacaoPagamento;
 use App\Models\Inscricao;
@@ -334,6 +335,9 @@ class VolumeSeeder extends Seeder
                 'documento' => Crypt::encryptString($documento),
                 'documento_hash' => Inscricao::hashDocumento($documento),
                 'data_nascimento' => Carbon::parse('1970-01-01')->addDays($i % 15_000)->toDateString(),
+                // Alternado, e nao sorteado: o seeder precisa produzir sempre o
+                // mesmo banco para que duas medicoes possam ser comparadas.
+                'sexo' => ($i % 2 === 0 ? Sexo::Masculino : Sexo::Feminino)->value,
                 'situacao' => $situacao,
                 // O valor e o do lote, fotografado na inscricao (RN-L7): alterar
                 // o lote depois nao mexe em inscricao nenhuma.

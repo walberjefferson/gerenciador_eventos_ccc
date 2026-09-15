@@ -46,6 +46,36 @@ test('a tela avisa, antes de enviar, o CPF incompleto e o campo obrigatorio vazi
     await expect(email).toBeFocused();
 });
 
+test('avancar sem escolher o sexo mostra o erro e nao sai da etapa', async ({ page }) => {
+    await page.goto(`/eventos/${EVENTO_DEMO.slug}/inscricao`);
+
+    // Tudo certo, menos o sexo: o campo novo e o unico motivo de a tela barrar.
+    await page.getByLabel('Nome completo').fill('Teresa Cristina Nogueira');
+    await page.getByLabel('E-mail').fill('teresa.nogueira@example.com');
+    await page.getByLabel('Telefone com DDD').fill('(11) 96666-1212');
+    await page.getByLabel('CPF').fill('82820930093');
+    await page.getByLabel('Data de nascimento').fill('14/05/1983');
+    await escolherNaLista(page, 'Setor', 'Setor Batalha');
+    await escolherNaLista(page, 'Grupo', 'Batalha (Sede)');
+
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Seus dados' })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'Escolha o seu sexo.' })).toBeVisible();
+
+    // O erro esta ligado ao campo, e o cursor volta para ele.
+    const sexo = page.locator('#sexo');
+    await expect(sexo).toHaveAttribute('aria-invalid', 'true');
+    await expect(sexo).toHaveAttribute('aria-describedby', 'erro-sexo');
+    await expect(sexo).toBeFocused();
+
+    // Escolhendo, o aviso sai e a etapa avanca.
+    await escolherNaLista(page, 'Sexo', 'Feminino');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Sua participação', exact: true })).toBeVisible();
+});
+
 test('o servidor recusa o CPF impossivel e a tela volta ao passo do campo', async ({ page }) => {
     await page.goto(`/eventos/${EVENTO_DEMO.slug}/inscricao`);
 
@@ -56,6 +86,7 @@ test('o servidor recusa o CPF impossivel e a tela volta ao passo do campo', asyn
     await page.getByLabel('Telefone com DDD').fill('(11) 95555-4444');
     await page.getByLabel('CPF').fill(CPF_IMPOSSIVEL);
     await page.getByLabel('Data de nascimento').fill('07/11/1980');
+    await escolherNaLista(page, 'Sexo', 'Masculino');
     // APOSTROFO e ACENTO de proposito, e nao por acaso: sao dados reais do
     // catalogo, e um seletor escrito com aspas simples quebraria neles.
     await escolherNaLista(page, 'Setor', "Setor Olho d'água das Flores");

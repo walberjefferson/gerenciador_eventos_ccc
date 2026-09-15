@@ -32,6 +32,10 @@ final class LinhaDaInscricaoResource
             'evento' => $inscricao->evento?->nome ?? '',
             'cidade' => self::cidade($inscricao),
             'grupo' => $inscricao->grupoParticipante?->nome ?? '',
+            // Nulos na inscricao gravada antes de o campo existir. A tela
+            // desenha travessao; inventar valor aqui seria pior (RN-X2).
+            'sexo' => $inscricao->sexo?->value,
+            'sexo_rotulo' => $inscricao->sexo?->rotulo(),
             'situacao' => $inscricao->situacao->value,
             'situacao_rotulo' => $inscricao->situacao->rotulo(),
             'valor_centavos' => $inscricao->valor_centavos,

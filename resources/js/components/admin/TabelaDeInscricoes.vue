@@ -7,7 +7,7 @@ import { Eye } from 'lucide-vue-next';
 /**
  * A tabela de inscrições encontradas.
  *
- * As colunas mostram nome, e-mail, setor, grupo, situação, valor e prazo.
+ * As colunas mostram nome, e-mail, setor, grupo, sexo, situação, valor e prazo.
  * **CPF não é uma delas** — nem aqui, nem no CSV.
  */
 const props = defineProps<{
@@ -31,7 +31,7 @@ function momento(iso: string | null): string {
     <div class="border-border overflow-x-auto rounded-lg border">
         <table class="w-full text-sm">
             <caption class="sr-only">
-                Inscrições encontradas, com o evento, o setor, o grupo, a situação, o valor e o prazo de pagamento de cada uma.
+                Inscrições encontradas, com o evento, o setor, o grupo, o sexo, a situação, o valor e o prazo de pagamento de cada uma.
             </caption>
             <thead>
                 <tr class="border-border border-b text-left">
@@ -39,6 +39,7 @@ function momento(iso: string | null): string {
                     <th scope="col" class="px-4 py-2 font-medium">Evento</th>
                     <th scope="col" class="px-4 py-2 font-medium">Setor</th>
                     <th scope="col" class="px-4 py-2 font-medium">Grupo</th>
+                    <th scope="col" class="px-4 py-2 font-medium">Sexo</th>
                     <th scope="col" class="px-4 py-2 font-medium">Situação</th>
                     <th scope="col" class="px-4 py-2 font-medium">Cobrança</th>
                     <th scope="col" class="px-4 py-2 font-medium">Valor</th>
@@ -55,6 +56,8 @@ function momento(iso: string | null): string {
                     <td class="px-4 py-2">{{ inscricao.evento }}</td>
                     <td class="px-4 py-2">{{ inscricao.cidade || '—' }}</td>
                     <td class="px-4 py-2">{{ inscricao.grupo || '—' }}</td>
+                    <!-- Travessão na inscrição gravada antes de o campo existir: o rótulo vem do servidor, e quando não há rótulo não há o que escrever. -->
+                    <td class="px-4 py-2">{{ inscricao.sexo_rotulo ?? '—' }}</td>
                     <td class="px-4 py-2">
                         <EtiquetaDeSituacao dominio="inscricao" :situacao="inscricao.situacao" :rotulo="inscricao.situacao_rotulo" />
                     </td>

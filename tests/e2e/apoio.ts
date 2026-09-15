@@ -100,6 +100,12 @@ export interface PessoaDeTeste {
     cpf: string;
     /** Em ISO (AAAA-MM-DD), como cada cenario a escreve. */
     nascimento: string;
+    /**
+     * O rotulo que a lista de sexo oferece. Opcional: quem nao disser nada
+     * escolhe "Masculino" e continua exercitando o campo novo — o que importa
+     * na maioria dos cenarios e passar pelo passo 1, nao qual opcao foi.
+     */
+    sexo?: 'Masculino' | 'Feminino';
 }
 
 /**
@@ -126,6 +132,11 @@ export async function preencherDadosPessoais(page: Page, pessoa: PessoaDeTeste):
     await page.getByLabel('Telefone com DDD').fill(pessoa.telefone);
     await page.getByLabel('CPF').fill(pessoa.cpf);
     await page.getByLabel('Data de nascimento').fill(dataComoNaTela(pessoa.nascimento));
+
+    // O sexo e obrigatorio desde o passo 1: escolhe-lo aqui faz os cenarios ja
+    // existentes exercitarem o campo novo sem virarem uma lista de correcoes
+    // mecanicas.
+    await escolherNaLista(page, 'Sexo', pessoa.sexo ?? 'Masculino');
 
     // Dado real do catalogo. O grupo tem PARENTESE de proposito: e o que
     // quebraria um seletor mal escrito, e e o nome que a comunidade usa.

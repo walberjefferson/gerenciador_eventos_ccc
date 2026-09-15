@@ -187,6 +187,7 @@ erDiagram
         text documento
         char_64 documento_hash
         date data_nascimento
+        varchar sexo
         varchar situacao
         bigint valor_centavos
         varchar versao_termos
@@ -485,6 +486,7 @@ Pares de atividades que não podem ser escolhidas juntas **mesmo sem choque de h
 | `documento` | text | não | — | CPF, **guardado cifrado** |
 | `documento_hash` | char(64) | não | — | Impressão digital do CPF (SHA-256 com segredo), usada só para duplicidade |
 | `data_nascimento` | date | não | — | Usada para verificar faixa etária por atividade |
+| `sexo` | varchar(20) | sim | `null` | Sexo da pessoa (Enum `Sexo`: `masculino`, `feminino`). **Obrigatório no formulário, anulável na coluna**: as inscrições gravadas antes do campo ficam sem o dado. Não entra em regra nenhuma |
 | `situacao` | varchar(40) | não | `'aguardando_pagamento'` | Situação (Enum `SituacaoInscricao`) |
 | `valor_centavos` | bigint | não | — | Valor congelado na criação: o do lote vigente quando há lotes (RN-L7), o do evento quando não há (RN-L8). **É a única fonte de verdade do que a pessoa deve pagar** |
 | `versao_termos` | varchar(40) | não | — | Versão do regulamento aceita |
@@ -507,12 +509,15 @@ Pares de atividades que não podem ser escolhidas juntas **mesmo sem choque de h
   `UNIQUE (evento_id, documento_hash) WHERE situacao IN ('aguardando_pagamento','confirmada')`
 - `index(situacao, prazo_pagamento)` — usado pela rotina de expiração
 - `index(evento_id, situacao)` — usado pelos números do painel
+- **`CHECK inscricoes_sexo_check`**: `sexo IS NULL OR sexo IN ('masculino','feminino')`
+- **Sem índice para `sexo`** — o filtro por sexo nunca chega sozinho (vem junto do evento ou da situação, que já têm índice) e uma coluna de duas opções quase não estreita o resultado. Índice que não é usado custa escrita em toda inscrição criada
 
 **Por quê:**
 
 - **Unicidade parcial (só vale para algumas linhas).** Precisamos impedir **duas inscrições ativas** com o mesmo e-mail, mas permitir uma nova inscrição depois que a anterior expirou. Uma unicidade comum bloquearia para sempre. A cláusula `WHERE` faz a regra valer apenas enquanto a inscrição está ativa.
 - **`lower(email)` no índice.** `Ana@email.com` e `ana@email.com` são a mesma pessoa. Comparar em minúsculas evita a duplicidade mais comum.
 - **Duas colunas para o CPF.** `documento` guarda o número cifrado, para que o vazamento do banco não entregue CPFs legíveis. `documento_hash` é uma impressão digital irreversível, gerada com um segredo do servidor, que serve apenas para comparar. Dado cifrado não pode ser usado em índice de unicidade, porque a mesma informação gera textos cifrados diferentes a cada gravação — por isso as duas colunas.
+- **`sexo` anulável, com o formulário obrigatório.** Não são a mesma pergunta. O formulário fala com quem está se inscrevendo agora e pode exigir a escolha; a coluna precisa acomodar as inscrições já gravadas, para as quais ninguém nunca perguntou nada. Escolher `masculino` como padrão para elas produziria uma contagem falsa, impossível de distinguir de dado real depois. Por isso nem `NOT NULL`, nem `default`. O `CHECK` protege o que o Enum do PHP não alcança: `tinker`, seeder e correção manual em produção.
 - **`valor_centavos` congelado.** Se o organizador reajustar o preço, quem já se inscreveu continua devendo o valor combinado. Sem essa cópia, a cobrança mudaria sozinha.
 - **Chaves estrangeiras `restrict`.** Apagar um evento ou um grupo que tem inscrições é sempre erro. O banco recusa.
 - **Não existe coluna `pago`.** Justificado no `PRD.md`, seção 16.1.
@@ -709,6 +714,7 @@ Guardados como texto em português. A aplicação controla os valores por Enum d
 |------|---------|--------------|
 | `SituacaoEvento` | `rascunho`, `publicado`, `inscricoes_abertas`, `inscricoes_encerradas`, `finalizado`, `cancelado` | `eventos.situacao` |
 | `SituacaoInscricao` | `aguardando_pagamento`, `confirmada`, `expirada`, `cancelada`, `lista_espera` | `inscricoes.situacao` |
+| `Sexo` | `masculino`, `feminino` | `inscricoes.sexo` |
 | `SituacaoPagamento` | `pendente`, `pago`, `falhou`, `expirado`, `cancelado`, `estornado` | `pagamentos.situacao` |
 | `MetodoPagamento` | `pix`, `cartao_credito` | `pagamentos.metodo` |
 | `SituacaoWebhook` | `recebido`, `processado`, `ignorado`, `falhou` | `webhooks_pagamento.situacao` |

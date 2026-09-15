@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoEvento;
 use App\Http\Resources\CidadeResource;
 use App\Http\Resources\EventoPublicoResource;
@@ -70,6 +71,10 @@ class InscricaoPublicaController extends Controller
             'evento_id' => $evento->id,
             'cidades' => CidadeResource::collection($cidades)->resolve(),
             'grupos_participantes' => GrupoParticipanteResource::collection($grupos)->resolve(),
+            // As duas opcoes vem do enum, e nao do componente: escrever
+            // "Masculino" na tela criaria uma segunda verdade sobre o que o
+            // servidor aceita.
+            'sexos' => Sexo::opcoes(),
             'conflitos' => $this->conflitosDoEvento($evento),
         ]);
     }

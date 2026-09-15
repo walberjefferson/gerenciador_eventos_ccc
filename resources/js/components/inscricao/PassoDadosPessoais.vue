@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apenasDigitos, mascararCpf, mascararTelefone } from '@/lib/formato';
-import type { CidadePublica, FormularioInscricao, GrupoParticipantePublico } from '@/types/inscricao';
+import type { CidadePublica, FormularioInscricao, GrupoParticipantePublico, OpcaoDeSexo } from '@/types/inscricao';
 import { computed } from 'vue';
 
 /**
@@ -13,7 +13,7 @@ import { computed } from 'vue';
  * fica ligado ao campo por aria-describedby, para o leitor de tela anunciar o
  * problema junto com o nome do campo.
  *
- * Os sete campos moram numa GRADE UNICA de duas colunas — o `.fields` do
+ * Os oito campos moram numa GRADE UNICA de duas colunas — o `.fields` do
  * prototipo —, e nao em tres grades empilhadas com larguras proprias. A
  * largura "do tamanho do dado" que valia aqui antes tinha um custo maior do
  * que o ganho: CPF e nascimento ficavam encolhidos no meio da linha e a coluna
@@ -22,6 +22,11 @@ import { computed } from 'vue';
  * colunas.
  */
 const props = defineProps<{
+    /**
+     * As duas opcoes de sexo, vindas do enum do servidor. O componente nunca
+     * escreve "Masculino": o par valor/rotulo tem uma fonte so.
+     */
+    sexos: OpcaoDeSexo[];
     cidades: CidadePublica[];
     gruposDaCidade: GrupoParticipantePublico[];
     avisoSemGrupos: string | null;
@@ -102,7 +107,7 @@ function sair(campo: string): void {
 
         Antes eram tres grades empilhadas, e uma delas com `sm:max-w-md`: CPF e
         nascimento sobravam encolhidos no meio da largura, e a coluna da
-        direita deixava de existir na altura deles. Numa grade unica os sete
+        direita deixava de existir na altura deles. Numa grade unica os oito
         campos alinham nas mesmas duas colunas, do primeiro ao ultimo.
     -->
     <div class="mt-[26px] grid gap-[18px] sm:grid-cols-2">
@@ -220,6 +225,31 @@ function sair(campo: string): void {
                 lido nada a respeito.
             -->
             <p v-else id="ajuda-data_nascimento" class="text-muted-foreground text-[13.5px]">Algumas atividades têm idade mínima ou máxima.</p>
+        </div>
+
+        <!--
+            Logo depois da data de nascimento e antes do setor: o bloco de
+            quem-e-a-pessoa fica junto. Com oito campos, o Grupo termina sozinho
+            na ultima linha — o mesmo que a grade ja fazia com numero impar.
+        -->
+        <div class="space-y-[7px]">
+            <Label for="sexo" class="text-[14.5px] font-medium">Sexo</Label>
+            <Select v-model="formulario.sexo">
+                <SelectTrigger
+                    id="sexo"
+                    class="border-input h-[50px] rounded-[10px] border-[1.5px] px-[14px] text-base"
+                    :aria-invalid="erro('sexo') ? 'true' : undefined"
+                    :aria-describedby="erro('sexo') ? 'erro-sexo' : undefined"
+                >
+                    <SelectValue placeholder="Escolha uma opção" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="opcao in sexos" :key="opcao.valor" :value="opcao.valor">{{ opcao.rotulo }}</SelectItem>
+                </SelectContent>
+            </Select>
+            <p v-if="erro('sexo')" id="erro-sexo" role="alert" class="text-destructive text-[13.5px] font-medium">
+                {{ erro('sexo') }}
+            </p>
         </div>
 
         <div class="space-y-[7px]">

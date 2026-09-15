@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\MetodoPagamento;
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use App\Enums\SituacaoPagamento;
 use App\Http\Controllers\Controller;
@@ -97,6 +98,10 @@ class InscricaoAdminController extends Controller
                 'evento' => $inscricao->evento?->nome ?? '',
                 'cidade' => LinhaDaInscricaoResource::cidade($inscricao),
                 'grupo' => $inscricao->grupoParticipante?->nome ?? '',
+                // Nulos quando a inscricao e anterior a existencia do campo: a
+                // ficha desenha travessao em vez de inventar um valor (RN-X2).
+                'sexo' => $inscricao->sexo?->value,
+                'sexo_rotulo' => $inscricao->sexo?->rotulo(),
                 'situacao' => $inscricao->situacao->value,
                 'situacao_rotulo' => $inscricao->situacao->rotulo(),
                 'valor_centavos' => $inscricao->valor_centavos,
@@ -215,6 +220,9 @@ class InscricaoAdminController extends Controller
                 fn (SituacaoInscricao $situacao): array => ['valor' => $situacao->value, 'rotulo' => $situacao->rotulo()],
                 SituacaoInscricao::cases(),
             ),
+            // Duas opcoes, e so (RN-X3). Elas vem do enum pelo mesmo caminho
+            // das situacoes: nenhum rotulo e escrito na tela.
+            'sexos' => Sexo::opcoes(),
             'situacoes_pagamento' => array_map(
                 fn (SituacaoPagamento $situacao): array => ['valor' => $situacao->value, 'rotulo' => $situacao->rotulo()],
                 SituacaoPagamento::cases(),

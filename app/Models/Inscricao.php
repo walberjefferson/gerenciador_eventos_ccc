@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Sexo;
 use App\Enums\SituacaoInscricao;
 use Database\Factories\InscricaoFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +41,7 @@ class Inscricao extends Model
         'documento',
         'documento_hash',
         'data_nascimento',
+        'sexo',
         'situacao',
         'valor_centavos',
         'versao_termos',
@@ -263,6 +265,9 @@ class Inscricao extends Model
     {
         return [
             'data_nascimento' => 'date',
+            // Nulo nas inscricoes gravadas antes de o campo existir, e isso nao
+            // e erro: quem le desenha travessao (RN-X2).
+            'sexo' => Sexo::class,
             'situacao' => SituacaoInscricao::class,
             'valor_centavos' => 'integer',
             'documento' => 'encrypted',
