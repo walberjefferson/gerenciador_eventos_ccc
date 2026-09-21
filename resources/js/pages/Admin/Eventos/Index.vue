@@ -59,7 +59,11 @@ function excluir(evento: EventoDaLista): void {
         titulo="Eventos"
         descricao="Cada evento tem uma ficha com os dados gerais e uma programação com os dias, os grupos e as atividades. Evento que já recebeu inscrição não pode ser excluído: mude a situação para cancelado ou finalizado."
     >
-        <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
+        <!-- O texto continua aqui para quem voltar à tela depois; quem
+             anuncia a ação recém-feita é o aviso rápido da moldura, e por
+             isso este parágrafo não é mais uma região viva: senão o leitor
+             de tela ouviria a mesma frase duas vezes. -->
+        <p v-if="props.sucesso" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
             {{ props.sucesso }}
         </p>
 
@@ -126,35 +130,19 @@ function excluir(evento: EventoDaLista): void {
                                     >
                                         Editar
                                     </BotaoDeAcao>
-                                    <BotaoDeAcao
-                                        tamanho="xs"
-                                        :icone="CalendarDays"
-                                        :href="route('admin.eventos.estrutura', { evento: evento.id })"
-                                    >
+                                    <BotaoDeAcao tamanho="xs" :icone="CalendarDays" :href="route('admin.eventos.estrutura', { evento: evento.id })">
                                         Programação
                                     </BotaoDeAcao>
 
                                     <span v-if="evento.inscricoes > 0" class="text-muted-foreground"> Não pode ser excluído: já tem inscrição. </span>
                                     <template v-else-if="confirmandoExclusao === evento.id">
                                         <span class="text-muted-foreground">Excluir mesmo?</span>
-                                        <BotaoDeAcao
-                                            tamanho="xs"
-                                            intencao="excluir"
-                                            :icone="Trash2"
-                                            :disabled="excluindo"
-                                            @click="excluir(evento)"
-                                        >
+                                        <BotaoDeAcao tamanho="xs" intencao="excluir" :icone="Trash2" :disabled="excluindo" @click="excluir(evento)">
                                             Sim, excluir
                                         </BotaoDeAcao>
                                         <BotaoDeAcao tamanho="xs" @click="confirmandoExclusao = null">Não</BotaoDeAcao>
                                     </template>
-                                    <BotaoDeAcao
-                                        v-else
-                                        tamanho="xs"
-                                        intencao="excluir"
-                                        :icone="Trash2"
-                                        @click="confirmandoExclusao = evento.id"
-                                    >
+                                    <BotaoDeAcao v-else tamanho="xs" intencao="excluir" :icone="Trash2" @click="confirmandoExclusao = evento.id">
                                         Excluir
                                     </BotaoDeAcao>
                                 </div>

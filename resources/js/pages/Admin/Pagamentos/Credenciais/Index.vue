@@ -195,15 +195,24 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
         titulo="Credenciais de pagamento"
         descricao="Aqui ficam guardadas a credencial e o certificado da Efí. Tudo é gravado cifrado e nenhum valor volta para esta tela depois de salvo — por isso um campo deixado em branco mantém o que já está guardado, e nunca apaga."
     >
-        <p data-testid="credenciais-origem" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">
+        <p data-testid="credenciais-origem" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
             {{ avisoDeOrigem }}
         </p>
 
-        <p v-if="props.sucesso" data-testid="credenciais-sucesso" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">
+        <!-- O texto continua aqui para quem voltar à tela depois; quem
+             anuncia a ação recém-feita é o aviso rápido da moldura, e por
+             isso este parágrafo não é mais uma região viva: senão o leitor
+             de tela ouviria a mesma frase duas vezes. -->
+        <p v-if="props.sucesso" data-testid="credenciais-sucesso" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
             {{ props.sucesso }}
         </p>
 
-        <p v-if="props.erro" data-testid="credenciais-erro" role="alert" class="rounded-md border border-destructive px-4 py-2 text-sm text-destructive">
+        <p
+            v-if="props.erro"
+            data-testid="credenciais-erro"
+            role="alert"
+            class="border-destructive text-destructive rounded-md border px-4 py-2 text-sm"
+        >
             {{ props.erro }}
         </p>
 
@@ -211,7 +220,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
             v-for="ambiente in props.ambientes"
             :key="ambiente.valor"
             :data-testid="`credenciais-bloco-${ambiente.valor}`"
-            class="grid gap-4 rounded-lg border border-border p-4"
+            class="border-border grid gap-4 rounded-lg border p-4"
             :aria-labelledby="`titulo-${ambiente.valor}`"
         >
             <header class="flex flex-wrap items-center justify-between gap-2">
@@ -220,19 +229,24 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                 <span
                     v-if="ambiente.cadastro?.ativo"
                     :data-testid="`credenciais-ativo-${ambiente.valor}`"
-                    class="rounded-full border border-border px-3 py-1 text-xs font-medium"
+                    class="border-border rounded-full border px-3 py-1 text-xs font-medium"
                 >
                     Em uso agora
                 </span>
             </header>
 
-            <p v-if="ambiente.cadastro" class="text-sm text-muted-foreground">
+            <p v-if="ambiente.cadastro" class="text-muted-foreground text-sm">
                 Guardado
                 <template v-if="ambiente.cadastro.atualizado_em">em {{ ambiente.cadastro.atualizado_em }}</template>
                 <template v-if="ambiente.cadastro.atualizado_por"> por {{ ambiente.cadastro.atualizado_por }}</template
-                >. {{ ambiente.cadastro.completa ? 'O cadastro está completo.' : 'Falta preencher alguma coisa: este ambiente ainda não pode ser ativado.' }}
+                >.
+                {{
+                    ambiente.cadastro.completa
+                        ? 'O cadastro está completo.'
+                        : 'Falta preencher alguma coisa: este ambiente ainda não pode ser ativado.'
+                }}
             </p>
-            <p v-else class="text-sm text-muted-foreground">Nada cadastrado neste ambiente ainda.</p>
+            <p v-else class="text-muted-foreground text-sm">Nada cadastrado neste ambiente ainda.</p>
 
             <form class="grid gap-4" enctype="multipart/form-data" @submit.prevent="salvar(ambiente.valor)">
                 <div class="grid gap-4 md:grid-cols-2">
@@ -244,10 +258,14 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             type="text"
                             autocomplete="off"
                             :data-testid="`credenciais-client-id-${ambiente.valor}`"
-                            :placeholder="ambiente.cadastro?.tem_client_id ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Cole aqui o Client Id do painel da Efí'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                            :placeholder="
+                                ambiente.cadastro?.tem_client_id
+                                    ? 'Há um valor guardado. Deixe em branco para mantê-lo.'
+                                    : 'Cole aqui o Client Id do painel da Efí'
+                            "
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
-                        <p v-if="formularios[ambiente.valor].errors.client_id" class="text-sm text-destructive">
+                        <p v-if="formularios[ambiente.valor].errors.client_id" class="text-destructive text-sm">
                             {{ formularios[ambiente.valor].errors.client_id }}
                         </p>
                     </div>
@@ -260,10 +278,14 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             type="password"
                             autocomplete="new-password"
                             :data-testid="`credenciais-client-secret-${ambiente.valor}`"
-                            :placeholder="ambiente.cadastro?.tem_client_secret ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Cole aqui o Client Secret do painel da Efí'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                            :placeholder="
+                                ambiente.cadastro?.tem_client_secret
+                                    ? 'Há um valor guardado. Deixe em branco para mantê-lo.'
+                                    : 'Cole aqui o Client Secret do painel da Efí'
+                            "
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
-                        <p v-if="formularios[ambiente.valor].errors.client_secret" class="text-sm text-destructive">
+                        <p v-if="formularios[ambiente.valor].errors.client_secret" class="text-destructive text-sm">
                             {{ formularios[ambiente.valor].errors.client_secret }}
                         </p>
                     </div>
@@ -276,10 +298,14 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                             type="text"
                             autocomplete="off"
                             :data-testid="`credenciais-chave-pix-${ambiente.valor}`"
-                            :placeholder="ambiente.cadastro?.tem_chave_pix ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'A chave Pix da conta do evento'"
-                            class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                            :placeholder="
+                                ambiente.cadastro?.tem_chave_pix
+                                    ? 'Há um valor guardado. Deixe em branco para mantê-lo.'
+                                    : 'A chave Pix da conta do evento'
+                            "
+                            class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                         />
-                        <p v-if="formularios[ambiente.valor].errors.chave_pix" class="text-sm text-destructive">
+                        <p v-if="formularios[ambiente.valor].errors.chave_pix" class="text-destructive text-sm">
                             {{ formularios[ambiente.valor].errors.chave_pix }}
                         </p>
                     </div>
@@ -293,22 +319,26 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                                 type="text"
                                 autocomplete="off"
                                 :data-testid="`credenciais-webhook-hmac-${ambiente.valor}`"
-                                :placeholder="ambiente.cadastro?.tem_webhook_hmac ? 'Há um valor guardado. Deixe em branco para mantê-lo.' : 'Use o botão ao lado'"
-                                class="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                                :placeholder="
+                                    ambiente.cadastro?.tem_webhook_hmac
+                                        ? 'Há um valor guardado. Deixe em branco para mantê-lo.'
+                                        : 'Use o botão ao lado'
+                                "
+                                class="border-input bg-background focus-visible:ring-ring h-10 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                             />
                             <button
                                 type="button"
                                 :data-testid="`credenciais-gerar-hmac-${ambiente.valor}`"
-                                class="h-10 shrink-0 rounded-md border border-border px-3 text-sm font-medium"
+                                class="border-border h-10 shrink-0 rounded-md border px-3 text-sm font-medium"
                                 @click="gerarValorDoWebhook(ambiente.valor)"
                             >
                                 Gerar valor
                             </button>
                         </div>
-                        <p class="text-xs text-muted-foreground">
+                        <p class="text-muted-foreground text-xs">
                             Este valor é conferido a cada aviso que a Efí manda. Não invente um à mão: use o botão.
                         </p>
-                        <p v-if="formularios[ambiente.valor].errors.webhook_hmac" class="text-sm text-destructive">
+                        <p v-if="formularios[ambiente.valor].errors.webhook_hmac" class="text-destructive text-sm">
                             {{ formularios[ambiente.valor].errors.webhook_hmac }}
                         </p>
                     </div>
@@ -321,39 +351,39 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                         type="file"
                         accept=".p12,.pfx,.pem"
                         :data-testid="`credenciais-certificado-${ambiente.valor}`"
-                        class="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        class="border-input bg-background rounded-md border px-3 py-2 text-sm"
                         @change="receberArquivo(ambiente.valor, $event)"
                     />
-                    <p v-if="ambiente.cadastro?.tem_certificado" class="text-xs text-muted-foreground">
+                    <p v-if="ambiente.cadastro?.tem_certificado" class="text-muted-foreground text-xs">
                         Guardado: {{ ambiente.cadastro.certificado_nome }}
-                        <template v-if="ambiente.cadastro.certificado_expira_em">
-                            — vale até {{ ambiente.cadastro.certificado_expira_em }}
-                        </template>
-                        <span v-if="ambiente.cadastro.certificado_vencido" class="font-medium text-destructive"> (vencido)</span>
+                        <template v-if="ambiente.cadastro.certificado_expira_em"> — vale até {{ ambiente.cadastro.certificado_expira_em }} </template>
+                        <span v-if="ambiente.cadastro.certificado_vencido" class="text-destructive font-medium"> (vencido)</span>
                     </p>
-                    <p v-else class="text-xs text-muted-foreground">Nenhum certificado guardado neste ambiente.</p>
-                    <p v-if="formularios[ambiente.valor].errors.certificado" class="text-sm text-destructive">
+                    <p v-else class="text-muted-foreground text-xs">Nenhum certificado guardado neste ambiente.</p>
+                    <p v-if="formularios[ambiente.valor].errors.certificado" class="text-destructive text-sm">
                         {{ formularios[ambiente.valor].errors.certificado }}
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-1 rounded-md border border-border p-3">
+                <div class="border-border flex flex-col gap-1 rounded-md border p-3">
                     <span class="text-sm font-medium">Endereço para registrar no painel da Efí</span>
-                    <code :data-testid="`credenciais-webhook-url-${ambiente.valor}`" class="break-all text-xs">{{ urlDoWebhook(ambiente.valor) }}</code>
-                    <p class="text-xs text-muted-foreground">
+                    <code :data-testid="`credenciais-webhook-url-${ambiente.valor}`" class="text-xs break-all">{{
+                        urlDoWebhook(ambiente.valor)
+                    }}</code>
+                    <p class="text-muted-foreground text-xs">
                         <template v-if="webhookPronto(ambiente.valor)">
                             Copie este endereço e registre no painel da Efí. Ele termina em <code>?ignorar=</code> de propósito.
                         </template>
                         <template v-else>
-                            Gere ou digite o valor de segurança acima para ver o endereço pronto. O valor já guardado não é mostrado
-                            aqui — se você não o tem anotado, gere um novo e salve.
+                            Gere ou digite o valor de segurança acima para ver o endereço pronto. O valor já guardado não é mostrado aqui — se você
+                            não o tem anotado, gere um novo e salve.
                         </template>
                     </p>
                     <button
                         type="button"
                         :disabled="!webhookPronto(ambiente.valor)"
                         :data-testid="`credenciais-copiar-webhook-${ambiente.valor}`"
-                        class="mt-1 h-9 w-fit rounded-md border border-border px-3 text-sm font-medium disabled:opacity-50"
+                        class="border-border mt-1 h-9 w-fit rounded-md border px-3 text-sm font-medium disabled:opacity-50"
                         @click="copiar(urlDoWebhook(ambiente.valor))"
                     >
                         Copiar endereço
@@ -365,7 +395,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                         type="submit"
                         :disabled="formularios[ambiente.valor].processing"
                         :data-testid="`credenciais-salvar-${ambiente.valor}`"
-                        class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground disabled:opacity-50"
+                        class="bg-acao text-acao-foreground h-10 rounded-md px-4 text-sm font-medium disabled:opacity-50"
                     >
                         Salvar {{ ambiente.rotulo }}
                     </button>
@@ -373,7 +403,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                     <button
                         type="button"
                         :data-testid="`credenciais-testar-${ambiente.valor}`"
-                        class="h-10 rounded-md border border-border px-4 text-sm font-medium"
+                        class="border-border h-10 rounded-md border px-4 text-sm font-medium"
                         @click="testar(ambiente.valor)"
                     >
                         Testar conexão
@@ -383,7 +413,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                         v-if="!ambiente.cadastro?.ativo"
                         type="button"
                         :data-testid="`credenciais-ativar-${ambiente.valor}`"
-                        class="h-10 rounded-md border border-border px-4 text-sm font-medium"
+                        class="border-border h-10 rounded-md border px-4 text-sm font-medium"
                         @click="ativar(ambiente)"
                     >
                         Usar este ambiente
@@ -415,13 +445,13 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
             role="dialog"
             aria-modal="true"
             aria-labelledby="titulo-confirmar-producao"
-            class="grid gap-3 rounded-lg border border-destructive p-4"
+            class="border-destructive grid gap-3 rounded-lg border p-4"
         >
-            <h2 id="titulo-confirmar-producao" class="text-lg font-semibold text-destructive">Passar a cobrar de verdade</h2>
+            <h2 id="titulo-confirmar-producao" class="text-destructive text-lg font-semibold">Passar a cobrar de verdade</h2>
 
             <p class="text-sm">
-                A partir do momento em que produção for ativada, toda cobrança gerada será real e sairá do bolso de quem se
-                inscrever. Para confirmar, digite <strong>{{ PALAVRA_DE_CONFIRMACAO }}</strong> abaixo.
+                A partir do momento em que produção for ativada, toda cobrança gerada será real e sairá do bolso de quem se inscrever. Para confirmar,
+                digite <strong>{{ PALAVRA_DE_CONFIRMACAO }}</strong> abaixo.
             </p>
 
             <label for="confirmacao-producao" class="text-sm font-medium">Confirmação</label>
@@ -431,7 +461,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                 type="text"
                 autocomplete="off"
                 data-testid="credenciais-palavra-confirmacao"
-                class="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-input bg-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             />
 
             <div class="flex gap-2">
@@ -439,7 +469,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                     type="button"
                     data-testid="credenciais-confirmar-ativacao"
                     :disabled="confirmacaoDigitada.trim().toUpperCase() !== PALAVRA_DE_CONFIRMACAO"
-                    class="h-10 rounded-md bg-acao px-4 text-sm font-medium text-acao-foreground disabled:opacity-50"
+                    class="bg-acao text-acao-foreground h-10 rounded-md px-4 text-sm font-medium disabled:opacity-50"
                     @click="confirmarProducao()"
                 >
                     Ativar produção
@@ -448,7 +478,7 @@ function resultadoDe(ambiente: string): ResultadoDoTeste | null {
                 <button
                     type="button"
                     data-testid="credenciais-cancelar-ativacao"
-                    class="h-10 rounded-md border border-border px-4 text-sm font-medium"
+                    class="border-border h-10 rounded-md border px-4 text-sm font-medium"
                     @click="trocandoParaProducao = false"
                 >
                     Cancelar

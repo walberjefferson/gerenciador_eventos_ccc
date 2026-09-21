@@ -55,18 +55,22 @@ const enderecoDaExportacao = computed(() => {
         titulo="Inscrições"
         descricao="Todas as inscrições, de todos os eventos. Os filtros se combinam e a busca olha nome, e-mail e código da inscrição — o CPF fica guardado cifrado e não é buscável, nem por pedaço."
     >
-        <p v-if="props.sucesso" role="status" class="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm">{{ props.sucesso }}</p>
+        <!-- O texto continua aqui para quem voltar à tela depois; quem
+             anuncia a ação recém-feita é o aviso rápido da moldura, e por
+             isso este parágrafo não é mais uma região viva: senão o leitor
+             de tela ouviria a mesma frase duas vezes. -->
+        <p v-if="props.sucesso" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">{{ props.sucesso }}</p>
 
         <FiltrosDeInscricao :filtros="props.filtros" :opcoes="props.opcoes" />
 
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <p role="status" class="text-sm text-muted-foreground">{{ resumo }}</p>
+            <p role="status" class="text-muted-foreground text-sm">{{ resumo }}</p>
 
             <a
                 v-if="props.pode_exportar"
                 :href="enderecoDaExportacao"
                 data-testid="exportar-csv"
-                class="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring inline-flex h-10 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Exportar para planilha (CSV)
             </a>
@@ -79,20 +83,18 @@ const enderecoDaExportacao = computed(() => {
                 v-if="props.inscricoes.links.anterior"
                 :href="props.inscricoes.links.anterior"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring h-10 rounded-md border px-4 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Página anterior
             </Link>
 
-            <span class="text-sm text-muted-foreground">
-                Página {{ props.inscricoes.pagina_atual }} de {{ props.inscricoes.ultima_pagina }}
-            </span>
+            <span class="text-muted-foreground text-sm"> Página {{ props.inscricoes.pagina_atual }} de {{ props.inscricoes.ultima_pagina }} </span>
 
             <Link
                 v-if="props.inscricoes.links.proxima"
                 :href="props.inscricoes.links.proxima"
                 preserve-scroll
-                class="h-10 rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="border-border focus-visible:ring-ring h-10 rounded-md border px-4 py-2 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Próxima página
             </Link>

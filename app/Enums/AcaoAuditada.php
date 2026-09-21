@@ -90,6 +90,22 @@ enum AcaoAuditada: string
      */
     case DesfezPresenca = 'desfez-presenca';
 
+    /**
+     * Alguem mandou de novo, para o participante, uma mensagem da inscricao.
+     *
+     * Tem verbo proprio porque nao e cadastro: e mensagem saindo do sistema
+     * para a caixa de entrada de uma pessoa. "Alterou" nao descreveria isso —
+     * nada foi alterado —, e quem revisa depois de um "eu nunca recebi nada"
+     * precisa achar o registro sem saber qual entidade filtrar.
+     *
+     * O registro guarda QUAL mensagem e PARA QUAL endereco ela foi. O endereco
+     * importa: trocar o e-mail de uma inscricao e reenviar o link de acesso sao
+     * duas acoes legitimas que, juntas, entregam o acesso a outra caixa de
+     * entrada. Cada uma deixa o seu proprio rastro, e e lendo os dois lado a
+     * lado que alguem enxerga a sequencia.
+     */
+    case ReenviouComunicacao = 'reenviou-comunicacao';
+
     public function rotulo(): string
     {
         return match ($this) {
@@ -106,6 +122,7 @@ enum AcaoAuditada: string
             self::AlterouCredencialPagamento => 'Mexeu na credencial de pagamento',
             self::RegistrouPresenca => 'Registrou entrada no evento',
             self::DesfezPresenca => 'Desfez uma entrada registrada',
+            self::ReenviouComunicacao => 'Reenviou uma mensagem ao participante',
         };
     }
 

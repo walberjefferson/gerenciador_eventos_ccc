@@ -44,6 +44,34 @@ class InscricaoPolicy
         return $usuario->can('inscricoes.cancelar');
     }
 
+    /**
+     * Corrigir os dados de uma inscricao ja criada.
+     *
+     * Cobra o alcance de setor, e nao apenas a permissao, pela mesma razao de
+     * `view()`: quem so enxerga o proprio setor na lista nao pode alcancar a
+     * inscricao de outro trocando o numero na URL. Aqui a razao e ainda mais
+     * forte — ver de fora e ruim, escrever por cima e pior.
+     */
+    public function editar(User $usuario, Inscricao $inscricao): bool
+    {
+        return $usuario->can('inscricoes.editar')
+            && ComprovantePagamentoPolicy::alcancaInscricao($usuario, $inscricao);
+    }
+
+    /**
+     * Mandar de novo, para o participante, uma mensagem da inscricao dele.
+     *
+     * Mesmo alcance de setor da edicao: a mensagem sai com o link assinado da
+     * inscricao, entao reenviar e, na pratica, entregar acesso a ela. Quem nao
+     * pode abrir a ficha nao pode despachar o conteudo dela para uma caixa de
+     * entrada.
+     */
+    public function reenviarComunicacao(User $usuario, Inscricao $inscricao): bool
+    {
+        return $usuario->can('inscricoes.reenviar-comunicacao')
+            && ComprovantePagamentoPolicy::alcancaInscricao($usuario, $inscricao);
+    }
+
     public function confirmarManualmente(User $usuario, Inscricao $inscricao): bool
     {
         return $usuario->can('pagamentos.confirmar-manual');

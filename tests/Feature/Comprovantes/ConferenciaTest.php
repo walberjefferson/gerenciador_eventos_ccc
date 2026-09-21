@@ -362,7 +362,10 @@ it('recusa conferir duas vezes o mesmo comprovante', function (): void {
 
     $this->actingAs($a['responsavel'])
         ->post("/admin/comprovantes/{$a['comprovante']->getKey()}/aceitar", ['observacao' => 'Confere de novo.'])
-        ->assertSessionHasErrors('observacao');
+        // "Ja foi conferido" nao e erro do que foi digitado: nao ha campo
+        // nenhum para corrigir. A recusa volta como aviso da acao.
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('erro');
 
     expect($a['inscricao']->fresh()->pagamentos()->count())->toBe(1);
 });

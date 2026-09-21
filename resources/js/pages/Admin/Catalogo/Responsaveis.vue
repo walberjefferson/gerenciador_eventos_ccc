@@ -171,7 +171,11 @@ function excluir(pessoa: ResponsavelDoCatalogo): void {
         titulo="Responsáveis"
         descricao="Quem recebe o Pix dos setores. Um responsável pode atender vários setores, e um setor pode ter vários responsáveis — a cada cobrança o sistema sorteia um deles, entre os que estiverem com menos inscrições no evento."
     >
-        <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
+        <!-- O texto continua aqui para quem voltar à tela depois; quem
+             anuncia a ação recém-feita é o aviso rápido da moldura, e por
+             isso este parágrafo não é mais uma região viva: senão o leitor
+             de tela ouviria a mesma frase duas vezes. -->
+        <p v-if="props.sucesso" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">
             {{ props.sucesso }}
         </p>
 

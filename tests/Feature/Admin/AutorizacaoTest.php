@@ -18,10 +18,13 @@ use Tests\Feature\Admin\Cenario;
  * "pagamentos.avisos-ver", so do administrador), de 11 para 13 no controle de
  * presenca ("presenca.registrar" e "presenca.desfazer") e de 13 para 14 no
  * recebimento pela chave Pix do setor ("pagamentos.conferir-comprovante", do
- * administrador e do responsavel de setor). Quem mexer neste numero esta
- * dizendo, por escrito, que criou ou tirou uma permissao.
+ * administrador e do responsavel de setor) e de 14 para 16 na edicao
+ * administrativa da inscricao ("inscricoes.editar" e
+ * "inscricoes.reenviar-comunicacao", as duas do administrador e do
+ * organizador). Quem mexer neste numero esta dizendo, por escrito, que criou
+ * ou tirou uma permissao.
  */
-const TOTAL_DE_PERMISSOES = 14;
+const TOTAL_DE_PERMISSOES = 16;
 
 /**
  * Quantos papeis existem.
@@ -36,7 +39,7 @@ const TOTAL_DE_PERMISSOES = 14;
  */
 const TOTAL_DE_PAPEIS = 4;
 
-it('cria os quatro papeis e as catorze permissoes', function (): void {
+it('cria os quatro papeis e as dezesseis permissoes', function (): void {
     Cenario::semearPapeis();
 
     expect(Role::count())->toBe(TOTAL_DE_PAPEIS)

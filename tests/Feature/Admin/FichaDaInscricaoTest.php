@@ -282,7 +282,11 @@ describe('confirmacao manual pela tela', function () {
                 'metodo' => 'dinheiro',
                 'observacao' => 'Trouxe o dinheiro depois do prazo.',
             ])
-            ->assertSessionHasErrors('observacao');
+            // A recusa nao e erro de campo: a observacao escrita estava certa,
+            // o que nao cabia era a acao. Ela volta como aviso da acao, e a
+            // tela mostra isso como aviso rapido.
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('erro');
 
         expect($inscricao->fresh()->situacao)->toBe(SituacaoInscricao::Expirada);
     });

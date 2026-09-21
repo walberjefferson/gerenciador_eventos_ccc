@@ -4,25 +4,35 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Comunicacao\ReenviarComunicacao;
 use App\Actions\Inscricoes\CancelarInscricaoAdministrativa;
 use App\Actions\Pagamentos\ConfirmarPagamentoManual;
+use App\Enums\AcaoAuditada;
+use App\Enums\SituacaoInscricao;
 use App\Exceptions\Pagamentos\ConfirmacaoManualRecusadaException;
+use App\Http\Controllers\Admin\Concerns\RegistraAuditoria;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CancelarInscricaoRequest;
 use App\Http\Requests\Admin\ConfirmarPagamentoManualRequest;
+use App\Http\Requests\Admin\ReenviarComunicacaoRequest;
 use App\Models\Inscricao;
+use App\Services\Ingressos\PdfDoIngresso;
 use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * As duas acoes que a organizacao pode tomar sobre uma inscricao concreta.
+ * As acoes que a organizacao pode tomar sobre uma inscricao concreta.
  *
- * Nenhuma das duas tem regra de dominio aqui dentro: quem sabe devolver vaga e
- * quem sabe reconhecer dinheiro sao as Actions. Este controller so faz o que um
- * controller deve fazer — confere quem pode, valida o que veio do formulario,
- * chama a Action e conta o resultado em portugues.
+ * Nenhuma delas tem regra de dominio aqui dentro: quem sabe devolver vaga, quem
+ * sabe reconhecer dinheiro e quem sabe se uma mensagem cabe naquela situacao sao
+ * as Actions. Este controller so faz o que um controller deve fazer — confere
+ * quem pode, valida o que veio do formulario, chama a Action e conta o resultado
+ * em portugues.
  */
 class AcaoInscricaoController extends Controller
 {
+    use RegistraAuditoria;
+
     /**
      * Cancela a inscricao e devolve a vaga na hora.
      *
@@ -75,9 +85,12 @@ class AcaoInscricaoController extends Controller
                 (string) $pedido->string('observacao'),
             );
         } catch (ConfirmacaoManualRecusadaException $recusa) {
-            // A recusa e uma resposta de negocio, nao um defeito: volta para o
-            // campo do formulario, em portugues, como qualquer outro erro.
-            return back()->withErrors(['observacao' => $recusa->getMessage()]);
+            // A recusa e uma resposta de negocio, nao um defeito — e tambem nao
+            // e erro de campo: "esta inscricao ja expirou" nao e culpa do que
+            // foi digitado na observacao, e pendurar a frase la mandava a
+            // pessoa corrigir um texto que estava certo. Ela volta como aviso
+            // da acao, em portugues, e a tela mostra como aviso rapido.
+            return back()->with('erro', $recusa->getMessage());
         }
 
         if (! $confirmou) {
@@ -85,5 +98,78 @@ class AcaoInscricaoController extends Controller
         }
 
         return back()->with('sucesso', 'Pagamento reconhecido e inscrição confirmada.');
+    }
+
+    /**
+     * Manda de novo uma mensagem que a pessoa diz nao ter recebido.
+     *
+     * A recusa por situacao errada sobe da Action como erro de validacao e cai
+     * sozinha no campo "tipo" do formulario — nao ha o que tratar aqui.
+     *
+     * O que fica registrado e a auditoria, e nao "comunicacoes_enviadas": aquela
+     * tabela guarda o envio AUTOMATICO, e a unicidade dela existe justamente
+     * para impedir a segunda copia que este botao acabou de produzir de
+     * proposito (RN-A1).
+     */
+    public function reenviarComunicacao(
+        ReenviarComunicacaoRequest $pedido,
+        Inscricao $inscricao,
+        ReenviarComunicacao $reenviar,
+    ): RedirectResponse {
+        $this->authorize('reenviarComunicacao', $inscricao);
+
+        $tipo = $pedido->tipo();
+
+        $destino = $reenviar($inscricao, $tipo);
+
+        $rotulo = ReenviarComunicacao::rotulo($tipo);
+
+        // O endereco vai junto de propósito: trocar o e-mail de uma inscricao e
+        // reenviar o link de acesso sao duas acoes legitimas que, em sequencia,
+        // entregam o acesso a outra caixa de entrada. Sem o destino no
+        // registro, a segunda metade dessa historia nao apareceria.
+        $this->auditar(
+            AcaoAuditada::ReenviouComunicacao,
+            'inscricao',
+            (int) $inscricao->getKey(),
+            ['mensagem' => $rotulo, 'destino' => $destino],
+        );
+
+        return back()->with('sucesso', "“{$rotulo}” está a caminho de {$destino}.");
+    }
+
+    /**
+     * O ingresso em PDF, entregue pelo painel.
+     *
+     * Serve a quem esta no balcao com a pessoa na frente, sem o link assinado em
+     * maos. As duas trancas sao as mesmas do controller do participante, e pela
+     * mesma razao: **so inscricao confirmada tem ingresso**. Entregar um PDF a
+     * quem ainda deve seria imprimir um codigo que a portaria recusaria depois,
+     * na frente da fila.
+     *
+     * Quem pode abrir a ficha pode imprimir o ingresso dela: a permissao e
+     * "inscricoes.ver" (cobrada na rota) mais o alcance de setor, que a policy
+     * confere aqui.
+     */
+    public function ingresso(Inscricao $inscricao, PdfDoIngresso $pdfDoIngresso): Response
+    {
+        $this->authorize('view', $inscricao);
+
+        $inscricao->loadMissing(['evento', 'ingresso']);
+
+        abort_unless($inscricao->situacao === SituacaoInscricao::Confirmada, 403);
+        abort_unless($inscricao->ingresso !== null, 403);
+
+        $pdf = $pdfDoIngresso($inscricao->ingresso);
+
+        // Nome de arquivo com o codigo publico, e nao com o codigo do ingresso:
+        // quem baixa dois ingressos da mesma familia nao pode acabar com dois
+        // arquivos de mesmo nome na pasta de downloads.
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="ingresso-'.$inscricao->codigo_publico.'.pdf"',
+            // O ingresso e de uma pessoa so: nenhum intermediario guarda copia.
+            'Cache-Control' => 'private, no-store, max-age=0',
+        ]);
     }
 }
