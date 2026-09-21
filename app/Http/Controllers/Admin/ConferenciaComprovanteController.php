@@ -136,7 +136,9 @@ class ConferenciaComprovanteController extends Controller
      *
      * A regra nao esta aqui — ela esta em ConfirmarPagamentoManual, alcancada
      * por ConferirComprovante (RN-S10). Este metodo so traduz as recusas do
-     * dominio para uma frase no campo certo do formulario.
+     * dominio para uma frase em portugues, no lugar certo: campo vazio fica no
+     * campo; recusa de negocio, que nao e culpa de nada que foi digitado, vira
+     * aviso da acao.
      */
     public function aceitar(
         ConferirComprovanteRequest $pedido,
@@ -147,8 +149,15 @@ class ConferenciaComprovanteController extends Controller
 
         try {
             $conferir->aceitar($comprovante, $pedido->user(), $pedido->observacao());
-        } catch (ComprovanteRecusadoException|ConfirmacaoManualRecusadaException|InvalidArgumentException $recusa) {
-            return back()->withErrors(['observacao' => $recusa->getMessage()]);
+        } catch (InvalidArgumentException $vazio) {
+            // Observacao em branco e erro DE CAMPO: a frase fica ao lado do
+            // campo, onde a pessoa vai escrever. Na pratica o formulario ja
+            // barra antes; esta e a rede que a Action estende por baixo.
+            return back()->withErrors(['observacao' => $vazio->getMessage()]);
+        } catch (ComprovanteRecusadoException|ConfirmacaoManualRecusadaException $recusa) {
+            // "Este comprovante ja foi conferido" nao pertence a campo nenhum:
+            // nao ha o que corrigir no formulario. Vira aviso da acao.
+            return back()->with('erro', $recusa->getMessage());
         }
 
         $nome = $comprovante->inscricao?->nome_completo ?? 'participante';
@@ -171,8 +180,11 @@ class ConferenciaComprovanteController extends Controller
 
         try {
             $conferir->recusar($comprovante, $pedido->user(), $pedido->motivo());
-        } catch (ComprovanteRecusadoException|InvalidArgumentException $recusa) {
-            return back()->withErrors(['motivo' => $recusa->getMessage()]);
+        } catch (InvalidArgumentException $vazio) {
+            // Mesma divisao do aceite: motivo em branco e erro de campo.
+            return back()->withErrors(['motivo' => $vazio->getMessage()]);
+        } catch (ComprovanteRecusadoException $recusa) {
+            return back()->with('erro', $recusa->getMessage());
         }
 
         return back()->with(

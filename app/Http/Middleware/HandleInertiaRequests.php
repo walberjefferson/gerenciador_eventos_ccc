@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -53,6 +54,37 @@ class HandleInertiaRequests extends Middleware
                 // tela. A tranca de verdade continua no middleware da rota.
                 'permissoes' => $request->user()?->getAllPermissions()->pluck('name')->all() ?? [],
             ],
+            // O aviso da acao que acabou de acontecer, disponivel em qualquer
+            // tela. Cada pagina continua recebendo o seu 'sucesso' proprio para
+            // desenhar o paragrafo dentro do conteudo; isto aqui e o que
+            // permite a moldura mostrar o mesmo recado como aviso rapido, sem
+            // que cada tela precise saber disso.
+            'flash' => $this->avisoDaAcao($request),
         ]);
+    }
+
+    /**
+     * O aviso guardado pela acao anterior, com um identificador descartavel.
+     *
+     * O identificador existe por um motivo pratico: cancelar duas inscricoes
+     * seguidas produz exatamente a mesma frase, e uma tela que ficasse de olho
+     * no TEXTO nao veria mudanca nenhuma na segunda vez — o aviso rapido
+     * simplesmente nao apareceria, justo no uso repetido, que e o uso real do
+     * painel. Com um valor novo a cada resposta, a segunda acao e tao visivel
+     * quanto a primeira.
+     *
+     * Ele nao e dado de negocio: nasce aqui, vive uma resposta e morre.
+     *
+     * @return array<string, string|null>
+     */
+    private function avisoDaAcao(Request $request): array
+    {
+        $sessao = $request->hasSession() ? $request->session() : null;
+
+        return [
+            'sucesso' => $sessao?->get('sucesso'),
+            'erro' => $sessao?->get('erro'),
+            'id' => (string) Str::uuid(),
+        ];
     }
 }

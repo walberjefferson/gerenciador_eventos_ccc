@@ -85,9 +85,12 @@ class AcaoInscricaoController extends Controller
                 (string) $pedido->string('observacao'),
             );
         } catch (ConfirmacaoManualRecusadaException $recusa) {
-            // A recusa e uma resposta de negocio, nao um defeito: volta para o
-            // campo do formulario, em portugues, como qualquer outro erro.
-            return back()->withErrors(['observacao' => $recusa->getMessage()]);
+            // A recusa e uma resposta de negocio, nao um defeito — e tambem nao
+            // e erro de campo: "esta inscricao ja expirou" nao e culpa do que
+            // foi digitado na observacao, e pendurar a frase la mandava a
+            // pessoa corrigir um texto que estava certo. Ela volta como aviso
+            // da acao, em portugues, e a tela mostra como aviso rapido.
+            return back()->with('erro', $recusa->getMessage());
         }
 
         if (! $confirmou) {

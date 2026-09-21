@@ -11,6 +11,20 @@ export interface Auth {
     permissoes: string[];
 }
 
+/**
+ * O aviso deixado pela acao anterior, compartilhado em toda resposta.
+ *
+ * `id` e descartavel: muda a cada resposta do servidor so para que a moldura
+ * perceba um aviso NOVO mesmo quando a frase e identica a anterior — duas
+ * inscricoes canceladas em sequencia produzem o mesmo texto, e um aviso rapido
+ * que so olhasse o texto nao apareceria na segunda vez.
+ */
+export interface AvisoDoServidor {
+    sucesso: string | null;
+    erro: string | null;
+    id: string;
+}
+
 export interface BreadcrumbItem {
     title: string;
     href: string;
@@ -33,6 +47,7 @@ export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
+    flash: AvisoDoServidor;
     ziggy: {
         location: string;
         url: string;

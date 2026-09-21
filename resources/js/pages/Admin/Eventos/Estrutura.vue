@@ -577,7 +577,11 @@ function escolhas(grupo: GrupoDaEstrutura): string {
         :titulo="`Programação de ${props.evento.nome}`"
         descricao="Os dias do evento, os grupos de escolha de cada dia, as atividades de cada grupo e os pares que ninguém pode escolher junto. Nada aqui é apagado quando alguém já escolheu: desative em vez de excluir."
     >
-        <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">{{ props.sucesso }}</p>
+        <!-- O texto continua aqui para quem voltar à tela depois; quem
+             anuncia a ação recém-feita é o aviso rápido da moldura, e por
+             isso este parágrafo não é mais uma região viva: senão o leitor
+             de tela ouviria a mesma frase duas vezes. -->
+        <p v-if="props.sucesso" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">{{ props.sucesso }}</p>
 
         <p v-if="erroDeExclusao" role="alert" class="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-4 py-2 text-sm">
             {{ erroDeExclusao }}
