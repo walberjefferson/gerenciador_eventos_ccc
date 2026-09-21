@@ -2,7 +2,7 @@
 import DialogoDeAcao from '@/components/admin/DialogoDeAcao.vue';
 import EtiquetaDeSituacao from '@/components/admin/EtiquetaDeSituacao.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import type { AtividadeEscolhida, CobrancaDaFicha, FichaDaInscricao, OpcaoDeSituacao } from '@/types/admin';
+import type { AtividadeEscolhida, CobrancaDaFicha, FichaDaInscricao, IngressoDaFicha, OpcaoDeSituacao } from '@/types/admin';
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -25,6 +25,12 @@ const props = defineProps<{
     metodos_manuais: OpcaoDeSituacao[];
     pode_cancelar: boolean;
     pode_confirmar_manualmente: boolean;
+    pode_editar: boolean;
+    pode_reenviar: boolean;
+    /** O que faz sentido reenviar nesta situação. Vem do servidor (RN-A2). */
+    reenvios: OpcaoDeSituacao[];
+    /** Só existe para inscrição confirmada que já teve ingresso emitido. */
+    ingresso: IngressoDaFicha | null;
     sucesso: string | null;
 }>();
 
@@ -37,7 +43,16 @@ const formularioConfirmacao = useForm({
     observacao: '',
 });
 
+const formularioReenvio = useForm({ tipo: props.reenvios[0]?.valor ?? '' });
+
 const podeCancelarAgora = computed(() => props.pode_cancelar && props.inscricao.esta_ativa);
+
+/**
+ * Reenviar só aparece quando há permissão E há alguma mensagem que caiba na
+ * situação de agora. Inscrição sem e-mail não oferece nenhuma: a lista chega
+ * vazia do servidor, e não há o que escolher.
+ */
+const podeReenviarAgora = computed(() => props.pode_reenviar && props.reenvios.length > 0);
 const podeConfirmarAgora = computed(() => props.pode_confirmar_manualmente && props.inscricao.situacao === 'aguardando_pagamento');
 
 const avisoDoCancelamento = computed(() =>
@@ -80,6 +95,17 @@ function cancelar(): void {
     });
 }
 
+/**
+ * O reenvio é um ato deliberado de gente, e por isso não passa pela trava que
+ * impede a automação de mandar duas vezes: quem clica aqui está pedindo
+ * justamente a segunda cópia.
+ */
+function reenviar(): void {
+    formularioReenvio.post(route('admin.inscricoes.reenviar', { inscricao: props.inscricao.id }), {
+        preserveScroll: true,
+    });
+}
+
 function confirmarPagamento(): void {
     formularioConfirmacao.post(route('admin.inscricoes.confirmar-pagamento', { inscricao: props.inscricao.id }), {
         preserveScroll: true,
@@ -98,12 +124,25 @@ function confirmarPagamento(): void {
     >
         <p v-if="props.sucesso" role="status" class="border-border bg-muted/40 rounded-md border px-4 py-2 text-sm">{{ props.sucesso }}</p>
 
-        <div>
+        <div class="flex flex-wrap gap-3">
             <Link
                 :href="route('admin.inscricoes.index')"
                 class="border-border focus-visible:ring-ring inline-flex h-10 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             >
                 Voltar para a lista
+            </Link>
+
+            <!-- Corrigir o cadastro é a ação mais comum desta tela, e por isso
+                 ela fica aqui em cima, junto da navegação: quem abriu a ficha
+                 por causa de um nome errado não deveria precisar rolar até o
+                 fim para consertá-lo. -->
+            <Link
+                v-if="props.pode_editar"
+                :href="route('admin.inscricoes.edit', { inscricao: props.inscricao.id })"
+                data-testid="editar-inscricao"
+                class="border-acao text-acao-texto hover:bg-secondary focus-visible:ring-ring inline-flex h-10 items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+            >
+                Editar inscrição
             </Link>
         </div>
 
@@ -174,6 +213,47 @@ function confirmarPagamento(): void {
             </ul>
         </section>
 
+        <!-- O ingresso só existe para quem está confirmado: a prop chega nula
+             em qualquer outra situação, e a seção inteira some junto. -->
+        <section v-if="props.ingresso" aria-labelledby="titulo-ingresso" class="border-border grid gap-3 rounded-lg border p-4">
+            <h2 id="titulo-ingresso" class="text-lg font-semibold">Ingresso</h2>
+
+            <div class="flex flex-wrap items-start gap-4">
+                <!-- O desenho vem pronto do servidor, em SVG, como na tela do
+                     participante: aparece mesmo com a rede ruim e não depende
+                     de biblioteca nenhuma no navegador. -->
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div
+                    class="border-border w-40 shrink-0 rounded-lg border bg-white p-2 [&>svg]:h-auto [&>svg]:w-full"
+                    data-testid="qr-do-ingresso"
+                    v-html="props.ingresso.qr"
+                />
+
+                <div class="grid gap-2">
+                    <div>
+                        <p class="text-muted-foreground text-sm">Código do ingresso</p>
+                        <p class="font-mono text-lg font-semibold tracking-widest" data-testid="codigo-do-ingresso">
+                            {{ props.ingresso.codigo_formatado }}
+                        </p>
+                    </div>
+
+                    <!-- Link comum, e não navegação do Inertia: o destino é um
+                         arquivo para baixar, não uma tela. -->
+                    <a
+                        :href="props.ingresso.url_pdf"
+                        data-testid="baixar-ingresso"
+                        class="border-border focus-visible:ring-ring inline-flex h-10 w-fit items-center rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        Baixar o ingresso em PDF
+                    </a>
+
+                    <p class="text-muted-foreground max-w-prose text-sm">
+                        Serve para quem está no balcão com a pessoa na frente. Na entrada, a portaria lê este mesmo código.
+                    </p>
+                </div>
+            </div>
+        </section>
+
         <section aria-labelledby="titulo-cobrancas" class="border-border grid gap-3 rounded-lg border p-4">
             <h2 id="titulo-cobrancas" class="text-lg font-semibold">Histórico da cobrança</h2>
 
@@ -239,8 +319,8 @@ function confirmarPagamento(): void {
             <h2 id="titulo-acoes" class="text-lg font-semibold">Ações</h2>
 
             <p class="text-muted-foreground max-w-3xl text-sm">
-                As duas ações ficam registradas com o motivo que você escrever. Cancelar devolve a vaga na hora — inclusive as vagas das atividades
-                escolhidas.
+                Cancelar e confirmar ficam registradas com o motivo que você escrever. Cancelar devolve a vaga na hora — inclusive as vagas das
+                atividades escolhidas.
             </p>
 
             <div class="flex flex-wrap gap-3">
@@ -264,10 +344,46 @@ function confirmarPagamento(): void {
                     Confirmar pagamento recebido
                 </button>
 
-                <p v-if="!podeCancelarAgora && !podeConfirmarAgora" class="text-muted-foreground text-sm">
+                <p v-if="!podeCancelarAgora && !podeConfirmarAgora && !podeReenviarAgora" class="text-muted-foreground text-sm">
                     Nenhuma ação disponível para esta inscrição.
                 </p>
             </div>
+
+            <!-- Reenviar é ato deliberado de gente: a automação já mandou uma
+                 vez e a trava dela existe para não mandar duas. Aqui a segunda
+                 cópia é exatamente o que se está pedindo. -->
+            <form v-if="podeReenviarAgora" class="border-border grid gap-3 border-t pt-4 md:max-w-xl" @submit.prevent="reenviar">
+                <h3 class="text-base font-medium">Reenviar uma mensagem</h3>
+
+                <div class="flex flex-col gap-1">
+                    <label for="tipo-reenvio" class="text-sm font-medium">Qual mensagem</label>
+                    <select
+                        id="tipo-reenvio"
+                        v-model="formularioReenvio.tipo"
+                        data-testid="tipo-de-reenvio"
+                        :aria-describedby="formularioReenvio.errors.tipo ? 'erro-tipo-reenvio' : 'ajuda-tipo-reenvio'"
+                        :aria-invalid="formularioReenvio.errors.tipo ? true : undefined"
+                        class="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        <option v-for="reenvio in props.reenvios" :key="reenvio.valor" :value="reenvio.valor">{{ reenvio.rotulo }}</option>
+                    </select>
+                    <p id="ajuda-tipo-reenvio" class="text-muted-foreground text-sm">
+                        Vai para {{ props.inscricao.email }}, que é o e-mail cadastrado nesta inscrição agora.
+                    </p>
+                    <p v-if="formularioReenvio.errors.tipo" id="erro-tipo-reenvio" role="alert" class="text-destructive text-sm">
+                        {{ formularioReenvio.errors.tipo }}
+                    </p>
+                </div>
+
+                <button
+                    type="submit"
+                    :disabled="formularioReenvio.processing"
+                    data-testid="reenviar-mensagem"
+                    class="border-border focus-visible:ring-ring h-10 w-fit rounded-md border px-4 text-sm focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-60"
+                >
+                    Reenviar
+                </button>
+            </form>
         </section>
 
         <DialogoDeAcao

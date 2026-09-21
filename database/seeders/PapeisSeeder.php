@@ -77,6 +77,23 @@ class PapeisSeeder extends Seeder
         'inscricoes.ver' => 'Consultar a lista de inscricoes',
         'inscricoes.exportar' => 'Baixar a lista de inscricoes',
         'inscricoes.cancelar' => 'Cancelar a inscricao de outra pessoa',
+        // As duas de baixo ficam DENTRO do organizador (nao entram em
+        // FORA_DO_ORGANIZADOR) e FORA da portaria e do responsavel de setor,
+        // cujas listas sao explicitas e nao mudam.
+        //
+        // Consertar cadastro errado e reenviar mensagem sao o trabalho diario
+        // de quem organiza o evento: o nome que chegou com erro de digitacao, o
+        // e-mail trocado, a atividade escolhida por engano, o comprovante que a
+        // pessoa jura nao ter recebido. Deixar isso so com o administrador
+        // faria cada correcao esperar por ele — e o engano que mais aparece e o
+        // da vespera do evento.
+        //
+        // Nenhuma das duas mexe em dinheiro nem em quem entra no sistema, que e
+        // o criterio que mantem uma permissao longe do organizador. Editar
+        // tambem nao cria nem apaga inscricao: alterar o CPF esta fora do
+        // formulario, e a situacao continua mudando so pelas acoes proprias.
+        'inscricoes.editar' => 'Alterar os dados de uma inscricao ja criada',
+        'inscricoes.reenviar-comunicacao' => 'Reenviar ao participante uma mensagem da inscricao dele',
         'pagamentos.confirmar-manual' => 'Declarar na mao que um pagamento entrou',
         'pagamentos.conferir-comprovante' => 'Conferir o comprovante enviado por quem se inscreveu no proprio setor',
         'usuarios.gerenciar' => 'Criar e ajustar contas administrativas',

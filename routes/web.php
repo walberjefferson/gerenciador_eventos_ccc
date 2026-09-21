@@ -263,7 +263,41 @@ Route::middleware(['auth', 'verified'])
                     ->middleware('permission:inscricoes.exportar')
                     ->name('exportar');
 
+                // Antes da rota de um segmento so, pela mesma razao de
+                // "exportar": o Laravel casa na ordem em que se declara.
+                Route::get('{inscricao}/editar', [InscricaoAdminController::class, 'edit'])
+                    ->middleware('permission:inscricoes.editar')
+                    ->name('edit');
+
                 Route::get('{inscricao}', [InscricaoAdminController::class, 'show'])->name('show');
+
+                // Corrigir o cadastro de quem ja se inscreveu. O CPF nao entra
+                // aqui: trocar o documento mexeria na chave que impede a mesma
+                // pessoa de se inscrever duas vezes no mesmo evento, e isso e
+                // outro assunto.
+                Route::put('{inscricao}', [InscricaoAdminController::class, 'update'])
+                    ->middleware('permission:inscricoes.editar')
+                    ->name('update');
+
+                // Reenviar uma mensagem que a pessoa diz nao ter recebido.
+                //
+                // Leva throttle porque e a unica acao do painel que faz sair
+                // e-mail para fora por um clique: sem teto, um dedo preso no
+                // botao vira uma dezena de copias na caixa de alguem — e o
+                // provedor de envio trata isso como o que parece ser. O teto e
+                // alto para gente e baixo para engano: vinte por minuto cobre
+                // qualquer mutirao de secretaria.
+                Route::post('{inscricao}/reenviar', [AcaoInscricaoController::class, 'reenviarComunicacao'])
+                    ->middleware(['permission:inscricoes.reenviar-comunicacao', 'throttle:20,1'])
+                    ->name('reenviar');
+
+                // O ingresso em PDF, entregue pelo painel — para quem esta no
+                // balcao com a pessoa na frente, sem o link assinado em maos.
+                // Fica sob "inscricoes.ver" (a permissao do grupo) mais o
+                // alcance de setor que a policy cobra: quem pode abrir a ficha
+                // pode imprimir o ingresso dela.
+                Route::get('{inscricao}/ingresso', [AcaoInscricaoController::class, 'ingresso'])
+                    ->name('ingresso');
 
                 // Cancelar devolve vaga; confirmar na mao declara que entrou
                 // dinheiro. Cada uma cobra a sua propria permissao, e a

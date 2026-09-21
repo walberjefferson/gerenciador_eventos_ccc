@@ -603,3 +603,95 @@ export interface EscopoDaFilaDeComprovantes {
     recortado_por_setor: boolean;
     setores: string[];
 }
+
+/* ----------------------------------------------- edição de uma inscrição --- */
+
+/**
+ * A inscrição aberta no formulário de correção.
+ *
+ * **Sem CPF**, como a ficha: o documento fica cifrado e não é corrigível por
+ * aqui. Sem evento, lote nem valor pelo mesmo motivo — nada disso é cadastro.
+ */
+export interface InscricaoEmEdicao {
+    id: number;
+    codigo_publico: string;
+    nome_completo: string;
+    email: string;
+    telefone: string | null;
+    /** Em ISO (AAAA-MM-DD). Nulo só nas inscrições antigas. */
+    data_nascimento: string | null;
+    sexo: string | null;
+    grupo_participante_id: number;
+    evento: string;
+    situacao: string;
+    situacao_rotulo: string;
+    /** Se esta inscrição tem vaga presa: só então trocar de atividade move contador (RN-E3). */
+    move_vagas: boolean;
+    /** Ids das atividades escolhidas hoje. */
+    atividades: number[];
+}
+
+/**
+ * Um grupo de participantes na lista de escolha.
+ *
+ * O `cidade_id` viaja junto porque a tela escolhe o SETOR primeiro e só então
+ * o grupo: é por ele que a segunda lista se reduz à primeira.
+ */
+export interface OpcaoDeGrupoParticipante {
+    id: number;
+    nome: string;
+    cidade_id: number | null;
+}
+
+/** Um setor na lista de escolha. */
+export interface OpcaoDeSetor {
+    id: number;
+    nome: string;
+}
+
+/** Uma atividade que o formulário de correção oferece. */
+export interface AtividadeParaEscolha {
+    id: number;
+    nome: string;
+    /** Nulos quando a atividade ocupa o dia inteiro. */
+    comeca_em: string | null;
+    termina_em: string | null;
+    capacidade: number | null;
+    vagas_ocupadas: number;
+    idade_minima: number | null;
+    idade_maxima: number | null;
+    /** A atividade, o grupo e o dia precisam estar os três de pé. */
+    ativa: boolean;
+    escolhida: boolean;
+}
+
+/** Um bloco de escolha, com a regra que o validador vai cobrar. */
+export interface GrupoParaEscolha {
+    id: number;
+    nome: string;
+    obrigatorio: boolean;
+    min_selecoes: number;
+    max_selecoes: number | null;
+    atividades: AtividadeParaEscolha[];
+}
+
+/** Um dia da programação, com os blocos dele. */
+export interface DiaParaEscolha {
+    id: number;
+    nome: string;
+    data: string;
+    ativo: boolean;
+    grupos: GrupoParaEscolha[];
+}
+
+/**
+ * O ingresso na ficha administrativa.
+ *
+ * O QR chega pronto do servidor, em SVG — como na tela do participante.
+ * Só existe para inscrição confirmada que já teve ingresso emitido.
+ */
+export interface IngressoDaFicha {
+    codigo_formatado: string;
+    qr: string;
+    url_pdf: string;
+}
